@@ -26,7 +26,7 @@ from mnms.io.graph import load_graph, save_graph
 gtfs_path = "lyon_tcl.zip" # gtfs zip folder
 mnms_json_filepath = "lyon_roads.json" # mlgraph with the road network only
 
-mlgraph_dump_file = "lyon_mnms_gtfs_bus_tram_metro.json"
+mlgraph_dump_file = "lyon_mnms_restricted_gtfs_bus_tram_metro.json"
 
 # Default speeds
 traditional_vehs_default_speed = 13.8 # m/s
@@ -552,20 +552,19 @@ list_bus_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, fe
 mnms_graph = load_graph(mnms_json_filepath)
 roads = mnms_graph.roads
 
-
-### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
-pt_lines = list_tram_lines + list_metro_lines
-pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines)
-
-register_pt_lines(pt_lines, pt_lines_types)
-
-
+# Buses before trams and subways
 ### Add the nodes ands stops related to each map matched PT line to the roadDescriptor
 filtered_bus_lines = filter_line(roads.sections, list_bus_lines)
 map_match_bus_line_type = ['BUS'] * len(filtered_bus_lines)
 
 bus_lines_map_match_sections = register_map_match_pt_lines(filtered_bus_lines, map_match_bus_line_type, 'BUS_')
 
+
+### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
+pt_lines = list_tram_lines + list_metro_lines
+pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines)
+
+register_pt_lines(pt_lines, pt_lines_types)
 
 ### Overwrite the roads zoning with a new zoning including all sections
 roads.add_zone(generate_one_zone("RES", roads))
