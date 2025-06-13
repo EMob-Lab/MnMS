@@ -120,6 +120,24 @@ def identify_final_sections(deadends):
 
     return final_sections
 
+# Identify and return a list of duplicate sections (all duplicates except original)
+def identify_duplicate_sections(sections):
+    duplicates = []
+    seen_pairs = {}
+
+    for id, section in sections.items():
+        id_section = section["id"]
+        upnode = section["upstream"]
+        downnode = section["downstream"]
+        pair = (upnode, downnode)
+
+        if pair in seen_pairs:
+            duplicates.append(id_section)
+        else:
+            seen_pairs[pair] = id_section
+
+    return duplicates
+
 
 def compute_centralities(roads):
     nodes = roads.get("NODES")
@@ -169,6 +187,7 @@ def analyze_roads(roads):
     springs = identify_springs(df_adj)
     isolates = [value for value in deadends if value in springs]
     final_sections = identify_final_sections(list(deadends))
+    duplicate_sections = identify_duplicate_sections(sections)
 
     print(f"Number of Dead-ends: {len(deadends)}")
     #print(list(deadends))
@@ -181,6 +200,9 @@ def analyze_roads(roads):
 
     print((f"Number of Final sections: {len(final_sections)}"))
     #print(final_sections)
+
+    print((f"Number of Duplicate sections: {len(duplicate_sections)}"))
+    print(duplicate_sections)
 
 
 def analyze_bus(layers):
@@ -369,8 +391,8 @@ if __name__ == "__main__":
         valid = validate_roads(roads)
 
     if valid:
-        # analyze_roads(roads)
-        analyze_bus(layers)
+        analyze_roads(roads)
+        # analyze_bus(layers)
 
         # centralities = compute_centralities(roads)
         # print(f"Node with maximum centrality degree : {max(centralities, key=centralities.get)} = {max(centralities.values())}")
