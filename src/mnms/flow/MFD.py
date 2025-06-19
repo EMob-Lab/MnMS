@@ -71,6 +71,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
         self.dict_accumulations: Optional[Dict] = None
         self.dict_speeds: Optional[Dict] = None
+        self.dict_flows: Optional[Dict] = None
 
         self.veh_manager: Optional[VehicleManager] = None
         self.graph_nodes: Optional[Dict] = None
@@ -146,9 +147,13 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         # Other initializations
         self.dict_accumulations = {}
         self.dict_speeds = {}
+        self.dict_flows = {}
+
         for res in self.reservoirs.values():
             self.dict_accumulations[res.id] = res.dict_accumulations
             self.dict_speeds[res.id] = res.dict_speeds
+            self.dict_flows[res.id] = res.dict_flows
+
         self.dict_accumulations[None] = {m: 0 for r in self.reservoirs.values() for m in r.modes} | {None: 0}
         self.dict_speeds[None] = {m: 0 for r in self.reservoirs.values() for m in r.modes} | {None: 0}
 
@@ -199,6 +204,13 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         dist_travelled = dt*speed
 
         if dist_travelled > veh.remaining_link_length:
+
+            res_id = self.get_vehicle_zone(veh)
+            sids = self.get_crossed_links(veh)
+            for sid in sids:
+                self.dict_flows[res_id][sid]=self.dict_flows[res_id][sid]+1./dt
+                #print(sid, self.dict_flows[res_id][sid])
+
             dist_travelled = veh.remaining_link_length
             elapsed_time = dist_travelled / speed
             veh.update_distance(dist_travelled)
@@ -217,6 +229,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                     elapsed_time = dt
             for passenger_id, passenger in veh.passengers.items():
                 passenger.set_position(veh._current_link, veh._current_node, veh.remaining_link_length, veh.position, tcurrent)
+
             return elapsed_time
         else:
             veh._remaining_link_length -= dist_travelled
@@ -255,6 +268,11 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
         return res_id
 
+    def get_crossed_links(self, veh):
+        unode, dnode = veh.current_link
+        curr_link = self.graph_nodes[unode].adj[dnode]
+        return self._graph.map_reference_links[curr_link.id]
+
     def step(self, dt: Dt):
 
         log.info(f'MFD step {self._tcurrent}')
@@ -263,6 +281,11 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             ghost_acc = res.ghost_accumulation(self._tcurrent)
             for mode in res.modes:
                 res.dict_accumulations[mode] = ghost_acc.get(mode, 0)
+
+        # Reset flow rates for each section
+        for res in self.reservoirs.values():
+            for section in res.zone.sections:
+                res.dict_flows[section] = 0.
 
         while self.veh_manager.has_new_vehicles:
             new_veh = self.veh_manager._new_vehicles.pop()
@@ -305,6 +328,19 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             new_time = self._tcurrent.add_time(dt)
             veh.notify(new_time)
             veh.notify_passengers(new_time)
+
+        # Save flow rates for each section
+        sflowfile = 'flow_sections_' + str(self._tcurrent) + '.csv'
+        with open(sflowfile, mode='w') as flow_file:
+            flow_writer = csv.writer(flow_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+            for res in self.reservoirs.values():
+                for section in res.zone.sections:
+                    row = [res.id,section,res.dict_flows[section]]
+                    flow_writer.writerow(row)
+
+            flow_file.close()
+
 
     def update_reservoir_speed(self, res, dict_accumulations):
         res.update_accumulations(dict_accumulations)

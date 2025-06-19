@@ -22,6 +22,7 @@ class AbstractReservoir(ABC):
         self.modes = modes
         self.dict_accumulations = defaultdict(lambda: 0)
         self.dict_speeds = defaultdict(lambda: 0.)
+        self.dict_flows = defaultdict(lambda:0.)        # Flow per section
 
         self.ghost_accumulation: Callable[[Time], Dict[str, float]] = lambda x: {}
 
