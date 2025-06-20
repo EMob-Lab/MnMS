@@ -208,7 +208,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             res_id = self.get_vehicle_zone(veh)
             sids = self.get_crossed_links(veh)
             for sid in sids:
-                self.dict_flows[res_id][sid]=self.dict_flows[res_id][sid]+1./dt
+                self.dict_flows[res_id][sid]+=1
                 #print(sid, self.dict_flows[res_id][sid])
 
             dist_travelled = veh.remaining_link_length
@@ -329,17 +329,22 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             veh.notify(new_time)
             veh.notify_passengers(new_time)
 
+        # Terminate flow rates for each section
+        for res in self.reservoirs.values():
+            for section in res.zone.sections:
+                res.dict_flows[section] = res.dict_flows[section] / dt.to_seconds()
+
         # Save flow rates for each section
-        sflowfile = 'flow_sections_' + str(self._tcurrent) + '.csv'
-        with open(sflowfile, mode='w') as flow_file:
-            flow_writer = csv.writer(flow_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-
-            for res in self.reservoirs.values():
-                for section in res.zone.sections:
-                    row = [res.id,section,res.dict_flows[section]]
-                    flow_writer.writerow(row)
-
-            flow_file.close()
+        # sflowfile = 'flow_sections' + '.csv'
+        # with open(sflowfile, mode='a') as flow_file:
+        #     flow_writer = csv.writer(flow_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        #
+        #     for res in self.reservoirs.values():
+        #         for section in res.zone.sections:
+        #             row = [self._tcurrent,res.id,section,res.dict_flows[section]]
+        #             flow_writer.writerow(row)
+        #
+        #     flow_file.close()
 
 
     def update_reservoir_speed(self, res, dict_accumulations):
