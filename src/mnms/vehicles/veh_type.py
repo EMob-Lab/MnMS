@@ -221,7 +221,7 @@ class VehicleActivityServing(VehicleActivity):
         else:
             unode = veh._current_node
         next_node_ind = self.user.get_node_index_in_path(unode, last_achieved=last_achieved) + 1
-        self.user.set_position((unode, upath[next_node_ind]), unode, 0, veh.position, tcurrent)
+        self.user.set_position((unode, upath[min(next_node_ind, len(upath)-1)]), unode, 0, veh.position, tcurrent)
         self.user.update_achieved_path_ms(veh.mobility_service)
         self.user.vehicle = None
         # self.user.notify(tcurrent)
