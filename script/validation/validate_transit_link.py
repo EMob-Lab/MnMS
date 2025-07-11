@@ -5,10 +5,11 @@ import json
 from statistics import mean, median
 from matplotlib import pyplot as plt
 
+# Placeholder for transit links validation (currently not implemented)
 def validate_transit_links():
     transit_links = "TODO"
 
-
+# Analyze the basic statistics (count, min, max, mean, median) of transit link lengths
 def analyze_transit_links(tlinks):
     tl_length = []
 
@@ -21,24 +22,27 @@ def analyze_transit_links(tlinks):
     print(f"Mean length of transit link : {mean(tl_length)}")
     print(f"Median length of transit link : {median(tl_length)}")
 
-
+# Visualize transit links on top of the road network nodes
 def visualize_transit_links(tlinks, roads, origins, destinations):
     nodes = roads.get("NODES")
 
     fig_nodes = plt.figure("Transit Links", figsize=(20, 12))
     fig_nodes.suptitle("Transit Links")
 
+    # Plot all road nodes in grey
     for id, node in nodes.items():
         x = float(node["position"][0])
         y = float(node["position"][1])
         plt.scatter(x, y, color="grey", s=1)
 
+    # Draw each transit link in red
     for tlink in tlinks:
         upnode = str(tlink["UPSTREAM"])
         downnode = str(tlink["DOWNSTREAM"])
 
         xu, yu, xd, yd = 0, 0, 0, 0
 
+        # Handle upstream node position (either ORIGIN or normal node)
         if upnode.startswith("ORIGIN"):
             for id, origin in origins.items():
                 if id == upnode:
@@ -50,6 +54,7 @@ def visualize_transit_links(tlinks, roads, origins, destinations):
                     xu = float(node["position"][0])
                     yu = float(node["position"][1])
 
+        # Handle downstream node position (either DESTINATION or normal node)
         if downnode.startswith("DESTINATION"):
             for id, destination in destinations.items():
                 if id == downnode:
@@ -61,10 +66,11 @@ def visualize_transit_links(tlinks, roads, origins, destinations):
                     xd = float(node["position"][0])
                     yd = float(node["position"][1])
 
+        # Only plot the link if both endpoints have valid coordinates
         if xu != 0 and yu != 0 and xd != 0 and yd != 0:
             plt.plot([xu, xd], [yu, yd], color="red")
 
-
+# Read and parse a JSON file into a Python object
 def extract_file(file):
     json_file = open(file)
     network = json.load(json_file)
@@ -72,14 +78,14 @@ def extract_file(file):
 
     return network
 
-
+# Custom argparse type to ensure file exists
 def _path_file_type(path):
     if os.path.isfile(path):
         return path
     else:
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
-
+# Main entry point: Load data, analyze, and visualize if required
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate a JSON transit_link file for MnMS")
     parser.add_argument('transit_link_file', type=_path_file_type, help='Path to the transit_link JSON file')
@@ -89,6 +95,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Extract data from JSON files
     transit_links = extract_file(args.transit_link_file)
     tlinks = transit_links.get("LINKS")
 
@@ -99,8 +106,10 @@ if __name__ == "__main__":
     origins = odlayer.get("ORIGINS")
     destinations = odlayer.get("DESTINATIONS")
 
+    # Perform analysis
     analyze_transit_links(tlinks)
 
+    # Visualize if requested
     if args.visualize:
         visualize_transit_links(tlinks, roads, origins, destinations)
         plt.show()
