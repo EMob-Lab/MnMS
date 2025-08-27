@@ -195,11 +195,11 @@ def analyze_roads(roads):
     sections = roads.get("SECTIONS")
     zones = roads.get("ZONES")
 
-    sections_length = []
+    sections_length = {}
 
     # Collect lengths of all sections
     for id, section in sections.items():
-        sections_length.append(section["length"])
+        sections_length[id] = section["length"]
 
     # Print summary statistics about network
     print(f"Number of nodes : {len(nodes)}")
@@ -208,10 +208,13 @@ def analyze_roads(roads):
     print(f"Number of zones : {len(zones)}")
     print(f"Number of sections per zone : {len(sections) / len(zones)}")
 
-    print(f"Min length of section : {min(sections_length)}")
-    print(f"Max length of section : {max(sections_length)}")
-    print(f"Mean length of section : {mean(sections_length)}")
-    print(f"Median length of section : {median(sections_length)}")
+    min_length = min(sections_length.values())
+    print(f"Min length of section : {min_length} for sections : {[k for k, v in sections_length.items() if v == min_length]}")
+    max_length = max(sections_length.values())
+    print(f"Max length of section : {max_length} for sections : {[k for k, v in sections_length.items() if v == max_length]}")
+
+    print(f"Mean length of section : {mean(sections_length.values())}")
+    print(f"Median length of section : {median(sections_length.values())}")
 
     print(f"Connectivity index : {len(sections) / len(nodes)}")
 
