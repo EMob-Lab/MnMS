@@ -1,5 +1,7 @@
 # Analyze scripts
 
+This repository contains Python scripts for analyzing MnMS output files.
+
 ---
 
 ## Path output file
@@ -27,6 +29,8 @@ completeness of the paths.
 python analyze_path_output.py path.csv
 ````
 
+- `path_file` – Path to the path output CSV file (semicolon-separated).
+
 ---
 
 ## User output file
@@ -52,3 +56,5 @@ and missing information.
 ````bash 
 python analyze_user_output.py user.csv
 ````
+
+- `user_file` – Path to the user output CSV file (semicolon-separated).
