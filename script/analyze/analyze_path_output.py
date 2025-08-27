@@ -58,7 +58,7 @@ def _path_file_type(path):
 # Main entry point of the script
 if __name__ == "__main__":
     # Setup command-line argument parser
-    parser = argparse.ArgumentParser(description="Validate a CSV path output file for MnMS")
+    parser = argparse.ArgumentParser(description="Analyze a CSV path output file for MnMS")
     parser.add_argument("path_file", type=_path_file_type, help="Path to the path output csv file")
 
     # Parse command-line arguments
