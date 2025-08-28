@@ -48,7 +48,7 @@ pip install pyproj
 ### Usage example
 
 ````bash 
-python validate_network.py mnms_network.json --visualize True
+python visualize_folium.py mnms_network.json
 ````
 
 - `network_file` – Path to the MnMS network JSON file.
