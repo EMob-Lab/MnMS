@@ -1,3 +1,5 @@
+import os
+import argparse
 import json
 import folium
 from pyproj import Transformer, CRS
@@ -27,136 +29,155 @@ def extract_file(file):
     with open(file, "r") as json_file:
         return json.load(json_file)
 
-# Load the mobility network (GTFS-like format)
-mnms_network = extract_file("lyon_mnms_restricted_gtfs_bus_tram_metro.json")
+# Validates that the argument path is a valid file
+def _path_file_type(path):
+    """
+    Validates that the given path is a valid file.
+    """
+    if os.path.isfile(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
-# Extract relevant sections of the data
-roads = mnms_network.get("ROADS")
-layers = mnms_network.get("LAYERS")
-stops = roads.get("STOPS")
-sections = roads.get("SECTIONS")
 
-# -----------------------------------
-# Map Setup with Folium
-# -----------------------------------
+# --------------------------- Entry Point ---------------------------
 
-# Initialize Folium map centered on Lyon, France
-m = folium.Map(location=[45.75, 4.85], zoom_start=12, tiles='cartodbpositron')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Visualize an MnMS network file with folium")
+    parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
 
-# Appearance configuration for different vehicle types
-radius_map = {
-    "mnms.vehicles.veh_type.Metro": 5,
-    "mnms.vehicles.veh_type.Tram": 3,
-    "mnms.vehicles.veh_type.Bus": 1
-}
+    args = parser.parse_args()
 
-color_map = {
-    "mnms.vehicles.veh_type.Metro": "#ff0000",   # Red
-    "mnms.vehicles.veh_type.Tram": "#a600ff",    # Purple
-    "mnms.vehicles.veh_type.Bus": "#10b400"      # Green
-}
+    # Load the mobility network (GTFS-like format)
+    mnms_network = extract_file(args.network_file)
 
-weight_map = {
-    "mnms.vehicles.veh_type.Metro": 5,
-    "mnms.vehicles.veh_type.Tram": 3,
-    "mnms.vehicles.veh_type.Bus": 1
-}
+    # Extract relevant sections of the data
+    roads = mnms_network.get("ROADS")
+    layers = mnms_network.get("LAYERS")
+    stops = roads.get("STOPS")
+    sections = roads.get("SECTIONS")
 
-opacity_map = {
-    "mnms.vehicles.veh_type.Metro": 0.8,
-    "mnms.vehicles.veh_type.Tram": 0.5,
-    "mnms.vehicles.veh_type.Bus": 0.3
-}
+    # -----------------------------------
+    # Map Setup with Folium
+    # -----------------------------------
 
-# Track which stops have already been drawn to avoid duplicates
-plotted_stops = set()
+    # Initialize Folium map centered on Lyon, France
+    m = folium.Map(location=[45.75, 4.85], zoom_start=12, tiles='cartodbpositron')
 
-# -----------------------------------
-# Drawing Layers: Stops & Routes
-# -----------------------------------
+    # Appearance configuration for different vehicle types
+    radius_map = {
+        "mnms.vehicles.veh_type.Metro": 5,
+        "mnms.vehicles.veh_type.Tram": 3,
+        "mnms.vehicles.veh_type.Bus": 1
+    }
 
-# Loop through each transport mode layer (e.g. Metro, Bus, Tram)
-for layer in layers:
-    veh_type = layer["VEH_TYPE"]  # Full string like "mnms.vehicles.veh_type.Metro"
+    color_map = {
+        "mnms.vehicles.veh_type.Metro": "#ff0000",  # Red
+        "mnms.vehicles.veh_type.Tram": "#a600ff",  # Purple
+        "mnms.vehicles.veh_type.Bus": "#10b400"  # Green
+    }
 
-    # Visual styling for the current transport type
-    radius = radius_map.get(veh_type)
-    color = color_map.get(veh_type)
-    weight = weight_map.get(veh_type)
-    opacity = opacity_map.get(veh_type)
+    weight_map = {
+        "mnms.vehicles.veh_type.Metro": 5,
+        "mnms.vehicles.veh_type.Tram": 3,
+        "mnms.vehicles.veh_type.Bus": 1
+    }
 
-    mobility = veh_type.split('.')[-1]  # Extract "Metro", "Bus", or "Tram"
+    opacity_map = {
+        "mnms.vehicles.veh_type.Metro": 0.8,
+        "mnms.vehicles.veh_type.Tram": 0.5,
+        "mnms.vehicles.veh_type.Bus": 0.3
+    }
 
-    # Create a separate layer for this vehicle type
-    fg = folium.FeatureGroup(name=mobility, show=True).add_to(m)
+    # Track which stops have already been drawn to avoid duplicates
+    plotted_stops = set()
 
-    if color:
-        lines = layer["LINES"]
+    # -----------------------------------
+    # Drawing Layers: Stops & Routes
+    # -----------------------------------
 
-        # Loop through each line within this vehicle type
-        for line in lines:
-            line_stops = line["STOPS"]
+    # Loop through each transport mode layer (e.g. Metro, Bus, Tram)
+    for layer in layers:
+        veh_type = layer["VEH_TYPE"]  # Full string like "mnms.vehicles.veh_type.Metro"
 
-            # ---- Render Stops ----
-            for stop_id in line_stops:
-                stop = stops[stop_id]
-                if stop_id not in plotted_stops:
-                    y = float(stop["absolute_position"][1])
-                    x = float(stop["absolute_position"][0])
+        # Visual styling for the current transport type
+        radius = radius_map.get(veh_type)
+        color = color_map.get(veh_type)
+        weight = weight_map.get(veh_type)
+        opacity = opacity_map.get(veh_type)
 
-                    # Convert from Lambert 93 to WGS84
-                    lat, lon = convert_from_lambert(x, y)
+        mobility = veh_type.split('.')[-1]  # Extract "Metro", "Bus", or "Tram"
 
-                    # Draw stop as a CircleMarker
-                    folium.CircleMarker(
-                        location=[lat, lon],
-                        radius=radius,
-                        tooltip=f"{mobility}: {stop_id}",
-                        color=color,
-                        fill=True,
-                        fill_color=color,
-                        fill_opacity=0.9
-                    ).add_to(fg)
+        # Create a separate layer for this vehicle type
+        fg = folium.FeatureGroup(name=mobility, show=True).add_to(m)
 
-                    plotted_stops.add(stop_id)
+        if color:
+            lines = layer["LINES"]
 
-            # ---- Render Sections (Links between Stops) ----
-            for stop_id in line_stops:
-                stop = stops[stop_id]
-                sec_id = stop.get("section")  # Get associated section if available
+            # Loop through each line within this vehicle type
+            for line in lines:
+                line_stops = line["STOPS"]
 
-                if sec_id and sec_id in sections:
-                    sec = sections[sec_id]
-                    up_id = sec["upstream"]
-                    down_id = sec["downstream"]
+                # ---- Render Stops ----
+                for stop_id in line_stops:
+                    stop = stops[stop_id]
+                    if stop_id not in plotted_stops:
+                        y = float(stop["absolute_position"][1])
+                        x = float(stop["absolute_position"][0])
 
-                    # Make sure both ends of the section exist
-                    if up_id in stops and down_id in stops:
-                        up = stops[up_id]["absolute_position"]
-                        down = stops[down_id]["absolute_position"]
+                        # Convert from Lambert 93 to WGS84
+                        lat, lon = convert_from_lambert(x, y)
 
-                        # Convert endpoints from Lambert to WGS84
-                        up_0, up_1 = convert_from_lambert(up[0], up[1])
-                        down_0, down_1 = convert_from_lambert(down[0], down[1])
-
-                        # Draw the section as a line
-                        folium.PolyLine(
-                            locations=[
-                                [float(up_0), float(up_1)],
-                                [float(down_0), float(down_1)]
-                            ],
+                        # Draw stop as a CircleMarker
+                        folium.CircleMarker(
+                            location=[lat, lon],
+                            radius=radius,
+                            tooltip=f"{mobility}: {stop_id}",
                             color=color,
-                            weight=weight,
                             fill=True,
-                            opacity=opacity
+                            fill_color=color,
+                            fill_opacity=0.9
                         ).add_to(fg)
 
-# -----------------------------------
-# Final Map Rendering
-# -----------------------------------
+                        plotted_stops.add(stop_id)
 
-# Add layer control so user can toggle Metro/Bus/Tram layers
-folium.LayerControl().add_to(m)
+                # ---- Render Sections (Links between Stops) ----
+                for stop_id in line_stops:
+                    stop = stops[stop_id]
+                    sec_id = stop.get("section")  # Get associated section if available
 
-# Save map to HTML
-m.save("folium_test.html")
+                    if sec_id and sec_id in sections:
+                        sec = sections[sec_id]
+                        up_id = sec["upstream"]
+                        down_id = sec["downstream"]
+
+                        # Make sure both ends of the section exist
+                        if up_id in stops and down_id in stops:
+                            up = stops[up_id]["absolute_position"]
+                            down = stops[down_id]["absolute_position"]
+
+                            # Convert endpoints from Lambert to WGS84
+                            up_0, up_1 = convert_from_lambert(up[0], up[1])
+                            down_0, down_1 = convert_from_lambert(down[0], down[1])
+
+                            # Draw the section as a line
+                            folium.PolyLine(
+                                locations=[
+                                    [float(up_0), float(up_1)],
+                                    [float(down_0), float(down_1)]
+                                ],
+                                color=color,
+                                weight=weight,
+                                fill=True,
+                                opacity=opacity
+                            ).add_to(fg)
+
+    # -----------------------------------
+    # Final Map Rendering
+    # -----------------------------------
+
+    # Add layer control so user can toggle Metro/Bus/Tram layers
+    folium.LayerControl().add_to(m)
+
+    # Save map to HTML
+    m.save("folium_map.html")
