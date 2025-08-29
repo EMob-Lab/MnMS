@@ -4,19 +4,9 @@ import json
 import folium
 from pyproj import Transformer, CRS
 
-# -----------------------------------
-# Coordinate System Setup
-# -----------------------------------
-
-# Define source and target coordinate systems using EPSG codes
-lambert_93 = CRS("EPSG:2154")  # Lambert 93 (used in France)
-wgs84 = CRS("EPSG:4326")       # WGS84 (global latitude/longitude)
-
-# Create a transformer to convert Lambert 93 → WGS84
-transformer = Transformer.from_crs(lambert_93, wgs84, always_xy=True)
 
 # Function to convert Lambert 93 coordinates to WGS84 (lat, lon)
-def convert_from_lambert(x, y):
+def convert_from_lambert(transformer, x, y):
     lon, lat = transformer.transform(x, y)
     return lat, lon
 
@@ -40,11 +30,25 @@ def _path_file_type(path):
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
 
+# Helper function for output path (no need to exist)
+def _output_file_type(path):
+    """
+    Validates only the directory part of the path exists,
+    but allows the file itself to not exist yet.
+    """
+    directory = os.path.dirname(path) or "."
+    if os.path.isdir(directory):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
+
+
 # --------------------------- Entry Point ---------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualize an MnMS network file with folium")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
+    parser.add_argument('folium_html_file', type=_output_file_type, help='Path to the folium HTML visualization file')
 
     args = parser.parse_args()
 
@@ -93,6 +97,17 @@ if __name__ == "__main__":
     plotted_stops = set()
 
     # -----------------------------------
+    # Coordinate System Setup
+    # -----------------------------------
+
+    # Define source and target coordinate systems using EPSG codes
+    lambert_93 = CRS("EPSG:2154")  # Lambert 93 (used in France)
+    wgs84 = CRS("EPSG:4326")  # WGS84 (global latitude/longitude)
+
+    # Create a transformer to convert Lambert 93 → WGS84
+    transformer = Transformer.from_crs(lambert_93, wgs84, always_xy=True)
+
+    # -----------------------------------
     # Drawing Layers: Stops & Routes
     # -----------------------------------
 
@@ -126,7 +141,7 @@ if __name__ == "__main__":
                         x = float(stop["absolute_position"][0])
 
                         # Convert from Lambert 93 to WGS84
-                        lat, lon = convert_from_lambert(x, y)
+                        lat, lon = convert_from_lambert(transformer, x, y)
 
                         # Draw stop as a CircleMarker
                         folium.CircleMarker(
@@ -157,8 +172,8 @@ if __name__ == "__main__":
                             down = stops[down_id]["absolute_position"]
 
                             # Convert endpoints from Lambert to WGS84
-                            up_0, up_1 = convert_from_lambert(up[0], up[1])
-                            down_0, down_1 = convert_from_lambert(down[0], down[1])
+                            up_0, up_1 = convert_from_lambert(transformer, up[0], up[1])
+                            down_0, down_1 = convert_from_lambert(transformer, down[0], down[1])
 
                             # Draw the section as a line
                             folium.PolyLine(
@@ -180,4 +195,4 @@ if __name__ == "__main__":
     folium.LayerControl().add_to(m)
 
     # Save map to HTML
-    m.save("folium_map.html")
+    m.save(args.folium_html_file)
