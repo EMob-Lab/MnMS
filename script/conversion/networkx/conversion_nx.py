@@ -7,18 +7,6 @@ from networkx.readwrite import json_graph
 from mnms.io.graph import load_graph
 
 
-# Output filename for the converted NetworkX graph
-nx_dump_file = "lyon_mnms_nx.json"
-
-
-# Helper function to check if a file path is valid
-def _path_file_type(path):
-    if os.path.isfile(path):
-        return path
-    else:
-        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
-
-
 # Function to convert MnMS graph data into a NetworkX MultiDiGraph
 def generate_nx_graph(nodes, sections):
     # Create a directed multigraph (allows multiple edges between nodes)
@@ -42,11 +30,33 @@ def generate_nx_graph(nodes, sections):
     return nxgraph
 
 
+# Helper function to check if a file path is valid
+def _path_file_type(path):
+    if os.path.isfile(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
+
+
+# Helper function for output path (no need to exist)
+def _output_file_type(path):
+    """
+    Validates only the directory part of the path exists,
+    but allows the file itself to not exist yet.
+    """
+    directory = os.path.dirname(path) or "."
+    if os.path.isdir(directory):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
+
+
 # Entry point for the script
 if __name__ == "__main__":
     # Set up argument parser for command-line execution
     parser = argparse.ArgumentParser(description="Convert JSON MnMS network file to JSON NetworkX file")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
+    parser.add_argument("networkx_output_file", type=_output_file_type, help="Path to the NetworkX JSON output file (directory must exists)")
 
     args = parser.parse_args()
 
@@ -65,5 +75,5 @@ if __name__ == "__main__":
     nxdata = json_graph.node_link_data(nxgraph)
 
     # Write the JSON data to a file
-    with open(nx_dump_file, "w") as f:
+    with open(args.networkx_output_file, "w") as f:
         json.dump(nxdata, f, indent=2)
