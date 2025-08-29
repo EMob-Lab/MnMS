@@ -3,6 +3,8 @@
 ###############
 ### Imports ###
 ###############
+import os
+import argparse
 import networkx.exception
 import numpy as np
 import math
@@ -18,33 +20,6 @@ from mnms.mobility_service.public_transport import PublicTransportMobilityServic
 from mnms.time import TimeTable, Time
 from mnms.io.graph import load_graph, save_graph
 
-
-##################
-### Parameters ###
-##################
-
-gtfs_path = "lyon_tcl.zip" # gtfs zip folder
-mnms_json_filepath = "lyon_roads.json" # mlgraph with the road network only
-
-mlgraph_dump_file = "lyon_mnms_restricted_gtfs_bus_tram_metro.json"
-
-# Default speeds
-traditional_vehs_default_speed = 13.8 # m/s
-metro_default_speed = 15 # m/s
-tram_default_speed = 18 # m/s
-funicular_default_speed = 5 # m/s
-
-# Map match max distance
-mapmatch_dist = 50
-
-#################
-### Functions ###
-#################
-
-_norm = np.linalg.norm
-
-# choose here your final coordinates system (ex: Lyon/Symuvia = Lambert 93, International/Other = UTM)
-_convert_coords = gps_to_lambert93
 
 def cleanString(string):
 
@@ -531,75 +506,129 @@ def register_map_match_pt_lines(pt_lines, pt_lines_types, prefix_line_name):
     return lines_mm_sections_dict
 
 
-#################
-### Script ###
-#################
-
-feed = Feed(gtfs_path)
-
-feed_routes = feed.routes
-feed_stops = feed.stops
-feed_stop_times = feed.stop_times
-feed_trips = feed.trips
-
-# Tram = 0, Subway = 1, Bus = 3, Funicular = 7
-list_tram_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 0)
-list_metro_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 1)
-list_bus_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 3)
-#list_funicular_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 7)
-
-### Get the MLGraph without TCs
-mnms_graph = load_graph(mnms_json_filepath)
-roads = mnms_graph.roads
-
-# Buses before trams and subways
-### Add the nodes ands stops related to each map matched PT line to the roadDescriptor
-filtered_bus_lines = filter_line(roads.sections, list_bus_lines)
-map_match_bus_line_type = ['BUS'] * len(filtered_bus_lines)
-
-bus_lines_map_match_sections = register_map_match_pt_lines(filtered_bus_lines, map_match_bus_line_type, 'BUS_')
+# Helper function to validate the file path argument
+def _path_file_type(path):
+    if os.path.isfile(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
 
-### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
-pt_lines = list_tram_lines + list_metro_lines
-pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines)
-
-register_pt_lines(pt_lines, pt_lines_types)
-
-### Overwrite the roads zoning with a new zoning including all sections
-roads.add_zone(generate_one_zone("RES", roads))
-
-
-### Create the PT layers, mob services and lines
-
-# Tram
-tram_service = PublicTransportMobilityService('TRAM')
-tram_layer = PublicTransportLayer(roads, 'TRAMLayer', Tram, tram_default_speed,
-        services=[tram_service])
-generate_public_transportation_lines(feed_stop_times, tram_layer, list_tram_lines, 'TRAM_')
-
-# Metro
-metro_service = PublicTransportMobilityService('METRO')
-metro_layer = PublicTransportLayer(roads, 'METROLayer', Metro, metro_default_speed,
-        services=[metro_service])
-generate_public_transportation_lines(feed_stop_times, metro_layer, list_metro_lines, 'METRO_')
-
-# Bus
-bus_service = PublicTransportMobilityService('BUS')
-bus_layer = PublicTransportLayer(roads, 'BUSLayer', Bus, traditional_vehs_default_speed,
-        services=[bus_service])
-# generate_public_transportation_lines(feed_stop_times, bus_layer, list_bus_lines, 'BUS_')
-generate_map_matching_pt_lines(feed_stop_times, bus_layer, filtered_bus_lines, bus_lines_map_match_sections, 'BUS_')
-
-# Funicular
-# funicular_service = PublicTransportMobilityService('FUNI')
-# funicular_layer = PublicTransportLayer(roads, 'FUNIlayer', Funicular, funicular_default_speed, services=[funicular_service])
-# generate_public_transportation_lines(feed_stop_times, funicular_layer, list_funicular_lines, 'FUNI_')
+# Helper function for output path (no need to exist)
+def _output_file_type(path):
+    """
+    Validates only the directory part of the path exists,
+    but allows the file itself to not exist yet.
+    """
+    directory = os.path.dirname(path) or "."
+    if os.path.isdir(directory):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
 
 
-### Create the MLGraph with PT
-mlgraph = MultiLayerGraph([tram_layer, metro_layer, bus_layer], None, None)
+# Entry point when script is run directly
+if __name__ == "__main__":
+    # Set up argument parser for command-line usage
+    parser = argparse.ArgumentParser(description="Convert GTFS public transport data to an MnMS JSON Network file")
+    parser.add_argument("gtfs_file", type=_path_file_type, help="Path to the GTFS data (.zip)")
+    parser.add_argument("mnms_roads_file", type=_path_file_type, help="Path to the MnMS road network JSON file")
+    parser.add_argument("mnms_output_file", type=_output_file_type, help="Path to the MnMS JSON output file (directory must exists)")
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    ##################
+    ### Parameters ###
+    ##################
+
+    gtfs_path = args.gtfs_file  # gtfs zip folder
+    mnms_json_filepath = args.mnms_roads_file  # mlgraph with the road network only
+    mlgraph_dump_file = args.mnms_output_file
+
+    # Default speeds
+    traditional_vehs_default_speed = 13.8  # m/s
+    metro_default_speed = 15  # m/s
+    tram_default_speed = 18  # m/s
+    funicular_default_speed = 5  # m/s
+
+    # Map match max distance
+    mapmatch_dist = 50
+
+    #################
+    ### Functions ###
+    #################
+
+    _norm = np.linalg.norm
+
+    # choose here your final coordinates system (ex: Lyon/Symuvia = Lambert 93, International/Other = UTM)
+    _convert_coords = gps_to_lambert93
+
+    feed = Feed(gtfs_path)
+
+    feed_routes = feed.routes
+    feed_stops = feed.stops
+    feed_stop_times = feed.stop_times
+    feed_trips = feed.trips
+
+    # Tram = 0, Subway = 1, Bus = 3, Funicular = 7
+    list_tram_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 0)
+    list_metro_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 1)
+    list_bus_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 3)
+    #list_funicular_lines = extract_gtfs_stops(feed_routes, feed_stops, feed_stop_times, feed_trips, 7)
+
+    ### Get the MLGraph without TCs
+    mnms_graph = load_graph(mnms_json_filepath)
+    roads = mnms_graph.roads
+
+    # Buses before trams and subways
+    ### Add the nodes ands stops related to each map matched PT line to the roadDescriptor
+    filtered_bus_lines = filter_line(roads.sections, list_bus_lines)
+    map_match_bus_line_type = ['BUS'] * len(filtered_bus_lines)
+
+    bus_lines_map_match_sections = register_map_match_pt_lines(filtered_bus_lines, map_match_bus_line_type, 'BUS_')
 
 
-### Save the graph
-save_graph(mlgraph, mlgraph_dump_file)
+    ### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
+    pt_lines = list_tram_lines + list_metro_lines
+    pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines)
+
+    register_pt_lines(pt_lines, pt_lines_types)
+
+    ### Overwrite the roads zoning with a new zoning including all sections
+    roads.add_zone(generate_one_zone("RES", roads))
+
+
+    ### Create the PT layers, mob services and lines
+
+    # Tram
+    tram_service = PublicTransportMobilityService('TRAM')
+    tram_layer = PublicTransportLayer(roads, 'TRAMLayer', Tram, tram_default_speed,
+            services=[tram_service])
+    generate_public_transportation_lines(feed_stop_times, tram_layer, list_tram_lines, 'TRAM_')
+
+    # Metro
+    metro_service = PublicTransportMobilityService('METRO')
+    metro_layer = PublicTransportLayer(roads, 'METROLayer', Metro, metro_default_speed,
+            services=[metro_service])
+    generate_public_transportation_lines(feed_stop_times, metro_layer, list_metro_lines, 'METRO_')
+
+    # Bus
+    bus_service = PublicTransportMobilityService('BUS')
+    bus_layer = PublicTransportLayer(roads, 'BUSLayer', Bus, traditional_vehs_default_speed,
+            services=[bus_service])
+    # generate_public_transportation_lines(feed_stop_times, bus_layer, list_bus_lines, 'BUS_')
+    generate_map_matching_pt_lines(feed_stop_times, bus_layer, filtered_bus_lines, bus_lines_map_match_sections, 'BUS_')
+
+    # Funicular
+    # funicular_service = PublicTransportMobilityService('FUNI')
+    # funicular_layer = PublicTransportLayer(roads, 'FUNIlayer', Funicular, funicular_default_speed, services=[funicular_service])
+    # generate_public_transportation_lines(feed_stop_times, funicular_layer, list_funicular_lines, 'FUNI_')
+
+
+    ### Create the MLGraph with PT
+    mlgraph = MultiLayerGraph([tram_layer, metro_layer, bus_layer], None, None)
+
+
+    ### Save the graph
+    save_graph(mlgraph, mlgraph_dump_file)
