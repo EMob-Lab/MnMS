@@ -36,7 +36,7 @@ _veh_type_convertor = {'METRO': Metro,
 
 
 # Main function to convert an OSM place query to an MnMS-compatible JSON graph
-def convert_osm_to_mnms(osm_query, output_dir, zone_dict: Dict[str, List[str]]=None, car_only=False, mono_res: Optional[str] = None):
+def convert_osm_to_mnms(osm_query, output_file, zone_dict: Dict[str, List[str]] = None, car_only=False, mono_res: Optional[str] = None):
     edges = dict()
     nodes = defaultdict(list)
 
@@ -118,7 +118,7 @@ def convert_osm_to_mnms(osm_query, output_dir, zone_dict: Dict[str, List[str]]=N
     mlgraph = MultiLayerGraph([car_layer])
 
     # Save the graph to file
-    save_graph(mlgraph, output_dir+'/test.json', indent=1)
+    save_graph(mlgraph, output_file, indent=1)
 
 
 # Helper to check if the path is a valid file
@@ -137,11 +137,24 @@ def _path_dir_type(path):
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
 
+# Helper function for output path (no need to exist)
+def _output_file_type(path):
+    """
+    Validates only the directory part of the path exists,
+    but allows the file itself to not exist yet.
+    """
+    directory = os.path.dirname(path) or "."
+    if os.path.isdir(directory):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
+
+
 # Entry point of the script
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert OpenStreetMap to MnMS JSON graph')
     parser.add_argument('query', type=str, help='String query, example: "Lyon, France"')
-    parser.add_argument('--output_dir', default=os.getcwd(), type=_path_dir_type, help='Path to the output dir')
+    parser.add_argument("osm_output_file", type=_output_file_type, help="Path to the OpenStreetMap JSON output file (directory must exists)")
 
     # Define mutually exclusive zone definitions (single vs. multiple reservoirs)
     command_group = parser.add_mutually_exclusive_group()
@@ -157,12 +170,12 @@ if __name__ == "__main__":
 
     # Run conversion with appropriate zone definition
     if args.mono_res is not None:
-        convert_osm_to_mnms(args.query, args.output_dir, zone_dict=None, mono_res=args.mono_res)
+        convert_osm_to_mnms(args.query, args.osm_output_file, zone_dict=None, mono_res=args.mono_res)
     elif args.multi_res is not None:
         with open(args.multi_res, 'r') as f:
             res_dict = json.load(f)
-        convert_osm_to_mnms(args.query, args.output_dir, res_dict, args.car_only)
+        convert_osm_to_mnms(args.query, args.osm_output_file, res_dict, args.car_only)
     else:
-        convert_osm_to_mnms(args.query, args.output_dir)
+        convert_osm_to_mnms(args.query, args.osm_output_file)
 
     log.info(f"Done!")

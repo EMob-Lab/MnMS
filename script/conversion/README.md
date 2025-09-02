@@ -162,15 +162,54 @@ Example NetworkX structure:
 
 ## OpenStreetMap conversion
 
+This script converts OpenStreetMap (OSM) data into an MnMS-compatible JSON multilayer graph.
+It allows researchers and developers to generate MnMS road networks directly from OSM queries such as "Lyon, France".
+
 ### Features
+
+- Query OpenStreetMap using osmnx.
+- Extract nodes and edges.
+- Convert coordinates (WGS → UTM).
+- Build MnMS RoadDescriptor with nodes and sections.
+- Define zones (single or multiple).
+- Create MnMS CarLayer with nodes and links.
+- Build the MultiLayerGraph.
+- Save to JSON file.
 
 ### Script structure
 
+- `convert_osm_to_mnms(osm_query, output_file, zone_dict=None, car_only=False, mono_res=None)` – Main function to convert 
+an OSM place query into an MnMS-compatible JSON multilayer graph :
+  - Loads road network from OSM.
+  - Converts WGS coordinates to UTM.
+  - Registers nodes and road sections in the MnMS RoadDescriptor.
+  - Defines zones either from a bounding box (--mono_res) or a mapping file (--multi_res).
+  - Creates the car layer and builds the multilayer graph.
+  - Saves result to an output file.
+
 ### Installation
+
+Install missing dependencies with:
+
+````bash
+pip install osmnx
+````
 
 ### Usage example
 
+````bash 
+python conversion_osm.py "Lyon, France" mnms_lyon_osm.json --mono_res ZONE_1
+````
+
+- `query` – The OSM place query (string). Example: "Lyon, France".
+- `--output_dir` – Path to the output directory (default: current working directory). Must exist.
+- `--mono_res` – Define a single reservoir (zone) with the given identifier.
+- `--multi_res` – Path to a JSON file mapping sections → reservoirs for multiple zones. Mutually exclusive with --mono_res.
+
 ### Notes
+
+The format used for OSM query in example is `City, Country`, OSM queries can be more specific, 
+please look for OpenStreetMap documentation for custom queries.
 
 ---
 
