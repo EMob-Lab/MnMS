@@ -6,15 +6,110 @@ This repository contains Python scripts for converting various network format to
 
 ## Bison conversion
 
+This README part on Bison conversion will only cover the bison/conversion_amsterdam_improved.py script.
+This script converts BISON (Netherlands) Public Transport (PT) data in XML and CSV format into a MnMS-compatible multilayer JSON graph.  
+It extracts bus, tram, and metro lines, processes stops, generates PT layers, and saves the resulting graph.
+
 ### Features
+
+- Parses Amsterdam Public Transport  network from BISON KV1-format data.
+- Extracts stop coordinates and line definitions from XML + CSV files.
+- Supports Bus, Metro, and Tram.
+- Creates MnMS PublicTransport layers with timetables and default frequencies.
+- Outputs a MnMS multilayer graph (JSON) with:
+  - Road nodes & sections
+  - Stops & lines
+  - PT layers (Bus, Tram, Metro)
 
 ### Script structure
 
+#### Parameters
+
+The script defines several constants in the header:
+- File paths
+  - coord_csv_filepath: CSV file with coordinates
+  - metro_xml_directory, tram_xml_directory, bus_xml_directory: XML directories for PT definitions
+  - Amsterdam BISON specific dataset structure is described in the Notes below
+- Default speeds
+  - Bus: 13.8 m/s (50 km/h)
+  - Metro: 18 m/s (65 km/h)
+  - Tram: 15 m/s (54 km/h)
+- Frequencies
+  - Bus: every 8 min
+  - Metro: every 4 min
+  - Tram: every 10 min
+- Operation hours
+  - Start: 05:00:00
+  - End: 23:00:00
+
+#### Functions description
+
+- `extract_amsterdam_stops(xml_dir)` – Parses XML files for one PT type (bus, tram, or metro).
+Builds stop sequences, splits them into two directions, and outputs a list of DataFrames with stops.
+  - Args: xml_dir: Directory containing XML definitions of lines.
+  - Returns: list of DataFrames (LINE_ID, STOP_NAME, STOP_CODE).
+  
+
+- `generate_public_transportation_lines(layer, list_lines, freq, operation_start_time, operation_end_time, prefix_line_name)`– Generates 
+PT lines on a given MnMS PublicTransportLayer.
+  - Args:
+    - layer: Target PT layer (Bus, Tram, Metro).
+    - list_lines: List of DataFrames for each line.
+    - freq: Frequency (Dt object).
+    - operation_start_time: Start time of service.
+    - operation_end_time: End time of service.
+    - prefix_line_name: Prefix string for line IDs.
+  - Returns: None.
+
+#### Script Flow
+
+- Parse input arguments:
+  - Load MnMS graph file
+  - Define output file
+- Extract PT lines from XML directories:
+  - Bus, Tram, Metro
+- Register stops and sections into road descriptor.
+- Overwrite zoning with one global zone.
+- Create PT layers (Bus, Tram, Metro) with default frequencies.
+- Assemble into a MultiLayerGraph.
+- Save graph to output file.
+
 ### Installation
+
+Install missing dependencies with:
+
+````bash
+pip install lxml
+````
 
 ### Usage example
 
+````bash 
+python conversion_gtfs.py base_mnms_graph.json amsterdam_graph.json
+````
+
+- `mnms_file` – Base MnMS JSON graph file (without PT).
+- `output_file` – Destination for the enriched graph with PT. (created by the script if it doesn’t exist yet)
+
+The script will produce as an output, a MnMS JSON graph containing:
+- Road network
+- Bus, Tram, Metro layers
+- Stops, sections, and PT lines with timetables.
+
 ### Notes
+
+As a reminder, only the bison/conversion_amsterdam_improved.py script is described here.
+
+- Amsterdam BISON dataset need to have the following structure:
+
+````bash 
+KV1_GVB_2609_2/
+├── Csv/POINT.csv        # Coordinates of stops
+└── Xml/
+    ├── BUS/             # Bus operation patterns
+    ├── TRAM/            # Tram operation patterns
+    └── METRO/           # Metro operation patterns
+````
 
 ---
 
@@ -83,6 +178,12 @@ This overwrites/updates existing PT definitions with more accurate ones.
 
 
 ### Installation
+
+Install missing dependencies with:
+
+````bash
+pip install gtfs_functions
+````
 
 ### Usage example
 
