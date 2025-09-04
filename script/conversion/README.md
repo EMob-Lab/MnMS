@@ -42,7 +42,7 @@ The script defines several constants in the header:
   - Start: 05:00:00
   - End: 23:00:00
 
-#### Functions description
+#### Functions Description
 
 - `extract_amsterdam_stops(xml_dir)` – Parses XML files for one PT type (bus, tram, or metro).
 Builds stop sequences, splits them into two directions, and outputs a list of DataFrames with stops.
@@ -316,12 +316,96 @@ please look for OpenStreetMap documentation for custom queries.
 
 ## Symuflow conversion
 
+This script converts a SymuFlow XML input file into a MnMS-compatible multilayer JSON graph.  
+It extracts road sections, junctions, stops, and optionally public transport lines, 
+then builds a MultiLayerGraph including CAR and PT (Public Transport) layers.
+
 ### Features
+
+- Parses SymuFlow XML input files.
+- Extracts:
+  - Road nodes & sections
+  - Lanes, reserved lanes, and car accessibility
+  - Junctions with allowed/forbidden movements
+  - Stops and PT lines (Bus, Tram, Metro)
+- Supports car-only mode or multimodal mode (Car + PT).
+- Creates a MnMS multilayer graph and saves it as JSON.
 
 ### Script structure
 
+#### Functions Description
+
+`convert_symuflow_to_mnms(file, output_dir, zone_dict=None, car_only=False, mono_res=None)`
+
+Main function performing the conversion:
+ - Parses XML with lxml.
+ - Extracts nodes, road sections, junctions, car accessibility.
+ - Computes section lengths from coordinates.
+ - Registers zones (single bounding box or multiple from file).
+ - Registers stops along sections.
+ - Builds:
+   - CarLayer with nodes, links, and junction movements. 
+   - PublicTransportLayer(s) for Bus/Tram/Metro if car_only is False.
+ - Generates PT lines with timetables (frequencies or explicit schedules).
+ - Assembles layers into a MultiLayerGraph.
+ - Saves the graph to JSON.
+
+#### Script Flow
+
+- Parse CLI arguments.
+- Parse XML:
+  - Road sections (TRONCONS)
+  - Junctions (CARREFOURSAFEUX, REPARTITEURS, GIRATOIRES)
+  - Stops (ARRETS)
+  - Public transport lines (LIGNES_TRANSPORT_GUIDEES)
+- Build RoadDescriptor with nodes, sections, stops.
+- Create CarLayer with allowed movements and links.
+- (Optional) Create PT layers (Bus/Tram/Metro) with timetables.
+- Assemble into MultiLayerGraph.
+- Save graph as JSON in output_dir.
+
 ### Installation
 
-### Usage example
+Install missing dependencies with:
+
+````bash
+pip install lxml
+````
+
+### Usage examples
+
+- Convert with only the car layer:
+
+````bash
+python symuflow_conversion.py network.xml --car_only --output_dir ./graphs
+````
+
+- Convert with public transport layers and single zone:
+
+````bash
+python symuflow_conversion.py network.xml --mono_res RES1 --output_dir ./graphs
+````
+
+- Convert with zone mapping:
+
+````bash
+python symuflow_conversion.py network.xml --multi_res zones.json --output_dir ./graphs
+````
+
+- Arguments
+
+  - `symuflow_graph.xml` – Input SymuFlow XML file.
+  - `--output_dir` – Directory where the MnMS JSON graph will be saved (default: current directory).
+  - `--car_only` – If set, only the car network is converted (no PT layers).
+  - `--mono_res` – Define a single reservoir zone (by ID).
+  - `--multi_res` – Path to a JSON mapping sections → reservoirs.
+
+
+- The script will produce as an output, a MnMS JSON graph containing:
+
+  - Car network (nodes, sections, junctions).
+  - Optionally, PT layers (Bus, Tram, Metro).
+  - Zones (mono or multi).
+  - Stops and PT lines with timetables.
 
 ### Notes
