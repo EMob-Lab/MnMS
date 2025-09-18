@@ -258,7 +258,6 @@ class UserFlow(object):
                 upath = u.path.nodes
                 cnode = u.current_node
                 cnode_ind = u.get_current_node_index()
-                next_link = self._gnodes[cnode].adj[upath[cnode_ind + 1]]
                 u.position = self._gnodes[cnode].position
                 if cnode == upath[-1]:
                     # User finished her planned trip, arrived at destination
@@ -266,18 +265,20 @@ class UserFlow(object):
                     to_del.append(u.id)
                     self._walking.pop(u.id, None)
                     u.notify(self._tcurrent)
-                elif next_link.label == "TRANSIT":
-                    # User is about to walk
-                    log.info(f"User {u.id} enters connection on {next_link.id}")
-                    u.set_state_walking()
-                    self._walking[u.id] = next_link.length
                 else:
-                    # User is about to request a service
-                    self._walking.pop(u.id, None)
-                    u.set_state_waiting_answer()
-                    log.info(f'User {u.id} is about to request a vehicle because he is stopped')
-                    requested_mservice = self._request_user_vehicles(u, self._tcurrent)
-                    self._waiting_answer.setdefault(u.id, (u.response_dt.copy(),requested_mservice))
+                    next_link = self._gnodes[cnode].adj[upath[cnode_ind + 1]]
+                    if next_link.label == "TRANSIT":
+                        # User is about to walk
+                        log.info(f"User {u.id} enters connection on {next_link.id}")
+                        u.set_state_walking()
+                        self._walking[u.id] = next_link.length
+                    else:
+                        # User is about to request a service
+                        self._walking.pop(u.id, None)
+                        u.set_state_waiting_answer()
+                        log.info(f'User {u.id} is about to request a vehicle because he is stopped')
+                        requested_mservice = self._request_user_vehicles(u, self._tcurrent)
+                        self._waiting_answer.setdefault(u.id, (u.response_dt.copy(),requested_mservice))
 
                 u.notify(self._tcurrent)
 

@@ -87,7 +87,7 @@ mlgraph.add_cost_function('TRANSIT', 'generalized_cost', gc_transit)
 # load_graph(demand_file.parent.joinpath('graph.json'))
 
 # uber.create_waiting_vehicle("CAR_1") # creation of 1 vehicle outside of any depot at CAR_1 node
-uber.add_depot("CAR_1", 1) # creation of 1 depot at CAR_1 node with 1 vehicle inside
+uber.add_depot("C_82611914", 1) # creation of 1 depot at CAR_1 node with 1 vehicle inside
 
 #### Demand ####
 demand = CSVDemandManager(demand_file)

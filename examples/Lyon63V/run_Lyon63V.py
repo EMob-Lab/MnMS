@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     personal_car = PersonalMobilityService()
     personal_car.attach_vehicle_observer(veh_observer)
-    mmgraph.layers["CAR"].add_mobility_service(personal_car)
+    mmgraph.layers["CARLayer"].add_mobility_service(personal_car)
 
     bus_service = PublicTransportMobilityService("BUS_MS")
     bus_service.attach_vehicle_observer(veh_observer)
