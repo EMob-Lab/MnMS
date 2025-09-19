@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from mnms.time import Time
 
 
-def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=True, draw_stops=True, label_size=5, highlight_section=None):
+def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=True, draw_stops=True, label_size=5, highlight_section=None, display_axes=False):
     lines = list()
 
     for section_data in roads.sections.values():
@@ -37,6 +37,11 @@ def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=Tru
 
     ax.margins(0.05, 0.05)
     ax.axis("equal")
+
+    if not display_axes:
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+
     plt.tight_layout()
 
 
