@@ -11,6 +11,8 @@ from mnms.tools.dict_tools import sum_dict
 import numpy as np
 from numpy.linalg import norm as _norm
 
+import sys
+
 log = create_logger(__name__)
 
 def find_sublist_in_list(sl,l):
