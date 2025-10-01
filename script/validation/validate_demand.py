@@ -269,7 +269,10 @@ def count_ms_occurences(df_users):
     users_ms = df_users["MOBILITY SERVICES"]
 
     for user_ms in users_ms:
-        mobility_services = user_ms.split(' ')
+        # skip NaN values when there is no mobility services specified (user can take all MS)
+        if pd.isna(user_ms):
+            continue
+        mobility_services = str(user_ms).split()
         for mobility_service in mobility_services:
             ms_occurences[mobility_service] = ms_occurences.get(mobility_service, 0) + 1
 
