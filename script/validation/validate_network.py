@@ -10,6 +10,7 @@ from statistics import mean, median
 from matplotlib import pyplot as plt
 from matplotlib import colormaps
 
+pd.set_option('future.no_silent_downcasting', True)
 
 # Check that all required sub-tags exist in the ROADS tag
 def validate_roads_tag(roads):
@@ -205,7 +206,7 @@ def analyze_roads(roads):
     print(f"Number of nodes : {len(nodes)}")
     print(f"Number of stops : {len(stops)}")
     print(f"Number of sections : {len(sections)}")
-    print(f"Number of zones : {len(zones)}")
+    print(f"Number of zones: {len(zones)} | Zone IDs: {', '.join(zone['id'] for zone in zones.values())}")
     print(f"Number of sections per zone : {len(sections) / len(zones)}")
 
     min_length = min(sections_length.values())
