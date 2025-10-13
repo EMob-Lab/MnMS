@@ -164,9 +164,10 @@ def identify_duplicate_sections(sections):
         if pair in seen_pairs:
             duplicates.append(id_section)
         else:
-            seen_pairs[pair] = id_section
+            seen_pairs[pair] = []
+        seen_pairs[pair].append(id_section)
 
-    return duplicates
+    return seen_pairs
 
 
 # Compute centrality as number of connected sections per node
@@ -240,8 +241,10 @@ def analyze_roads(roads):
     print((f"Number of Final sections: {len(final_sections)}"))
     #print(final_sections)
 
-    print((f"Number of Duplicate sections: {len(duplicate_sections)}"))
-    print(duplicate_sections)
+    ds = [(k,v) for k, v in duplicate_sections.items() if len(v) > 1]
+    print((f"Number of duplicate sections: {len(ds)}"))
+    for s in ds:
+        print(s)
 
 
 # Analyze bus-specific data in the LAYERS tag if present
