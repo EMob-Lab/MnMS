@@ -1,6 +1,7 @@
 import os
 import argparse
 import json
+import re
 
 import pandas as pd
 import mpl_scatter_density
@@ -9,8 +10,16 @@ import numpy as np
 from statistics import mean, median
 from matplotlib import pyplot as plt
 from matplotlib import colormaps
+from matplotlib import cm as cm
 
-pd.set_option('future.no_silent_downcasting', True)
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+
+import dash
+from dash import dcc, html
+
+# pd.set_option('future.no_silent_downcasting', True)
 
 # Check that all required sub-tags exist in the ROADS tag
 def validate_roads_tag(roads):
@@ -246,6 +255,8 @@ def analyze_roads(roads):
     for s in ds:
         print(s)
 
+    return deadends, springs, isolates
+
 
 # Analyze bus-specific data in the LAYERS tag if present
 def analyze_bus(layers):
@@ -298,116 +309,399 @@ def analyze_bus(layers):
             print(f"Average Bus mapmatching rate: {sum_mapmatching_rate / bus_line_count}")
 
 
-# Visualize nodes on a scatter plot
-def visualize_nodes(roads):
-    nodes = roads.get("NODES")
+# # Visualize nodes on a scatter plot
+# def visualize_nodes(roads):
+#     nodes = roads.get("NODES")
+#
+#     fig_nodes = plt.figure("Nodes", figsize=(20, 12))
+#     fig_nodes.suptitle("Nodes")
+#     for id, node in nodes.items():
+#         x = float(node["position"][0])
+#         y = float(node["position"][1])
+#         plt.scatter(x, y, color="blue", s=1)
+#
+#
+# # Visualize stops on a scatter plot
+# def visualize_stops(roads):
+#     stops = roads.get("STOPS")
+#
+#     fig_stops = plt.figure("Stops", figsize=(20, 12))
+#     fig_stops.suptitle("Stops")
+#     for id, stop in stops.items():
+#         x = float(stop["absolute_position"][0])
+#         y = float(stop["absolute_position"][1])
+#         plt.scatter(x, y, color="red", s=10)
+#
+#
+# # Visualize sections as lines connecting nodes
+# def visualize_sections(roads):
+#     nodes = roads.get("NODES")
+#     sections = roads.get("SECTIONS")
+#
+#     fig_sections = plt.figure("Sections", figsize=(20, 12))
+#     fig_sections.suptitle("Sections")
+#     for id, section in sections.items():
+#         upnode = section["upstream"]
+#         downnode = section["downstream"]
+#
+#         # Find coordinates for upstream and downstream nodes
+#         for id, node in nodes.items():
+#             if node["id"] == upnode:
+#                 ux = float(node["position"][0])
+#                 uy = float(node["position"][1])
+#             if node["id"] == downnode:
+#                 dx = float(node["position"][0])
+#                 dy = float(node["position"][1])
+#
+#         # Draw a line between the nodes
+#         plt.plot([ux, dx], [uy, dy])
+#
+#
+# # Visualize zones by plotting their contours
+# def visualize_zones(roads):
+#     zones = roads.get("ZONES")
+#     fig_centralities = plt.figure("Zones", figsize=(20, 12))
+#     fig_centralities.suptitle("Zones")
+#     for id, res in zones.items():
+#         xvalues = []
+#         yvalues = []
+#         col = (np.random.random(), np.random.random(), np.random.random())
+#         contour = res["contour"]
+#         for point in contour:
+#             xvalues.append(float(point[0]))
+#             yvalues.append(float(point[1]))
+#         # Close the polygon by connecting last point to first
+#         xvalues.append(xvalues[0])
+#         yvalues.append(yvalues[0])
+#         plt.plot(xvalues, yvalues, color=col)
+#
+#
+# # Visualize node centralities with color intensity
+# def visualize_centralities(roads, centralities, max_degree):
+#     nodes = roads.get("NODES")
+#     xvalues = []
+#     yvalues = []
+#     dvalues = []
+#
+#     # Collect node positions and degree values
+#     for id, degree in centralities.items():
+#         node = nodes[id]
+#         xvalues.append(float(node["position"][0]))
+#         yvalues.append(float(node["position"][1]))
+#         dvalues.append(float(degree))
+#
+#     fig_centralities = plt.figure("Centralities", figsize=(20, 12))
+#     fig_centralities.suptitle("Centralities")
+#     plt.scatter(x=xvalues, y=yvalues, c=dvalues, cmap="YlOrRd", vmin=0, vmax=max_degree, s=1)
+#
+#
+# # Visualize public transport lines by plotting stops and connecting them
+# def visualize_pt_lines(roads, layers):
+#     nodes = roads.get("NODES")
+#     stops = roads.get("STOPS")
+#
+#     for layer in layers:
+#         if layer["TYPE"] == "mnms.graph.layers.PublicTransportLayer":
+#             veh_type = layer["VEH_TYPE"]
+#             fig_layer = plt.figure(veh_type, figsize=(20, 12))
+#             fig_layer.suptitle(veh_type)
+#             lines = layer["LINES"]
+#             for line in lines:
+#                 lstops = line["STOPS"]
+#                 xvalues = []
+#                 yvalues = []
+#                 col = (np.random.random(), np.random.random(), np.random.random())
+#                 for lstop in lstops:
+#                     stop = stops[lstop]
+#                     x = float(stop["absolute_position"][0])
+#                     xvalues.append(x)
+#                     y = float(stop["absolute_position"][1])
+#                     yvalues.append(y)
+#                     plt.scatter(x, y, color=col, s=10)
+#                 plt.plot(xvalues, yvalues, color=col)
 
-    fig_nodes = plt.figure("Nodes", figsize=(20, 12))
-    fig_nodes.suptitle("Nodes")
-    for id, node in nodes.items():
-        x = float(node["position"][0])
-        y = float(node["position"][1])
-        plt.scatter(x, y, color="blue", s=1)
+
+def plot_zones(roads):
+    zones = roads.get("ZONES", {})
+    fig = go.Figure()
+    cmap = px.colors.qualitative.Set3
+
+    for i, (zid, zone) in enumerate(zones.items()):
+        contour = np.array(zone["contour"], dtype=float)
+        color = cmap[i % len(cmap)]
+        fig.add_trace(go.Scatter(
+            x=contour[:, 0],
+            y=contour[:, 1],
+            mode="lines",
+            fill="toself",
+            fillcolor=color,
+            line=dict(color=color, width=1.5),
+            name=f"Zone {zid}",
+            opacity=0.4
+        ))
+
+    fig.update_layout(title="Zones", template="plotly_white", width=1500, height=1000)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+    return fig
 
 
-# Visualize stops on a scatter plot
-def visualize_stops(roads):
-    stops = roads.get("STOPS")
+def plot_sections(roads):
+    nodes = roads.get("NODES", {})
+    sections = roads.get("SECTIONS", {})
 
-    fig_stops = plt.figure("Stops", figsize=(20, 12))
-    fig_stops.suptitle("Stops")
-    for id, stop in stops.items():
-        x = float(stop["absolute_position"][0])
-        y = float(stop["absolute_position"][1])
-        plt.scatter(x, y, color="red", s=10)
+    # Precompute node coordinates
+    node_coords = {
+        n["id"]: (float(n["position"][0]), float(n["position"][1]))
+        for n in nodes.values()
+    }
 
+    fig = go.Figure()
 
-# Visualize sections as lines connecting nodes
-def visualize_sections(roads):
-    nodes = roads.get("NODES")
-    sections = roads.get("SECTIONS")
+    # Add one line per section for hover clarity
+    for sec in sections.values():
+        up, down = sec["upstream"], sec["downstream"]
+        if up in node_coords and down in node_coords:
+            ux, uy = node_coords[up]
+            dx, dy = node_coords[down]
 
-    fig_sections = plt.figure("Sections", figsize=(20, 12))
-    fig_sections.suptitle("Sections")
-    for id, section in sections.items():
-        upnode = section["upstream"]
-        downnode = section["downstream"]
+            # Custom hover text with HTML formatting
+            # Too much information can slow the dashboard
+            hovertext = (
+                f"<b>ID:</b> {sec['id']}<br>"
+                # f"<b>Upstream:</b> {up}<br>"
+                # f"<b>Downstream:</b> {down}<br>"
+                # f"<b>Length:</b> {sec.get('length', 'N/A')}"
+            )
 
-        # Find coordinates for upstream and downstream nodes
-        for id, node in nodes.items():
-            if node["id"] == upnode:
-                ux = float(node["position"][0])
-                uy = float(node["position"][1])
-            if node["id"] == downnode:
-                dx = float(node["position"][0])
-                dy = float(node["position"][1])
+            fig.add_trace(go.Scatter(
+                x=[ux, dx],
+                y=[uy, dy],
+                mode="lines",
+                line=dict(color="gray", width=1),
+                hovertext=[hovertext, hovertext],  # same for both points
+                hoverinfo="text",
+                showlegend=False,
+            ))
 
-        # Draw a line between the nodes
-        plt.plot([ux, dx], [uy, dy])
+    fig.update_layout(
+        title="Sections",
+        template="plotly_white",
+        width=1500,
+        height=1000,
+        hoverlabel=dict(
+            bgcolor="white",
+            bordercolor="gray",
+            font_size=12,
+            font_family="Arial"
+        )
+    )
 
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
-# Visualize zones by plotting their contours
-def visualize_zones(roads):
-    zones = roads.get("ZONES")
-    fig_centralities = plt.figure("Zones", figsize=(20, 12))
-    fig_centralities.suptitle("Zones")
-    for id, res in zones.items():
-        xvalues = []
-        yvalues = []
-        col = (np.random.random(), np.random.random(), np.random.random())
-        contour = res["contour"]
-        for point in contour:
-            xvalues.append(float(point[0]))
-            yvalues.append(float(point[1]))
-        # Close the polygon by connecting last point to first
-        xvalues.append(xvalues[0])
-        yvalues.append(yvalues[0])
-        plt.plot(xvalues, yvalues, color=col)
-
-
-# Visualize node centralities with color intensity
-def visualize_centralities(roads, centralities, max_degree):
-    nodes = roads.get("NODES")
-    xvalues = []
-    yvalues = []
-    dvalues = []
-
-    # Collect node positions and degree values
-    for id, degree in centralities.items():
-        node = nodes[id]
-        xvalues.append(float(node["position"][0]))
-        yvalues.append(float(node["position"][1]))
-        dvalues.append(float(degree))
-
-    fig_centralities = plt.figure("Centralities", figsize=(20, 12))
-    fig_centralities.suptitle("Centralities")
-    plt.scatter(x=xvalues, y=yvalues, c=dvalues, cmap="YlOrRd", vmin=0, vmax=max_degree, s=1)
+    return fig
 
 
-# Visualize public transport lines by plotting stops and connecting them
-def visualize_pt_lines(roads, layers):
-    nodes = roads.get("NODES")
-    stops = roads.get("STOPS")
+def plot_nodes(roads, springs, deadends, isolates):
+    nodes = roads.get("NODES", {})
+
+    set_springs = set(springs)
+    set_deadends = set(deadends)
+    set_isolates = set(isolates)
+
+    # Prepare categories
+    categories = {
+        "Isolates": {"color": "black", "ids": set_isolates},
+        "Springs": {"color": "green", "ids": set_springs - set_isolates},
+        "Deadends": {"color": "red", "ids": set_deadends - set_isolates},
+        "Standard": {
+            "color": "lightgrey",
+            "ids": set(nodes.keys()) - (set_springs | set_deadends | set_isolates),
+        },
+    }
+
+    fig = go.Figure()
+
+    # Add one trace per category
+    for name, info in categories.items():
+        ids = info["ids"]
+        if not ids:
+            continue  # Skip empty categories
+
+        x = [float(nodes[i]["position"][0]) for i in ids if i in nodes]
+        y = [float(nodes[i]["position"][1]) for i in ids if i in nodes]
+
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y,
+            mode="markers",
+            name=name,
+            marker=dict(color=info["color"], size=6),
+            legendgroup=name,
+            showlegend=True,
+            hovertext=[f"Node ID: {i}" for i in ids],
+            hoverinfo="text",
+        ))
+
+    fig.update_layout(
+        title="Nodes by Category",
+        template="plotly_white",
+        width=1500,
+        height=1000,
+        legend=dict(
+            title="Node Type",
+            bgcolor="rgba(255,255,255,0.7)",
+            bordercolor="lightgray",
+            borderwidth=1,
+            x=1.02,
+            y=1,
+        ),
+    )
+
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+    return fig
+
+
+def plot_stops(roads):
+    stops = roads.get("STOPS", {})
+    fig = go.Figure()
+
+    # --- Define color map for known modes ---
+    color_map = {
+        "BUS": "green",
+        "METRO": "red",
+        "TRAM": "purple",
+    }
+
+    # --- Generic fallback colors for unknown keywords ---
+    default_colors = px.colors.qualitative.Plotly
+    default_color_index = 0
+
+    # --- Group stops by detected mode ---
+    grouped_stops = {}
+
+    for stop_id, stop in stops.items():
+        # Extract keyword (first uppercase token, e.g. "BUS" in "BUS_10_DIR1_...")
+        match = re.match(r"([A-Z]+)", stop_id)
+        mode = match.group(1) if match else "OTHER"
+
+        # Assign a color (predefined or new from default palette)
+        if mode not in color_map:
+            color_map[mode] = default_colors[default_color_index % len(default_colors)]
+            default_color_index += 1
+
+        grouped_stops.setdefault(mode, []).append(stop)
+
+    # --- Plot each mode with its color ---
+    for mode, stops_list in grouped_stops.items():
+        x = [float(s["absolute_position"][0]) for s in stops_list]
+        y = [float(s["absolute_position"][1]) for s in stops_list]
+
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y,
+            mode="markers",
+            name=mode,
+            marker=dict(color=color_map[mode], size=8, opacity=0.8),
+            hovertext=[s["id"] for s in stops_list],
+            hoverinfo="text"
+        ))
+
+    fig.update_layout(title="Stops",
+                      template="plotly_white",
+                      width=2000,
+                      height=1000,
+                      legend=dict(
+                          title="Mode",
+                          x=1.02,
+                          y=1,
+                          bgcolor="rgba(255,255,255,0.7)",
+                          bordercolor="lightgray",
+                          borderwidth=1
+                      )
+                      )
+
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+    return fig
+
+
+def plot_centralities(roads, centralities, max_degree):
+    nodes = roads.get("NODES", {})
+    fig = go.Figure()
+    x, y, d = [], [], []
+
+    for nid, val in centralities.items():
+        node = nodes[nid]
+        x.append(float(node["position"][0]))
+        y.append(float(node["position"][1]))
+        d.append(val)
+
+    fig.add_trace(go.Scatter(
+        x=x, y=y,
+        mode="markers",
+        marker=dict(size=8, color=d, colorscale="YlOrRd", cmin=0, cmax=max_degree,
+                    colorbar=dict(title="Centrality"))
+    ))
+
+    fig.update_layout(title="Node Centralities", template="plotly_white", width=1500, height=1000)
+
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+    return fig
+
+
+def plot_pt_lines(roads, layers):
+    stops = roads.get("STOPS", {})
+    fig = go.Figure()
+    cmap = px.colors.qualitative.Bold
 
     for layer in layers:
-        if layer["TYPE"] == "mnms.graph.layers.PublicTransportLayer":
-            veh_type = layer["VEH_TYPE"]
-            fig_layer = plt.figure(veh_type, figsize=(20, 12))
-            fig_layer.suptitle(veh_type)
-            lines = layer["LINES"]
-            for line in lines:
+        if layer.get("TYPE") == "mnms.graph.layers.PublicTransportLayer":
+
+            for i, line in enumerate(layer["LINES"]):
+                lid = line["ID"]
+                color = cmap[i % len(cmap)]
                 lstops = line["STOPS"]
-                xvalues = []
-                yvalues = []
-                col = (np.random.random(), np.random.random(), np.random.random())
+                xvalues, yvalues = [], []
                 for lstop in lstops:
-                    stop = stops[lstop]
-                    x = float(stop["absolute_position"][0])
-                    xvalues.append(x)
-                    y = float(stop["absolute_position"][1])
-                    yvalues.append(y)
-                    plt.scatter(x, y, color=col, s=10)
-                plt.plot(xvalues, yvalues, color=col)
+                    stop = stops.get(lstop)
+                    if stop:
+                        xvalues.append(float(stop["absolute_position"][0]))
+                        yvalues.append(float(stop["absolute_position"][1]))
+                if xvalues:
+                    fig.add_trace(go.Scatter(
+                        x=xvalues, y=yvalues,
+                        mode="lines+markers",
+                        line=dict(color=color, width=2),
+                        name=f"{lid}"
+                    ))
+
+    fig.update_layout(title="Public Transport Lines", template="plotly_white", width=2000, height=1000)
+
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+    return fig
+
+
+# Dash App
+def run_dash_app(roads, layers, springs, deadends, isolates, centralities, max_degree):
+    app = dash.Dash(__name__)
+
+    app.layout = html.Div([
+        html.H1("MnMS Network Dashboard", style={"textAlign": "center"}),
+        dcc.Tabs([
+            dcc.Tab(label="Zones", children=[dcc.Graph(figure=plot_zones(roads))]),
+            dcc.Tab(label="Sections", children=[dcc.Graph(figure=plot_sections(roads))]),
+            dcc.Tab(label="Nodes", children=[dcc.Graph(figure=plot_nodes(roads, springs, deadends, isolates))]),
+            dcc.Tab(label="Stops", children=[dcc.Graph(figure=plot_stops(roads))]),
+            dcc.Tab(label="Centralities", children=[dcc.Graph(figure=plot_centralities(roads, centralities, max_degree))]),
+            dcc.Tab(label="Public Transport Lines", children=[dcc.Graph(figure=plot_pt_lines(roads, layers))]),
+        ])
+    ])
+
+    app.run(debug=True, port=8050)
 
 
 # Load the JSON network file from disk
@@ -452,17 +746,18 @@ if __name__ == "__main__":
 
     # If valid, run analysis and optionally visualization
     if valid:
-        analyze_roads(roads)
+        springs, deadends, isolates = analyze_roads(roads)
         # analyze_bus(layers)
 
-        # centralities = compute_centralities(roads)
-        # print(f"Node with maximum centrality degree : {max(centralities, key=centralities.get)} = {max(centralities.values())}")
+        centralities = compute_centralities(roads)
+        print(f"Node with maximum centrality degree : {max(centralities, key=centralities.get)} = {max(centralities.values())}")
 
         if args.visualize:
-            visualize_nodes(roads)
-            visualize_stops(roads)
-            visualize_sections(roads)
+            run_dash_app(roads, layers, springs, deadends, isolates, centralities, max(centralities.values()))
+            # visualize_nodes(roads)
+            # visualize_stops(roads)
+            # visualize_sections(roads)
             # visualize_centralities(roads, centralities, max(centralities.values()))
-            visualize_zones(roads)
-            visualize_pt_lines(roads, layers)
-            plt.show()
+            # visualize_zones(roads)
+            # visualize_pt_lines(roads, layers)
+            # plt.show()
