@@ -85,6 +85,8 @@ if __name__ == '__main__':
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
     parser.add_argument('vehicles_file', type=_path_file_type, help='Path to the vehicles CSV file')
     parser.add_argument('users_file', type=_path_file_type, help='Path to the users CSV file')
+    parser.add_argument("--osm", default=False, type=bool,
+                        help="Visualize OpenStreetMap background, True or False")
     # parser.add_argument('--simulation_duration', type=int, default=None) # simulation duration (in seconds)
 
     args = parser.parse_args()
@@ -274,7 +276,8 @@ if __name__ == '__main__':
     gdf_roads.plot(ax=ax1, color='grey', linewidth=1, label='road network')
 
     # Add the OpenStreetMap basemap
-    ctx.add_basemap(ax1, crs=gdf_roads.crs, source=ctx.providers.OpenStreetMap.Mapnik)
+    if args.osm:
+        ctx.add_basemap(ax1, crs=gdf_roads.crs, source=ctx.providers.OpenStreetMap.Mapnik)
 
     lc_car = LineCollection(lines_car, linewidths=1)
     lc_car.set_color('grey')
