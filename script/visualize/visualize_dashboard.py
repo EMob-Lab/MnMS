@@ -201,6 +201,14 @@ def plot_nodes(roads, springs, deadends, isolates):
         template="plotly_white",
         width=1500,
         height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
         legend=dict(
             title="Node Type",
             bgcolor="rgba(255,255,255,0.7)",
@@ -249,8 +257,8 @@ def plot_sections(roads):
                 y=[uy, dy],
                 mode="lines",
                 line=dict(color="gray", width=1),
-                hovertext=[hovertext, hovertext],  # same for both points
-                hoverinfo="text",
+                # hovertext=[hovertext, hovertext],  # same for both points
+                # hoverinfo="text",
                 showlegend=False,
             ))
 
@@ -259,6 +267,14 @@ def plot_sections(roads):
         template="plotly_white",
         width=1500,
         height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
         hoverlabel=dict(
             bgcolor="white",
             bordercolor="gray",
@@ -317,19 +333,28 @@ def plot_stops(roads):
             hoverinfo="text"
         ))
 
-    fig.update_layout(title="Stops",
-                      template="plotly_white",
-                      width=2000,
-                      height=1000,
-                      legend=dict(
-                          title="Mode",
-                          x=1.02,
-                          y=1,
-                          bgcolor="rgba(255,255,255,0.7)",
-                          bordercolor="lightgray",
-                          borderwidth=1
-                      )
-                      )
+    fig.update_layout(
+        title="Stops",
+        template="plotly_white",
+        width=2000,
+        height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        legend=dict(
+            title="Mode",
+            x=1.02,
+            y=1,
+            bgcolor="rgba(255,255,255,0.7)",
+            bordercolor="lightgray",
+            borderwidth=1
+        )
+    )
 
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
@@ -351,10 +376,25 @@ def plot_centralities(roads, centralities, max_degree):
         x=x, y=y,
         mode="markers",
         marker=dict(size=8, color=d, colorscale="YlOrRd", cmin=0, cmax=max_degree,
-                    colorbar=dict(title="Centrality"))
+                    colorbar=dict(title="Centrality")),
+        hovertext=[f"Node ID: {i}" for i in centralities],
+        hoverinfo="text",
     ))
 
-    fig.update_layout(title="Node Centralities", template="plotly_white", width=1500, height=1000)
+    fig.update_layout(
+        title="Node Centralities",
+        template="plotly_white",
+        width=1500,
+        height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        )
+    )
 
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
@@ -430,6 +470,14 @@ def plot_pt_lines(roads, layers):
         template="plotly_white",
         width=2000,
         height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
         legend=dict(
             title="Mode",
             x=1.02,
@@ -465,7 +513,20 @@ def plot_zones(roads):
             opacity=0.4
         ))
 
-    fig.update_layout(title="Zones", template="plotly_white", width=1500, height=1000)
+    fig.update_layout(
+        title="Zones",
+        template="plotly_white",
+        width=1500,
+        height=1000,
+        xaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        ),
+        yaxis=dict(
+            tickformat=",d",
+            exponentformat="none"
+        )
+    )
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
     return fig
