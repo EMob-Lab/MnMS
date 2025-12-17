@@ -8,7 +8,7 @@ MnMS is an agent-based dynamic simulator for urban mobility. Travelers make mode
 
 ### From sources
 
-MnMS relies on [HiPOP](https://github.com/licit-lab/HiPOP.git), make sure to clone it before going through the following installation guidelines.
+MnMS relies on [HiPOP](https://github.com/EMob-Lab/HiPOP.git), make sure to clone it before going through the following installation guidelines.
 
 Clone MnMS. Then, using [conda](https://docs.conda.io/en/latest/miniconda.html), create and configure a new environment:
 
@@ -61,4 +61,4 @@ mkdocs serve
 
 ### Detailed
 
-The detailed documentation is available [there](https://github.com/licit-lab/MnMS/blob/develop/doc/MnMS_detailed_documentation.pdf).
+The detailed documentation is available [there](https://github.com/EMob-Lab/MnMS/blob/develop/doc/MnMS_detailed_documentation.pdf).
