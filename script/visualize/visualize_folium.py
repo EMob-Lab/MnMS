@@ -46,11 +46,20 @@ def _output_file_type(path):
 # --------------------------- Entry Point ---------------------------
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Visualize an MnMS network file with folium")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
-    parser.add_argument('folium_html_file', type=_output_file_type, help='Path to the folium HTML visualization file')
+    parser.add_argument('CRS_src', type=str, help='Coordinate Reference System of the network')
+    parser.add_argument('folium_html_file', type=_output_file_type, help='Path to the folium HTML visualization file', nargs='?', default='')
 
     args = parser.parse_args()
+
+    output_folium_file = args.folium_html_file
+    if not output_folium_file:
+        output_folium_file = os.path.splitext(args.network_file)[0]+'.html'
+
+    CRS_src = args.CRS_src
+
 
     # Load the mobility network (GTFS-like format)
     mnms_network = extract_file(args.network_file)
@@ -66,7 +75,7 @@ if __name__ == "__main__":
     # -----------------------------------
 
     # Initialize Folium map centered on Lyon, France
-    m = folium.Map(location=[45.75, 4.85], zoom_start=12, tiles='cartodbpositron')
+    m = folium.Map(tiles='cartodbpositron')
 
     # Appearance configuration for different vehicle types
     radius_map = {
@@ -82,9 +91,9 @@ if __name__ == "__main__":
     }
 
     weight_map = {
-        "mnms.vehicles.veh_type.Metro": 5,
+        "mnms.vehicles.veh_type.Metro": 4,
         "mnms.vehicles.veh_type.Tram": 3,
-        "mnms.vehicles.veh_type.Bus": 1
+        "mnms.vehicles.veh_type.Bus": 2
     }
 
     opacity_map = {
@@ -101,11 +110,55 @@ if __name__ == "__main__":
     # -----------------------------------
 
     # Define source and target coordinate systems using EPSG codes
-    lambert_93 = CRS("EPSG:2154")  # Lambert 93 (used in France)
     wgs84 = CRS("EPSG:4326")  # WGS84 (global latitude/longitude)
 
     # Create a transformer to convert Lambert 93 → WGS84
-    transformer = Transformer.from_crs(lambert_93, wgs84, always_xy=True)
+    transformer = Transformer.from_crs(CRS_src, wgs84, always_xy=True)
+
+    # -----------------------------------
+    # Drawing Sections
+    # -----------------------------------
+    sections=roads['SECTIONS']
+    nodes = roads['NODES']
+
+    min_lat = 90
+    max_lat = -90
+    min_lon = 180
+    max_lon = -180
+
+    for key, val_node in nodes.items():
+        x = float(val_node["position"][0])
+        y = float(val_node["position"][1])
+        val_node['lat'], val_node['lon'] = convert_from_lambert(transformer, x, y)
+        min_lat = min(min_lat, val_node['lat'])
+        max_lat = max(max_lat, val_node['lat'])
+        min_lon = min(min_lon, val_node['lon'])
+        max_lon = max(max_lon, val_node['lon'])
+
+    fg = folium.FeatureGroup(name='sections', show=True).add_to(m)
+    for key, val_section in sections.items():
+
+        up_0 = nodes[val_section['upstream']]['lat']
+        up_1 = nodes[val_section['upstream']]['lon']
+
+        down_0 = nodes[val_section['downstream']]['lat']
+        down_1 = nodes[val_section['downstream']]['lon']
+
+        # Draw the section
+
+        folium.PolyLine(
+            locations=[
+                [up_0, up_1],
+                [down_0, down_1]
+            ],
+            color='black',
+            weight=2,
+            tooltip=f"{'section'}: {key}",
+            fill=True,
+            opacity=0.3
+        ).add_to(fg)
+
+    m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
 
     # -----------------------------------
     # Drawing Layers: Stops & Routes
@@ -123,15 +176,16 @@ if __name__ == "__main__":
 
         mobility = veh_type.split('.')[-1]  # Extract "Metro", "Bus", or "Tram"
 
-        # Create a separate layer for this vehicle type
-        fg = folium.FeatureGroup(name=mobility, show=True).add_to(m)
-
         if color:
+            # Create a separate layer for this vehicle type
+            fg = folium.FeatureGroup(name=mobility, show=True).add_to(m)
+
             lines = layer["LINES"]
 
             # Loop through each line within this vehicle type
             for line in lines:
                 line_stops = line["STOPS"]
+                prev_stop = None
 
                 # ---- Render Stops ----
                 for stop_id in line_stops:
@@ -142,6 +196,9 @@ if __name__ == "__main__":
 
                         # Convert from Lambert 93 to WGS84
                         lat, lon = convert_from_lambert(transformer, x, y)
+
+                        stop['lat']=lat
+                        stop['lon'] = lon
 
                         # Draw stop as a CircleMarker
                         folium.CircleMarker(
@@ -156,43 +213,27 @@ if __name__ == "__main__":
 
                         plotted_stops.add(stop_id)
 
-                # ---- Render Sections (Links between Stops) ----
-                for stop_id in line_stops:
-                    stop = stops[stop_id]
-                    sec_id = stop.get("section")  # Get associated section if available
+                    if prev_stop:
+                        # Draw the section
+                        folium.PolyLine(
+                            locations=[
+                                [prev_stop['lat'], prev_stop['lon']],
+                                [lat, lon]
+                            ],
+                            color=color,
+                            weight=weight,
+                            tooltip=f"{mobility}: {line['ID']}",
+                            fill=True,
+                            opacity=opacity
+                        ).add_to(fg)
 
-                    if sec_id and sec_id in sections:
-                        sec = sections[sec_id]
-                        up_id = sec["upstream"]
-                        down_id = sec["downstream"]
+                    prev_stop = stop
 
-                        # Make sure both ends of the section exist
-                        if up_id in stops and down_id in stops:
-                            up = stops[up_id]["absolute_position"]
-                            down = stops[down_id]["absolute_position"]
 
-                            # Convert endpoints from Lambert to WGS84
-                            up_0, up_1 = convert_from_lambert(transformer, up[0], up[1])
-                            down_0, down_1 = convert_from_lambert(transformer, down[0], down[1])
 
-                            # Draw the section as a line
-                            folium.PolyLine(
-                                locations=[
-                                    [float(up_0), float(up_1)],
-                                    [float(down_0), float(down_1)]
-                                ],
-                                color=color,
-                                weight=weight,
-                                fill=True,
-                                opacity=opacity
-                            ).add_to(fg)
-
-    # -----------------------------------
-    # Final Map Rendering
-    # -----------------------------------
 
     # Add layer control so user can toggle Metro/Bus/Tram layers
     folium.LayerControl().add_to(m)
 
     # Save map to HTML
-    m.save(args.folium_html_file)
+    m.save(output_folium_file)

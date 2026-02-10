@@ -8,6 +8,8 @@ This repository contains Python scripts for visualizing MnMS mobility network fi
 
 ### Installation
 
+These scripts can be run outside the conda MnMS environment.
+
 Install missing dependencies with:
 
 ````bash
@@ -50,10 +52,11 @@ It converts coordinates from Lambert 93 to WGS84 and renders Metro, Tram, and Bu
 #### Usage example
 
 ````bash 
-python visualize_folium.py mnms_network.json
+python visualize_folium.py mnms_network.json folium_map.html
 ````
 
 - `network_file` – Path to the MnMS network JSON file.
+- `folium_map.html` – Path to the output HTML (optional).
 
 The script will produce as an output:
 
