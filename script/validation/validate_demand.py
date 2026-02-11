@@ -227,7 +227,7 @@ def check_user_ms_defined(user):
     """
     ms_defined = False
 
-    if user["MOBILITY SERVICES"]:
+    if "MOBILITY SERVICES" in user.index.to_list():
         ms_defined = True
 
     return ms_defined
