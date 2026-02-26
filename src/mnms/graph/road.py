@@ -65,7 +65,7 @@ class RoadDescriptor(object):
 
         self.stops[sid] = RoadStop(sid, lid, relative_position, abs_pos)
 
-    def register_section(self, lid: str, upstream: str, downstream: str, length: Optional[float] = None):
+    def register_section(self, lid: str, upstream: str, downstream: str, length: Optional[float] = None, zone: Optional[str] = None):
         assert upstream in self.nodes, f"{upstream} node is not registered"
         assert downstream in self.nodes, f"{downstream} node is not registered "
 
@@ -74,7 +74,8 @@ class RoadDescriptor(object):
         self.sections[lid] = RoadSection(lid,
                                          upstream,
                                          downstream,
-                                         section_length)
+                                         section_length,
+                                         zone)
 
     def add_zone(self, zone: Zone):
         self.zones[zone.id] = zone
