@@ -1,18 +1,32 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Patch
 
 from mnms.time import Time
 
 
-def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=True, draw_stops=True, label_size=5):
+def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=True, draw_stops=True, label_size=5, internal_points=None):
+
+    if internal_points is None:
+        internal_points={}
+
     lines = list()
 
     for section_data in roads.sections.values():
         unode = section_data.upstream
         dnode = section_data.downstream
-        lines.append([roads.nodes[unode].position, roads.nodes[dnode].position])
+
+        if section_data.id in internal_points:
+            up_pt = roads.nodes[unode].position
+            for pt in internal_points[section_data.id]:
+                lines.append([up_pt, np.array(pt)])
+                up_pt = np.array(pt)
+            lines.append([up_pt, roads.nodes[dnode].position])
+        else:
+            lines.append([roads.nodes[unode].position, roads.nodes[dnode].position])
+
     line_segment = LineCollection(lines, linestyles='solid', colors=color, linewidths=linkwidth)
     ax.add_collection(line_segment)
 
