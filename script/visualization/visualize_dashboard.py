@@ -130,7 +130,7 @@ def build_adjacency_matrix(network):
         df_adj.loc[row.upstream, row.downstream] = 1
 
     # Fill missing values with 0 (no connection)
-    df_adj.fillna(0, inplace=True)
+    df_adj = df_adj.fillna(0).infer_objects(copy=False)
 
     return df_adj
 

@@ -85,13 +85,13 @@ def _path_file_type(path):
     else:
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
-# Main entry point: Load data, analyze, and visualize if required
+# Main entry point: Load data, analyze, and visualization if required
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate a JSON transit_link file for MnMS")
     parser.add_argument('transit_link_file', type=_path_file_type, help='Path to the transit_link JSON file')
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
     parser.add_argument('odlayer_file', type=_path_file_type, help='Path to the ODLayer JSON file')
-    parser.add_argument("--visualize", default=False, type=bool, help="Visualize transit links, True or False")
+    parser.add_argument("--visualization", default=False, type=bool, help="Visualize transit links, True or False")
 
     args = parser.parse_args()
 

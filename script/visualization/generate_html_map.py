@@ -1,20 +1,20 @@
+"""
+Generate an html file from the MnMS network with an OpenStreetMap map in the background
+"""
 import os
 import argparse
+
 import json
 import folium
 from pyproj import Transformer, CRS
 
 
-# Function to convert Lambert 93 coordinates to WGS84 (lat, lon)
+# Function to convert coordinates to WGS84 (lat, lon)
 def convert_from_lambert(transformer, x, y):
     lon, lat = transformer.transform(x, y)
     return lat, lon
 
-# -----------------------------------
-# Data Loading
-# -----------------------------------
-
-# Load JSON file containing transportation network data
+# Load JSON file containing MnMS network data
 def extract_file(file):
     with open(file, "r") as json_file:
         return json.load(json_file)
@@ -30,38 +30,20 @@ def _path_file_type(path):
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
 
-# Helper function for output path (no need to exist)
-def _output_file_type(path):
-    """
-    Validates only the directory part of the path exists,
-    but allows the file itself to not exist yet.
-    """
-    directory = os.path.dirname(path) or "."
-    if os.path.isdir(directory):
-        return path
-    else:
-        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
-
-
 # --------------------------- Entry Point ---------------------------
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Visualize an MnMS network file with folium")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
-    parser.add_argument('CRS_src', type=str, help='Coordinate Reference System of the network')
-    parser.add_argument('folium_html_file', type=_output_file_type, help='Path to the folium HTML visualization file', nargs='?', default='')
+    parser.add_argument('CRS_src', type=str, help='EPSG code of coordinate system of the network')
 
     args = parser.parse_args()
 
-    output_folium_file = args.folium_html_file
-    if not output_folium_file:
-        output_folium_file = os.path.splitext(args.network_file)[0]+'.html'
-
+    output_folium_file = os.path.splitext(args.network_file)[0]+'.html'
     CRS_src = args.CRS_src
 
-
-    # Load the mobility network (GTFS-like format)
+    # Load the mobility network (MnMS format)
     mnms_network = extract_file(args.network_file)
 
     # Extract relevant sections of the data
@@ -75,7 +57,8 @@ if __name__ == "__main__":
     # -----------------------------------
 
     # Initialize Folium map centered on Lyon, France
-    m = folium.Map(tiles='cartodbpositron')
+    #m = folium.Map(tiles='cartodbpositron')
+    m = folium.Map()
 
     # Appearance configuration for different vehicle types
     radius_map = {
@@ -109,10 +92,10 @@ if __name__ == "__main__":
     # Coordinate System Setup
     # -----------------------------------
 
-    # Define source and target coordinate systems using EPSG codes
+    # Define target coordinate systems using EPSG codes
     wgs84 = CRS("EPSG:4326")  # WGS84 (global latitude/longitude)
 
-    # Create a transformer to convert Lambert 93 → WGS84
+    # Create a transformer to convert WGS84
     transformer = Transformer.from_crs(CRS_src, wgs84, always_xy=True)
 
     # -----------------------------------

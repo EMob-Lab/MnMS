@@ -52,7 +52,7 @@ It converts coordinates from Lambert 93 to WGS84 and renders Metro, Tram, and Bu
 #### Usage example
 
 ````bash 
-python visualize_folium.py mnms_network.json folium_map.html
+python generate_html_map.py mnms_network.json folium_map.html
 ````
 
 - `network_file` – Path to the MnMS network JSON file.

@@ -61,7 +61,7 @@ and optionally produces visualizations of origins, destinations, and demand dyna
 ### Usage example
 
 ````bash 
-python validate_demand.py demand.csv --radius 10 --visualize True
+python validate_demand.py demand.csv --radius 10 --visualization True
 ````
 
 - `demand_file` – Path to the demand CSV file (semicolon-separated).
@@ -171,7 +171,7 @@ and optional visualizations of the road network and public transport layers.
 ### Usage example
 
 ````bash 
-python validate_network.py mnms_network.json --visualize True
+python validate_network.py mnms_network.json --visualization True
 ````
 
 - `network_file` – Path to the MnMS network JSON file.
@@ -256,7 +256,7 @@ The script provides summary statistics of transit link lengths and an optional v
 ### Usage example
 
 ````bash
-python validate_transit_link.py transit_links.json network.json odlayer.json --visualize True
+python validate_transit_link.py transit_links.json network.json odlayer.json --visualization True
 ````
 
 - `transit_link_file` – Path to the transit links JSON file.

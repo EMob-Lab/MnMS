@@ -316,7 +316,7 @@ def _path_file_type(path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate a JSON network file for MnMS")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
-    parser.add_argument("--visualize", default=False, type=bool,
+    parser.add_argument("--visualization", default=False, type=bool,
                         help="Visualize network, True or False")
 
     args = parser.parse_args()

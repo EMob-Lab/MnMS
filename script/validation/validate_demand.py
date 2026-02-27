@@ -469,7 +469,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validate a CSV demand file for MnMS")
     parser.add_argument("demand_file", type=_path_file_type, help="Path to the demand csv file")
     parser.add_argument("--radius", default=0, type=float, help="Tolerance radius in meters")
-    parser.add_argument("--visualize", default=False, type=bool,
+    parser.add_argument("--visualization", default=False, type=bool,
                         help="Visualize demand origin/destination, True or False")
 
     args = parser.parse_args()
