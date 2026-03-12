@@ -1,3 +1,7 @@
+"""
+Generate a dashboard of a MnMS network displaying different views
+"""
+
 import os
 import argparse
 import json
@@ -5,10 +9,8 @@ import re
 
 import pandas as pd
 import numpy as np
-
 import plotly.graph_objects as go
 import plotly.express as px
-
 import dash
 from dash import dcc, html
 
@@ -570,7 +572,7 @@ def _path_file_type(path):
 
 # Main script execution starts here
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate a JSON MnMS Network Dashboard visualization")
+    parser = argparse.ArgumentParser(description="Generate a MnMS Network Dashboard visualization")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
 
     args = parser.parse_args()
@@ -580,6 +582,10 @@ if __name__ == "__main__":
 
     roads = network.get("ROADS")
     layers = network.get("LAYERS")
+
+    if not roads or not layers:
+        print(f'Incorrect json format for {args.network_file}')
+        exit()
 
     df_adj = build_adjacency_matrix(network)
 

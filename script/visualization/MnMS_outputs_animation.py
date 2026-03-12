@@ -101,7 +101,7 @@ if __name__ == '__main__':
     time_init = datetime(2023, 12, 14, 6, 30, 0)
 
     # Plot setting
-    color_vehs = {'STOP': 'green', 'PICKUP': 'orange', 'SERVING': 'blue', 'PV': 'red'}
+    color_vehs = {'STOP': 'green', 'PICKUP': 'orange', 'SERVING': 'blue', 'PV': 'red', 'REPOSITIONING':'grey'}
     color_veh_type = {'Bus': 'green', 'Tram': 'magenta', 'Metro': 'red'}
 
     # Load the network json file

@@ -1,14 +1,23 @@
-# Vizualisation scripts
+# MNMS NETWORK VIZUALISATION
 
-This repository contains Python scripts for visualizing MnMS mobility network file and animate simulation results
+This repository contains Python scripts and jupyter notebooks for visualizing MnMS mobility network file and animate simulation results
 
 ---
+# Scripts
 
-## Using folium
+## generate_html_map
+
+This Python script loads an MnMS network file in JSON format generated from real data and visualises it using Folium.
+It converts the source system coordinates to WGS84 and displays sections and public transport (lines and stops) on a saved interactive HTML map.
+
+<figure align="center">
+  <img src="../../docs/images/Lyon_network.png" width="500">
+  <figcaption>Example of the rendering of the MnMS network in Lyon</figcaption>
+</figure>
 
 ### Installation
 
-These scripts can be run outside the conda MnMS environment.
+This Python script can be run outside the conda MnMS environment.
 
 Install missing dependencies with:
 
@@ -20,62 +29,64 @@ pip install folium
 pip install pyproj
 ````
 
-### Script visualize_folium
-
-This Python script loads an MnMS network file and visualizes it using Folium (installation command further below).  
-It converts coordinates from Lambert 93 to WGS84 and renders Metro, Tram, and Bus stops and sections on an interactive map.
-
-#### Features
-
-- **Coordinate conversion**
-  - Converts network data from Lambert 93 (EPSG:2154) → WGS84 (EPSG:4326).
-
-  
-- **Visualization with Folium**
-  - Plots stops as colored markers depending on transport type.
-  - Draws sections (links) between stops as colored polylines.
-  - Supports Metro, Tram, and Bus layers.
-
-  
-- **Interactivity**
-  - Layer control allows toggling of different transport modes.
-  - Tooltips on stops show the stop ID and transport type.
- 
- 
-- **Output**
-  - Saves an interactive HTML map (`folium_map.html`).
-
-#### Script structure
-
-- `convert_from_lambert(x, y)` – Converts coordinates from Lambert 93 to WGS84 (latitude, longitude).
-
 #### Usage example
 
 ````bash 
-python generate_html_map.py mnms_network.json folium_map.html
+python generate_html_map.py ./mnms_lyon_network.json EPSG:2154
 ````
 
 - `network_file` – Path to the MnMS network JSON file.
-- `folium_map.html` – Path to the output HTML (optional).
+- `CRS_src` – EPSG code of coordinate system of the network (EPSG:2154 for RGF93 v1 / Lambert-93 -- France for example)
 
-The script will produce as an output:
+## generate_dashboard
 
-- `folium_map.html` – Interactive HTML map viewable in any browser.
-- Example of color map visualization:
-  - Red markers & lines, 5 weight value → Metro
-  - Purple markers & lines, 3 weight value → Tram
-  - Green markers & lines, 1 weight value → Bus
-- Each layer can be toggled on/off in the interactive map.
-  
-#### Notes
+This Python script loads an MnMS network file in JSON format and generates a dashboard for viewing different views of the network.
 
-Coordinates format used in this script is Lambert 93, other coordinate system can be used.
-Color map can be customized as well
+<figure align="center">
+  <img src="../../docs/images/Lyon63V_dashboard.png" width="500">
+  <figcaption>Example of the dashboard of a MnMS network</figcaption>
+</figure>
 
-### Script animate_folium
+### Installation
 
+This Python script can be run outside the conda MnMS environment.
+
+Install missing dependencies with:
+
+````bash
+pip install dash
+````
+````bash
+pip install plotly
+````
 ---
 
-## Notebook visualization
+# Notebooks
 
-README description in progress
+## pyvis_network_visualization
+
+This notebook loads a mnms network, generates the corresponding pyvis network (https://pyvis.readthedocs.io) and visualizes it.
+
+<figure align="center">
+  <img src="../../docs/images/Athens_pyvis_network.png" width="500">
+  <figcaption>Example of the pyvis visualization of a MnMS network</figcaption>
+</figure>
+
+### Installation
+
+This Jupyter notebook can be run outside the conda MnMS environment.
+
+Install missing dependencies with:
+
+````bash
+pip install pyvis
+````
+
+
+# MNMS animation
+
+## mnms_outputs_animation 
+
+This Python script generates an MP4 video of the results of an MnMS simulation
+
+![Demo](../../docs/images/animation.gif)

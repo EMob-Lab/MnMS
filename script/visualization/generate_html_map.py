@@ -1,5 +1,5 @@
 """
-Generate an html file from the MnMS network with an OpenStreetMap map in the background
+Generate an html file from the MnMS real network with an OpenStreetMap map in the background
 """
 import os
 import argparse
@@ -7,7 +7,6 @@ import argparse
 import json
 import folium
 from pyproj import Transformer, CRS
-
 
 # Function to convert coordinates to WGS84 (lat, lon)
 def convert_from_lambert(transformer, x, y):
@@ -29,7 +28,6 @@ def _path_file_type(path):
     else:
         raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
-
 # --------------------------- Entry Point ---------------------------
 
 if __name__ == "__main__":
@@ -49,6 +47,11 @@ if __name__ == "__main__":
     # Extract relevant sections of the data
     roads = mnms_network.get("ROADS")
     layers = mnms_network.get("LAYERS")
+
+    if not roads or not layers:
+        print(f'Incorrect json format for {args.network_file}')
+        exit()
+
     stops = roads.get("STOPS")
     sections = roads.get("SECTIONS")
 
@@ -57,7 +60,6 @@ if __name__ == "__main__":
     # -----------------------------------
 
     # Initialize Folium map centered on Lyon, France
-    #m = folium.Map(tiles='cartodbpositron')
     m = folium.Map()
 
     # Appearance configuration for different vehicle types
@@ -92,10 +94,8 @@ if __name__ == "__main__":
     # Coordinate System Setup
     # -----------------------------------
 
-    # Define target coordinate systems using EPSG codes
-    wgs84 = CRS("EPSG:4326")  # WGS84 (global latitude/longitude)
-
-    # Create a transformer to convert WGS84
+    # Create a transformer to convert WGS84 (global latitude/longitude)
+    wgs84 = CRS("EPSG:4326")
     transformer = Transformer.from_crs(CRS_src, wgs84, always_xy=True)
 
     # -----------------------------------
@@ -128,7 +128,6 @@ if __name__ == "__main__":
         down_1 = nodes[val_section['downstream']]['lon']
 
         # Draw the section
-
         folium.PolyLine(
             locations=[
                 [up_0, up_1],
@@ -211,9 +210,6 @@ if __name__ == "__main__":
                         ).add_to(fg)
 
                     prev_stop = stop
-
-
-
 
     # Add layer control so user can toggle Metro/Bus/Tram layers
     folium.LayerControl().add_to(m)
