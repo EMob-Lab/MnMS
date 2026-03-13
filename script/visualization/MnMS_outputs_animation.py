@@ -48,13 +48,13 @@ def update(n):
     print(n, time_current.strftime(time_template))
 
     # Users
-    if time_current.strftime("%H:%M:%S.00") in df_grouped_users.groups.keys():
-        df_current_users = df_grouped_users.get_group(time_current.strftime("%H:%M:%S.00"))
-        print('users ',len(df_current_users))
-        arr_current_users = df_current_users[['X', 'Y']].copy().to_numpy()
-        scat_users.set_offsets(arr_current_users)
+    #if time_current.strftime("%H:%M:%S.00") in df_grouped_users.groups.keys():
+    #    df_current_users = df_grouped_users.get_group(time_current.strftime("%H:%M:%S.00"))
+    #    print('users ',len(df_current_users))
+    #    arr_current_users = df_current_users[['X', 'Y']].copy().to_numpy()
+    #    scat_users.set_offsets(arr_current_users)
 
-        user_number_text.set_text('# users: ' + str(len(df_current_users['ID'].unique())))
+    #    user_number_text.set_text('# users: ' + str(len(df_current_users['ID'].unique())))
 
     # Vehicles
     if time_current.strftime("%H:%M:%S.00") in df_grouped_vehs.groups.keys():
@@ -68,7 +68,7 @@ def update(n):
 
         veh_number_text.set_text('# vehicles: ' + str(len(cv)))
 
-    return scat_vehs, scat_users,
+    return scat_vehs, #scat_users,
 
 
 # Custom argparse type to check if path is valid file
@@ -216,55 +216,53 @@ if __name__ == '__main__':
     df_grouped_vehs = df_vehs.groupby('TIME')
 
     # Users
-    df_users = pd.read_csv(users_file, sep=';')
+    #df_users = pd.read_csv(users_file, sep=';')
 
-    df_users = df_users.drop(df_users[df_users.STATE == 'DEADEND'].index)
+    #df_users = df_users.drop(df_users[df_users.STATE == 'DEADEND'].index)
 
-    df_users['TIME_STEP'] = df_users.apply(lambda x: datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour * 3600 + (
-        datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute) * 60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").second,
-                                           axis=1)
+    #df_users['TIME_STEP'] = df_users.apply(lambda x: datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour * 3600 + (
+     #   datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute) * 60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").second,
+      #                                     axis=1)
 
     # Complete data for each missing time step
-    df_grouped_users_by_id = df_users.groupby('ID')
-    new_rows = []
-    for id, group in df_grouped_users_by_id:
-
-        print('user ', id)
-        group.sort_values(by=['TIME'])
-
-        if len(group[group.STATE == 'WAITING_ANSWER']) > 0:
-            d1 = group[group.STATE == 'WAITING_ANSWER'].iloc[0].TIME_STEP
-            d2 = d1
-            if d1 > 0:
-                if len(group[group.STATE == 'INSIDE_VEHICLE']) > 0:
-                    d2 = group[group.STATE == 'INSIDE_VEHICLE'].iloc[0].TIME_STEP
-                else:
-                    if len(group[group.STATE == 'STOP']):
-                        d2 = group[group.STATE == 'STOP'].iloc[0].TIME_STEP
-
-                if d2 - d1 > flow_dt.total_seconds():
-                    for n in range(1, d2 - d1):
-                        new_row = group[group.STATE == 'WAITING_ANSWER'].iloc[0]
-                        new_row.TIME_STEP = group[group.STATE == 'WAITING_ANSWER'].iloc[0].TIME_STEP+n*flow_dt.total_seconds()
-                        new_row.TIME = timedelta_to_time(new_row.TIME_STEP).strftime("%H:%M:%S.00")
-                        new_rows.append(new_row)
-
-    df_new_rows = pd.DataFrame(new_rows)
-    df_users = pd.concat([df_users, pd.DataFrame(df_new_rows)], ignore_index=True)
-
-    df_users=df_users.sort_values(by=['TIME'])
-
-    #df_users.to_csv("users_ext.csv", index=False, sep=';')
-
-    df_users['sep'] = df_users['POSITION'].str.find(' ')
-    df_users['X'] = df_users.apply(lambda x: float(x['POSITION'][:x['sep']]), axis=1)
-    df_users['Y'] = df_users.apply(lambda x: float(x['POSITION'][x['sep'] + 1:]), axis=1)
-    df_users['X'], df_users['Y'] = project_to_webmercator(df_users['X'], df_users['Y'])
-    #df_users['TIME_STEP']=df_users.apply(lambda x : datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour*60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute, axis=1)
+    #df_grouped_users_by_id = df_users.groupby('ID')
+    # df_grouped_users_by_id=None
+    # new_rows = []
+    # for id, group in df_grouped_users_by_id:
     #
-    df_users['TIME_STEP'] = df_users.apply(lambda x: datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour * 3600 + (datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute) * 60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").second, axis = 1)
+    #     print('user ', id)
+    #     group.sort_values(by=['TIME'])
     #
-    df_grouped_users = df_users.groupby('TIME')
+    #     if len(group[group.STATE == 'WAITING_ANSWER']) > 0:
+    #         d1 = group[group.STATE == 'WAITING_ANSWER'].iloc[0].TIME_STEP
+    #         d2 = d1
+    #         if d1 > 0:
+    #             if len(group[group.STATE == 'INSIDE_VEHICLE']) > 0:
+    #                 d2 = group[group.STATE == 'INSIDE_VEHICLE'].iloc[0].TIME_STEP
+    #             else:
+    #                 if len(group[group.STATE == 'STOP']):
+    #                     d2 = group[group.STATE == 'STOP'].iloc[0].TIME_STEP
+    #
+    #             if d2 - d1 > flow_dt.total_seconds():
+    #                 for n in range(1, d2 - d1):
+    #                     new_row = group[group.STATE == 'WAITING_ANSWER'].iloc[0]
+    #                     new_row.TIME_STEP = group[group.STATE == 'WAITING_ANSWER'].iloc[0].TIME_STEP+n*flow_dt.total_seconds()
+    #                     new_row.TIME = timedelta_to_time(new_row.TIME_STEP).strftime("%H:%M:%S.00")
+    #                     new_rows.append(new_row)
+    #
+    # df_new_rows = pd.DataFrame(new_rows)
+    # df_users = pd.concat([df_users, pd.DataFrame(df_new_rows)], ignore_index=True)
+    #
+    # df_users=df_users.sort_values(by=['TIME'])
+
+    # df_users['sep'] = df_users['POSITION'].str.find(' ')
+    # df_users['X'] = df_users.apply(lambda x: float(x['POSITION'][:x['sep']]), axis=1)
+    # df_users['Y'] = df_users.apply(lambda x: float(x['POSITION'][x['sep'] + 1:]), axis=1)
+    # df_users['X'], df_users['Y'] = project_to_webmercator(df_users['X'], df_users['Y'])
+    #
+    # df_users['TIME_STEP'] = df_users.apply(lambda x: datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour * 3600 + (datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute) * 60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").second, axis = 1)
+    # #
+    # df_grouped_users = df_users.groupby('TIME')
 
     # Plot
     figsize = (24, 9)
@@ -323,7 +321,7 @@ if __name__ == '__main__':
 
 
     # Users
-    scat_users = ax1.scatter([], [], c='red', s=10, marker='x', label='User')
+    #scat_users = ax1.scatter([], [], c='red', s=10, marker='x', label='User')
 
     plt.legend(handles=[scat_users, PV_legend, OnDemand_STOP_legend, OnDemand_PICKUP_legend, OnDemand_SERVING_legend], loc=(0.8, 0.8))
 
