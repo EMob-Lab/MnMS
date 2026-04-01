@@ -1,16 +1,26 @@
 site_name: MnMS
 site_url: ""
 use_directory_urls: false
+site_description: 'MnMS ''s documentation'
 nav:
     - Home: index.md
+    - Installation: installation.md
+    - Tutorials:
+        - Main: doc/tutorials/General.ipynb
+        - Graph: doc/tutorials/Graph.ipynb
+        - Demand and Decision Model: TutorialDemandTravelDecision.ipynb
     - Code Reference:
         - mnms: reference/SUMMARY.md
 
 theme:
   name: material
   palette:
-    scheme: slate
-    primary: black
+    scheme: default
+    primary: indigo
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/EMob-Lab/mnms
 
 plugins:
   - search
