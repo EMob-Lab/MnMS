@@ -8,7 +8,7 @@ MnMS (**M**ultimodal **N**etwork **M**odelling and **S**imulation) is a multimod
 
 ## Requirements
 
-- [HiPOP](https://github.com/licit-lab/HiPOP)
+- [HiPOP](https://github.com/EMob-Lab/HiPOP)
 - python=3.10
 - ipython
 - matplotlib
