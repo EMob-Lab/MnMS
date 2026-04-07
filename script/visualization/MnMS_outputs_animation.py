@@ -109,7 +109,7 @@ if __name__ == '__main__':
 
     # Plot setting
     color_vehs = {'STOP': 'green', 'PICKUP': 'orange', 'SERVING': 'red', 'PV': 'blue', 'REPOSITIONING':'grey'}
-    color_veh_type = {'Bus': 'purle', 'Tram': 'magenta', 'Metro': 'yellow'}
+    color_veh_type = {'Bus': 'purple', 'Tram': 'magenta', 'Metro': 'yellow'}
 
     # Load the network json file
     with open(network_file, 'r') as f:
@@ -158,6 +158,11 @@ if __name__ == '__main__':
 
             stopsX[layer['ID']] = stops_X
             stopsY[layer['ID']] = stops_Y
+
+        on_demand_mobility_service = False
+        for service in layer['SERVICES']:
+            if service['TYPE'] == 'mnms.mobility_service.on_demand.OnDemandMobilityService':
+                on_demand_mobility_service=True
 
     # Build a GeoDataFrame for the road network
     #gdf_roads = gpd.GeoDataFrame(
@@ -292,7 +297,7 @@ if __name__ == '__main__':
 
     c = 0
     #colors = ['b','g','tomato','blue','magenta']
-    #label= ['bus line','metro line','tram line']
+    label= ['bus line','metro line','tram line']
     for l in lines_PT:
         lc_pt = LineCollection(l['lines'], linewidths=3, alpha=0.2)
         lc_pt.set_color(l['color'])
@@ -322,17 +327,24 @@ if __name__ == '__main__':
 
     # Only for legend
     PV_legend = ax1.scatter([], [], c=color_vehs['PV'], s=50, marker='h',alpha=0.8, label='Personal vehicle')
-    OnDemand_STOP_legend = ax1.scatter([], [], c=color_vehs['STOP'], s=50, marker='h', alpha=0.8, label='On demand vehicle waiting')
-    OnDemand_PICKUP_legend = ax1.scatter([], [], c=color_vehs['PICKUP'], s=50, marker='h', alpha=0.8,
-                                       label='On demand vehicle to pick up')
-    OnDemand_SERVING_legend = ax1.scatter([], [], c=color_vehs['SERVING'], s=50, marker='h', alpha=0.8,
-                                       label='On demand vehicle in service')
-
 
     # Users
     scat_users = ax1.scatter([], [], c='red', s=50, marker='x', label='User')
 
-    plt.legend(handles=[scat_users, PV_legend, OnDemand_STOP_legend, OnDemand_PICKUP_legend, OnDemand_SERVING_legend], loc=(0.8, 0.8))
+    if on_demand_mobility_service:
+        OnDemand_STOP_legend = ax1.scatter([], [], c=color_vehs['STOP'], s=50, marker='h', alpha=0.8, label='On demand vehicle waiting')
+        OnDemand_PICKUP_legend = ax1.scatter([], [], c=color_vehs['PICKUP'], s=50, marker='h', alpha=0.8,
+                                           label='On demand vehicle to pick up')
+        OnDemand_SERVING_legend = ax1.scatter([], [], c=color_vehs['SERVING'], s=50, marker='h', alpha=0.8,
+                                           label='On demand vehicle in service')
+
+        plt.legend(handles=[scat_users, PV_legend, OnDemand_STOP_legend, OnDemand_PICKUP_legend, OnDemand_SERVING_legend],
+               loc=(0.8, 0.8))
+
+    else:
+        plt.legend(
+            handles=[scat_users, PV_legend ],
+            loc=(0.8, 0.8))
 
     animALL = FuncAnimation(fig, update, frames=int(simulation_duration)+1, interval=100, repeat=False, blit=False)
 
