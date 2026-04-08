@@ -5,10 +5,8 @@ site_description: 'MnMS ''s documentation'
 nav:
     - Home: index.md
     - Installation: installation.md
-    - Tutorials:
-        - Main: doc/tutorials/General.ipynb
-        - Graph: doc/tutorials/Graph.ipynb
-        - Demand and Decision Model: TutorialDemandTravelDecision.ipynb
+    - Tutorial:
+        - Quick start: QuickStartTutorial.ipynb
     - Code Reference:
         - mnms: reference/SUMMARY.md
 
