@@ -18,7 +18,7 @@ conda env create -f conda/env.yaml
 ````
 
 Activate it:
-````bash
+````bash[]()
 conda activate mnms
 ````
 

@@ -5,10 +5,8 @@ site_description: 'MnMS ''s documentation'
 nav:
     - Home: index.md
     - Installation: installation.md
-    - Tutorials:
-        - Main: TutorialSeminar.ipynb
-        - Graph: TutorialGraph.ipynb
-        - Demand and Decision Model: TutorialDemandTravelDecision.ipynb
+    - Tutorial:
+        - Quick start: QuickStartTutorial.ipynb
     - Code Reference:
         - mnms: reference/SUMMARY.md
 
@@ -20,7 +18,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
-repo_url: https://github.com/licit-lab/mnms
+repo_url: https://github.com/EMob-Lab/mnms
 
 plugins:
   - search
