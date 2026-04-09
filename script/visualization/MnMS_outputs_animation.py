@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+This script animates the simulated vehicles and users and generates an MP4 video
 
 @author: cecile.becarie
 """
@@ -8,25 +9,13 @@
 import os
 import argparse
 import json
+from datetime import datetime, time
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import geopandas as gpd
 import pandas as pd
-import numpy as np
-import contextily as ctx
-import pyproj
-from shapely.geometry import LineString, Point
 from matplotlib.animation import FuncAnimation
 from matplotlib.collections import LineCollection
-from datetime import datetime
-from datetime import timedelta, time
-
-
-def project_to_webmercator(x, y):
-    """Convert Lambert 93 (EPSG:2154) to Web Mercator (EPSG:3857)"""
-    transformer = pyproj.Transformer.from_crs(2154, 3857, always_xy=True)
-    return transformer.transform(x, y)
-
 
 def notify_PV(g):
     if g.iloc[0].STATE == 'SERVING':
@@ -82,13 +71,11 @@ def _path_file_type(path):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="Demonstrator OpenStreetMap")
+    parser = argparse.ArgumentParser(description="Animation of simulated vehicles and users")
     parser.add_argument('network_file', type=_path_file_type, help='Path to the network JSON file')
     parser.add_argument('vehicles_file', type=_path_file_type, help='Path to the vehicles CSV file')
     parser.add_argument('users_file', type=_path_file_type, help='Path to the users CSV file')
-    parser.add_argument("--osm", default=False, type=bool,
-                        help="Visualize OpenStreetMap background, True or False")
-    # parser.add_argument('--simulation_duration', type=int, default=None) # simulation duration (in seconds)
+    parser.add_argument('--save_mp4', type=bool, default=False, help='Specifies whether to save the animation as an MP4 file')
 
     args = parser.parse_args()
 
@@ -96,6 +83,7 @@ if __name__ == '__main__':
     network_file = args.network_file
     vehicles_file = args.vehicles_file
     users_file = args.users_file
+    backup = args.save_mp4
 
     # Time parameters
     df_vehs = pd.read_csv(vehicles_file, sep=';')
@@ -164,12 +152,6 @@ if __name__ == '__main__':
             if service['TYPE'] == 'mnms.mobility_service.on_demand.OnDemandMobilityService':
                 on_demand_mobility_service=True
 
-    # Build a GeoDataFrame for the road network
-    #gdf_roads = gpd.GeoDataFrame(
-    #    geometry=[LineString(line) for line in lines_car],
-    #    crs="EPSG:2154"  # Lambert 93
-    #).to_crs(epsg=3857)  # Convert to Web Mercator
-
     # Vehicles
     df_vehs = pd.read_csv(vehicles_file, sep=';')
     df_vehs.drop(df_vehs[df_vehs['POSITION'].isna() == True].index, inplace=True)
@@ -191,7 +173,6 @@ if __name__ == '__main__':
         bUber = False
         #if len(group[group.STATE == 'STOP']) > 0:
         for index, row in group[group.STATE == 'STOP'].iterrows():
-            #d1 = group[group.STATE == 'STOP'].iloc[0].TIME_STEP
             d1 = row.TIME_STEP
             red_group=group[group.TIME_STEP > d1]
             d2 = d1
@@ -216,14 +197,11 @@ if __name__ == '__main__':
 
     df_vehs = df_vehs.sort_values(by=['TIME'])
 
-    #df_vehs.to_csv("vehs_ext.csv", index=False, sep=';')
-
     time_mn_init = start.hour * 3600 + start.minute * 60
 
     df_vehs['sep'] = df_vehs['POSITION'].str.find(' ')
     df_vehs['X'] = df_vehs.apply(lambda x : float(x['POSITION'][:x['sep']]), axis=1)
     df_vehs['Y'] = df_vehs.apply(lambda x : float(x['POSITION'][x['sep']+1:]), axis=1)
-    #df_vehs['X'], df_vehs['Y'] = project_to_webmercator(df_vehs['X'], df_vehs['Y'])
 
     df_grouped_vehs = df_vehs.groupby('TIME')
 
@@ -271,7 +249,6 @@ if __name__ == '__main__':
     df_users['sep'] = df_users['POSITION'].str.find(' ')
     df_users['X'] = df_users.apply(lambda x: float(x['POSITION'][:x['sep']]), axis=1)
     df_users['Y'] = df_users.apply(lambda x: float(x['POSITION'][x['sep'] + 1:]), axis=1)
-    #df_users['X'], df_users['Y'] = project_to_webmercator(df_users['X'], df_users['Y'])
 
     df_users['TIME_STEP'] = df_users.apply(lambda x: datetime.strptime(x['TIME'], "%H:%M:%S.%f").hour * 3600 + (datetime.strptime(x['TIME'], "%H:%M:%S.%f").minute) * 60 + datetime.strptime(x['TIME'], "%H:%M:%S.%f").second, axis = 1)
     #
@@ -283,20 +260,12 @@ if __name__ == '__main__':
     fig = plt.figure(figsize=figsize)
     ax1 = fig.add_subplot(1, 1, 1)
 
-    # Plot the road network first
-    #gdf_roads.plot(ax=ax1, color='grey', linewidth=1, label='road network')
-
-    # Add the OpenStreetMap basemap
-    #if args.osm:
-    #    ctx.add_basemap(ax1, crs=gdf_roads.crs, source=ctx.providers.OpenStreetMap.Mapnik)
-
     lc_car = LineCollection(lines_car, linewidths=1)
     lc_car.set_color('grey')
     lc_car.set_label('roads network')
     ax1.add_collection(lc_car)
 
     c = 0
-    #colors = ['b','g','tomato','blue','magenta']
     label= ['bus line','metro line','tram line']
     for l in lines_PT:
         lc_pt = LineCollection(l['lines'], linewidths=3, alpha=0.2)
@@ -306,7 +275,6 @@ if __name__ == '__main__':
         ax1.scatter(stopsX[l['id']], stopsY[l['id']], s=20, color=l['color'], alpha=0.2)
         c = c+1
 
-    #ax1.autoscale()
     ax1.set_aspect('equal')
     ax1.set_xticks([])
     ax1.set_yticks([])
@@ -348,7 +316,6 @@ if __name__ == '__main__':
 
     animALL = FuncAnimation(fig, update, frames=int(simulation_duration)+1, interval=100, repeat=False, blit=False)
 
-    backup = False
     if backup:
         aniWriter = mpl.animation.writers['ffmpeg']
         aniWriter = aniWriter(fps=5)

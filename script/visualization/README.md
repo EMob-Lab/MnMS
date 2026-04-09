@@ -29,14 +29,17 @@ pip install folium
 pip install pyproj
 ````
 
+#### Arguments
+
+- `network_file` – Path to the MnMS network JSON file
+- `CRS_src` – EPSG code of coordinate system of the network (EPSG:2154 for RGF93 v1 / Lambert-93 -- France for example)
+
 #### Usage example
 
 ````bash 
 python generate_html_map.py ./mnms_lyon_network.json EPSG:2154
 ````
-
-- `network_file` – Path to the MnMS network JSON file.
-- `CRS_src` – EPSG code of coordinate system of the network (EPSG:2154 for RGF93 v1 / Lambert-93 -- France for example)
+---
 
 ## generate_dashboard
 
@@ -55,10 +58,11 @@ Install missing dependencies with:
 
 ````bash
 pip install dash
-````
-````bash
 pip install plotly
 ````
+
+### Arguments
+- `network_file` – Path to the MnMS network JSON file.
 ---
 
 # Notebooks
@@ -82,11 +86,22 @@ Install missing dependencies with:
 pip install pyvis
 ````
 
-
 # MNMS animation
 
 ## mnms_outputs_animation 
 
-This Python script generates an MP4 video of the results of an MnMS simulation
+This Python script animates the simulated vehicles and users and generates an MP4 video
 
 ![Demo](../../docs/images/animation.gif)
+
+### Installation
+
+This Python script can be run outside the conda MnMS environment.
+
+````
+### Arguments
+- `network_file` – Path to the MnMS network JSON file
+- `vehicles_file` – Path to the MnMS output csv file of simulated vehicles
+- `users_file` – Path to the MnMS output csv file of simulated users
+- `--save_mp4` - Specifies whether to save the animation as an MP4 file (false by default)
+-----
