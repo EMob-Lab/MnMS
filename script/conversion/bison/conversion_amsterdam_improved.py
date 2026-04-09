@@ -1,6 +1,7 @@
 ###############
 ### Imports ###
 ###############
+import argparse
 import os
 import math
 import sys
@@ -26,14 +27,11 @@ from mnms.io.graph import load_graph, save_graph
 
 # Files and directories
 coord_csv_filepath = "KV1_GVB_2609_2/Csv/POINT.csv" # file with coordinates of the network
-amsterdam_json_filepath = "new_network.json" # mlgraph with the road network only
 
 metro_xml_directory = "KV1_GVB_2609_2/Xml/METRO" # Definition of operation patterns for METRO lines
 tram_xml_directory = "KV1_GVB_2609_2/Xml/TRAM" # Definition of operation patterns for TRAM lines
 bus_xml_directory = "KV1_GVB_2609_2/Xml/BUS" # Definition of operation patterns for BUS lines
 ns = "http://bison.connekt.nl/tmi8/kv1/msg" # something related to xml domain
-
-mlgraph_dump_file = 'amsterdam_tc_improved.json'
 
 # Points coordinates
 df_points = pd.read_csv(coord_csv_filepath, sep='|', converters={"DATAOWNERCODE": str})
@@ -41,8 +39,8 @@ df_points = df_points[["DATAOWNERCODE", "LOCATIONXEW", "LOCATIONYNS"]]
 
 # Default speeds
 traditional_vehs_default_speed = 13.8 # m/s
-metro_default_speed = 15 # m/s
-tram_default_speed = 18 # m/s
+metro_default_speed = 18 # m/s
+tram_default_speed = 15 # m/s
 
 # PT operation parameters
 bus_freq = Dt(minutes=8)
@@ -143,64 +141,93 @@ def generate_public_transportation_lines(layer, list_lines, freq, operation_star
         layer.create_line(line_name, stops, sections, TimeTable.create_table_freq(operation_start_time, operation_end_time, freq))
 
 
+# Helper to check if the path is a valid file
+def _path_file_type(path):
+    if os.path.isfile(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
+
+
+# Helper function for output path (no need to exist)
+def _output_file_type(path):
+    """
+    Validates only the directory part of the path exists,
+    but allows the file itself to not exist yet.
+    """
+    directory = os.path.dirname(path) or "."
+    if os.path.isdir(directory):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"Directory {directory} does not exist")
+
+
 ##############
 ### Script ###
 ##############
 
-### Get the lines definition from the data
-lines = []
-list_bus_lines = extract_amsterdam_stops(bus_xml_directory)
-list_tram_lines = extract_amsterdam_stops(tram_xml_directory)
-list_metro_lines = extract_amsterdam_stops(metro_xml_directory) # /!\ keep only one JOPA for each direction in the data file
-                                                                    # JOPA correspond to different operation patterns, eg express train that do not stop at certain stations
-### Get the MLGraph without TCs
-amsterdam_graph = load_graph(amsterdam_json_filepath)
-roads = amsterdam_graph.roads
+# Entry point of the script
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Convert Bison (Netherland) public transport data to MnMS JSON graph')
+    parser.add_argument('mnms_file', type=_path_file_type, help='Path to the MnMS JSON file')
+    parser.add_argument("output_file", type=_output_file_type, help="Path to the JSON output file (directory must exists)")
 
-### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
-pt_lines = list_tram_lines + list_metro_lines + list_bus_lines
-pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines) + ['BUS'] * len(list_bus_lines)
-pt_nodes = {}
-for line, line_type in zip(pt_lines, pt_lines_types):
-    for ind, stop in line.iterrows():
-        x = float(df_points["LOCATIONXEW"].loc[df_points["DATAOWNERCODE"] == stop['STOP_CODE']])
-        y = float(df_points["LOCATIONYNS"].loc[df_points["DATAOWNERCODE"] == stop['STOP_CODE']])
-        x_utm, y_utm = rd_to_utm(x, y)
-        node_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind)
-        pt_nodes[node_id] = [x_utm,y_utm]
-        roads.register_node(node_id, [x_utm, y_utm])
-        if ind > 0:
-            onode_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind-1)
-            dnode_id = node_id
-            section_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind-1) + '_' + str(ind)
-            section_length = _norm(np.array(pt_nodes[onode_id]) - np.array(pt_nodes[dnode_id]))
-            roads.register_section(section_id, onode_id, dnode_id, section_length)
-            roads.register_stop(onode_id, section_id, 0.)
-        if ind == max(line.index):
-            roads.register_stop(dnode_id, section_id, 1.)
+    args = parser.parse_args()
 
-### Overwrite the roads zoning with a new zoning including all sections
-roads.add_zone(generate_one_zone("RES", roads))
+    ### Get the lines definition from the data
+    lines = []
+    list_bus_lines = extract_amsterdam_stops(bus_xml_directory)
+    list_tram_lines = extract_amsterdam_stops(tram_xml_directory)
+    list_metro_lines = extract_amsterdam_stops(metro_xml_directory) # /!\ keep only one JOPA for each direction in the data file
+                                                                        # JOPA correspond to different operation patterns, eg express train that do not stop at certain stations
+    ### Get the MLGraph without TCs
+    amsterdam_graph = load_graph(args.mnms_file)
+    roads = amsterdam_graph.roads
 
-### Create the PT layers, mob services and lines
-# Bus
-bus_service = PublicTransportMobilityService('BUS')
-bus_layer = PublicTransportLayer(roads, 'BUSLayer', Bus, traditional_vehs_default_speed,
-        services=[bus_service])
-generate_public_transportation_lines(bus_layer, list_bus_lines, bus_freq, operation_start_time, operation_end_time, 'BUS_')
-# Metro
-metro_service = PublicTransportMobilityService('METRO')
-metro_layer = PublicTransportLayer(roads, 'METROLayer', Metro, metro_default_speed,
-        services=[metro_service])
-generate_public_transportation_lines(metro_layer, list_metro_lines, metro_freq,operation_start_time, operation_end_time, 'METRO_')
-# Tram
-tram_service = PublicTransportMobilityService('TRAM')
-tram_layer = PublicTransportLayer(roads, 'TRAMLayer', Tram, tram_default_speed,
-        services=[tram_service])
-generate_public_transportation_lines(tram_layer, list_tram_lines, tram_freq, operation_start_time, operation_end_time, 'TRAM_')
+    ### Add the nodes, sections, and stops related to each PT line to the roadDescriptor
+    pt_lines = list_tram_lines + list_metro_lines + list_bus_lines
+    pt_lines_types = ['TRAM'] * len(list_tram_lines) + ['METRO'] * len(list_metro_lines) + ['BUS'] * len(list_bus_lines)
+    pt_nodes = {}
+    for line, line_type in zip(pt_lines, pt_lines_types):
+        for ind, stop in line.iterrows():
+            x = float(df_points["LOCATIONXEW"].loc[df_points["DATAOWNERCODE"] == stop['STOP_CODE']])
+            y = float(df_points["LOCATIONYNS"].loc[df_points["DATAOWNERCODE"] == stop['STOP_CODE']])
+            x_utm, y_utm = rd_to_utm(x, y)
+            node_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind)
+            pt_nodes[node_id] = [x_utm,y_utm]
+            roads.register_node(node_id, [x_utm, y_utm])
+            if ind > 0:
+                onode_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind-1)
+                dnode_id = node_id
+                section_id = line_type + '_' + stop['LINE_ID'] + '_' + str(ind-1) + '_' + str(ind)
+                section_length = _norm(np.array(pt_nodes[onode_id]) - np.array(pt_nodes[dnode_id]))
+                roads.register_section(section_id, onode_id, dnode_id, section_length)
+                roads.register_stop(onode_id, section_id, 0.)
+            if ind == max(line.index):
+                roads.register_stop(dnode_id, section_id, 1.)
 
-### Create the MLGraph with PT
-mlgraph = MultiLayerGraph([bus_layer, tram_layer, metro_layer], None, None)
+    ### Overwrite the roads zoning with a new zoning including all sections
+    roads.add_zone(generate_one_zone("RES", roads))
 
-### Save the graph
-save_graph(mlgraph, mlgraph_dump_file)
+    ### Create the PT layers, mob services and lines
+    # Bus
+    bus_service = PublicTransportMobilityService('BUS')
+    bus_layer = PublicTransportLayer(roads, 'BUSLayer', Bus, traditional_vehs_default_speed,
+            services=[bus_service])
+    generate_public_transportation_lines(bus_layer, list_bus_lines, bus_freq, operation_start_time, operation_end_time, 'BUS_')
+    # Metro
+    metro_service = PublicTransportMobilityService('METRO')
+    metro_layer = PublicTransportLayer(roads, 'METROLayer', Metro, metro_default_speed,
+            services=[metro_service])
+    generate_public_transportation_lines(metro_layer, list_metro_lines, metro_freq,operation_start_time, operation_end_time, 'METRO_')
+    # Tram
+    tram_service = PublicTransportMobilityService('TRAM')
+    tram_layer = PublicTransportLayer(roads, 'TRAMLayer', Tram, tram_default_speed,
+            services=[tram_service])
+    generate_public_transportation_lines(tram_layer, list_tram_lines, tram_freq, operation_start_time, operation_end_time, 'TRAM_')
+
+    ### Create the MLGraph with PT
+    mlgraph = MultiLayerGraph([bus_layer, tram_layer, metro_layer], None, None)
+
+    ### Save the graph
+    save_graph(mlgraph, args.outputfile)
