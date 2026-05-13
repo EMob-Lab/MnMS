@@ -299,12 +299,13 @@ class AbstractMobilityService(ABC):
             # Do not tirgger a matching phase
             self._counter_matching += 1
 
-    def estimate_pickup_time_for_planning(self, pu_node):
+    def estimate_pickup_time_for_planning(self, pu_node, tcurrent : Time):
         """Method that returns the estimated pickup time at a specific node. This
         information is used by user to (re)plan.
 
         Args:
             -pu_node: pickup node
+            -tcurrent: current time
 
         Returns:
             -estimated pickup time in seconds
@@ -727,13 +728,14 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
         for zone in zones:
             self.add_zone(zone)
 
-    def estimate_pickup_time_for_planning(self, pu_node):
+    def estimate_pickup_time_for_planning(self, pu_node, tcurrent : Time):
         """Method that returns the estimated pickup time at a specific node. This
         information is used by user to (re)plan. If the node belongs to several zones,
         return the mean of their estimated pickup times.
 
         Args:
             -pu_node: pickup node
+            -tcurrent: current time
 
         Returns:
             -estimated pickup time in seconds

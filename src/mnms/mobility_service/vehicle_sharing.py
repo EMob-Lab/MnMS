@@ -210,12 +210,13 @@ class VehicleSharingMobilityService(AbstractMobilityService):
     def periodic_maintenance(self, dt: Dt):
         pass
 
-    def estimate_pickup_time_for_planning(self, pu_node):
+    def estimate_pickup_time_for_planning(self, pu_node,tcurrent: Time):
         """Method that returns the estimated pickup time at a specific node. This
         information is used by user to (re)plan.
 
         Args:
             -pu_node: pickup node
+            -tcurrent: current time
 
         Returns:
             -estimated pickup time in seconds

@@ -543,19 +543,20 @@ class PublicTransportMobilityService(AbstractMobilityService):
             sys.exit(-1)
         return chosen_line_id, chosen_line
 
-    def estimate_pickup_time_for_planning(self, pu_node):
+    def estimate_pickup_time_for_planning(self, pu_node, tcurrent: Time):
         """Method that returns the estimated pickup time for a specific public transport
         node. The estimated pick up time corresponds to the headway of the line serving
         the node divided by 2.
 
         Args:
             -pu_node: pickup node
+            -tcurrent: current time
 
         Returns:
             -estimated_pickup_time: estimated pickup time in seconds
         """
         _, chosen_line = self.find_line(pu_node)
-        freq = chosen_line['table'].get_freq()
+        freq = chosen_line['table'].get_freq(tcurrent)
         if freq is not None:
             estimated_pickup_time = freq / 2
         else:

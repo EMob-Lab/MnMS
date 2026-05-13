@@ -297,13 +297,30 @@ class TimeTable(object):
             if date < d:
                 return d
 
-    def get_freq(self):
-        if len(self.table) > 1:
-            waiting_times_seconds = [self.table[i+1].to_seconds()-self.table[i].to_seconds() for i in range(len(self.table)-1)]
+    def     get_freq(self, tcurrent:Time=None):
+    """Method that returns the mean frequence for a specific time table.
+       Only time values greater than the current time are taken into account (if the current time is set)
+
+            Args:
+                -tcurrent: current time
+
+            Returns:
+                -Mean frequence
+            """
+
+        n0 = 0
+        if tcurrent:
+            for i, t in enumerate(self.table):
+                if t < tcurrent:
+                    n0 = i
+
+        if (len(self.table) - n0) > 1:
+            waiting_times_seconds = [self.table[i+1].to_seconds()-self.table[i].to_seconds() for i in range(n0,len(self.table)-1)]
             return np.mean(waiting_times_seconds)
         else:
             log.warning("TimeTable has no Time and cant compute a frequency")
             return None
+
     def __add__(self, other):
         return TimeTable(self.table + other.table)
 

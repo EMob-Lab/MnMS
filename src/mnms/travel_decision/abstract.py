@@ -673,7 +673,7 @@ class AbstractDecisionModel(ABC):
             log.error(f'Case not yet developped')
             sys.exit(-1)
 
-    def parse_paths(self, paths, uids, chosen_mservices, nb_paths, users_paths, intermodality=None):
+    def parse_paths(self, paths, uids, chosen_mservices, nb_paths, users_paths, tcurrent: Time, intermodality=None):
         """Method that parsed HiPOP outputs.
 
         Args:
@@ -682,6 +682,7 @@ class AbstractDecisionModel(ABC):
             -chosen_mservices: list of map between available layer and chosen mob service
             -nb_paths: nb of paths requested
             -users_paths: list of saved shortest paths for users who are (re)planning
+            -tcurrent: current time
             -intermodality: specifies if specific layers must be passed through
 
         Return:
@@ -706,7 +707,7 @@ class AbstractDecisionModel(ABC):
                         if self.save_routes_dynamically_and_reapply:
                             self.save_computed_route(p[0], chosen_mservices[i], intermodality)
                         p = Path(p[1], p[0]) # at this stage, p.path_cost contains the first stage cost
-                        self.treat_path(p, chosen_mservices[i], user, gnodes)
+                        self.treat_path(p, chosen_mservices[i], user, gnodes, tcurrent)
                         # NB: we save this path even if equal to an already saved path, it is useful for testing purposes
                         user_paths.append(p)
                     else:
@@ -718,7 +719,7 @@ class AbstractDecisionModel(ABC):
                 log.warning(f'Zero path computed for user {user_id} for mode combination {chosen_mservices[i]}, {kpath}')
         return users_paths
 
-    def treat_path(self, p, chosen_mservice, user, gnodes):
+    def treat_path(self, p, chosen_mservice, user, gnodes, tcurrent: Time):
         """Method that achieves the building of a path.
 
         Args:
@@ -726,12 +727,13 @@ class AbstractDecisionModel(ABC):
             -chosen_mservice: the dict specifying which mobility service is used on which layer
             -user: the user who is considering this path
             -gnodes: the graph nodes
+            -tcurrent: current time
         """
         p.construct_layers_from_links(gnodes)
         path_mobservices = [chosen_mservice[layer_id] for layer_id,_ in p.layers]
         p.set_mobility_services(path_mobservices)
         # Second stage path cost computation = take into account waiting time
-        estim_waiting_time = sum([self._mlgraph.layers[layer].mobility_services[service].estimate_pickup_time_for_planning(p.nodes[node_inds][0]) for (layer, node_inds), service in zip(p.layers, p.mobility_services) if service != 'WALK'])
+        estim_waiting_time = sum([self._mlgraph.layers[layer].mobility_services[service].estimate_pickup_time_for_planning(p.nodes[node_inds][0], tcurrent) for (layer, node_inds), service in zip(p.layers, p.mobility_services) if service != 'WALK'])
         p.increment_path_cost(self.waiting_cost_functions[self._cost](estim_waiting_time))
         # Third stage path cost computation = eventually add additional cost
         p.increment_path_cost(self.additional_cost_functions[self._cost](p, user))
@@ -782,7 +784,7 @@ class AbstractDecisionModel(ABC):
                 sys.exit(-1)
 
             ## Parse the outputs of HiPOP and proceed to path selection
-            users_paths = self.parse_paths(paths, uids, chosen_mservices, nb_paths, users_paths)
+            users_paths = self.parse_paths(paths, uids, chosen_mservices, nb_paths, users_paths, tcurrent)
 
         ### If self._considered_modes is defined, proceed to the guided paths discovery
         else:
