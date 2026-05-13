@@ -297,8 +297,8 @@ class TimeTable(object):
             if date < d:
                 return d
 
-    def     get_freq(self, tcurrent:Time=None):
-    """Method that returns the mean frequence for a specific time table.
+    def get_freq(self, tcurrent:Time=None):
+        """Method that returns the mean frequence for a specific time table.
        Only time values greater than the current time are taken into account (if the current time is set)
 
             Args:
