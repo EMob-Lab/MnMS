@@ -55,6 +55,9 @@ def convert_osm_to_mnms(osm_query, output_file, zone_dict: Dict[str, List[str]] 
         up_nid = iedge[0]
         down_nid = iedge[1]
         length = edge["length"]
+        name=None
+        if 'name' in edge.keys():
+            name = edge["name"]
 
         # Get WGS coordinates for upstream and downstream nodes
         up_node = osm_graph.nodes[up_nid]
@@ -72,7 +75,7 @@ def convert_osm_to_mnms(osm_query, output_file, zone_dict: Dict[str, List[str]] 
         nodes[down_nid].append(coords_aval)
 
         # Store edge information
-        edges[lid] = {"up": up_nid, "down": down_nid, "length": length}
+        edges[lid] = {"up": up_nid, "down": down_nid, "length": length, "name":name}
 
         # Track which nodes and links are part of the car layer
         link_car.add(lid)
@@ -84,11 +87,11 @@ def convert_osm_to_mnms(osm_query, output_file, zone_dict: Dict[str, List[str]] 
 
     # Register nodes in the road descriptor
     for nid, pos in nodes.items():
-        roads.register_node(nid, pos)
+        roads.register_node(str(nid), pos)
 
     # Register sections (edges) in the road descriptor
     for eid, edata in edges.items():
-        roads.register_section(eid, edata['up'], edata['down'], edata['length'])
+        roads.register_section(eid, str(edata['up']), str(edata['down']), edata['length'], edata['name'])
 
     # Define zones: either multiple zones from file or a bounding box for a single zone
     if mono_res is None:
@@ -104,7 +107,7 @@ def convert_osm_to_mnms(osm_query, output_file, zone_dict: Dict[str, List[str]] 
 
     # Create car layer nodes
     for n in node_car:
-        car_layer.create_node(str(n), n)
+        car_layer.create_node(str(n), str(n))
 
     # Create car layer links
     for lid in link_car:
@@ -166,7 +169,7 @@ if __name__ == "__main__":
     # Set log level
     log.setLevel(LOGLEVEL.INFO)
 
-    log.info(f"Writing MNMS graph at '{args.output_dir}' ...")
+    #log.info(f"Writing MNMS graph at '{args.output_dir}' ...")
 
     # Run conversion with appropriate zone definition
     if args.mono_res is not None:
