@@ -1,0 +1,58 @@
+[project]
+name = "MnMS" # TODO switch to lower case?
+version = "1.0.1"
+description = "Agent-based Multimodal Urban Moblity Simulator resulting from the ERC MAGnUM project"
+readme = "README.md"
+requires-python = ">= 3.10"
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
+# TODO authors/maintainers
+keywords = [
+    "traffic",
+    "urban-mobility",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10", # Oldest supported version (must be kept consistent with `ci.yaml`).
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14", # Most recent supported version (must be kept consistent with `ci.yaml`).
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "dill >= 0.4",
+    "jsonpickle >= 4.1",
+    "matplotlib >= 3.10",
+    "numpy >= 2.2",
+    "pandas >= 2.3",
+    "scipy >= 1.15",
+    "scisoftdev-tmp-HiPOP >= 1.0", # TODO swich the final package when available
+    "seaborn >= 0.13",
+    "shapely >= 2.1",
+]
+
+[project.urls]
+Repository = "https://github.com/EMob-Lab/MnMS"
+Issues = "https://github.com/EMob-Lab/MnMS/issues"
+
+[dependency-groups]
+test = [ # Dependencies needed for test tasks.
+    "pytest >= 9.1",
+]
+dev = [ # All dependencies needed for development tasks.
+    { include-group = "test" },
+]
+distrib = [ # Dependencies needed to build distribution files (wheels & source distributions).
+    "build >= 1.6",
+]
+
+[build-system]
+requires = [
+    "hatchling >= 1.32",
+]
+build-backend = "hatchling.build"

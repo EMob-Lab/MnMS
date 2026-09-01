@@ -1,0 +1,8 @@
+[pytest]
+addopts = [
+    "--verbose",
+    "-W error", # Report Python warnings as errors.
+]
+testpaths = [
+    "tests",
+]
