@@ -1,0 +1,9 @@
+project-includes = [
+    "src/**/*.py",
+]
+preset = "strict"
+
+[errors]
+unannotated-return = "error"
+unnecessary-type-conversion = "error"
+untyped-import = "error"
