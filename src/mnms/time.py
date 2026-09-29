@@ -55,10 +55,10 @@ class Dt(object):
         minutes = int(self._minutes-int(other._minutes))
         hours = int(self._hours-int(other._hours))
         if seconds < 0:
-            seconds = 60 + seconds
+            seconds += 60
             minutes -= 1
         if minutes < 0:
-            minutes = 60 + seconds
+            minutes += 60
             hours -= 1
 
         return Dt(hours, minutes, seconds)
