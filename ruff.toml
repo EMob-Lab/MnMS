@@ -1,0 +1,32 @@
+include = [
+    "examples/**/*.py",
+    "src/**/*.py",
+    "tests/**/*.py",
+]
+
+indent-width = 4
+line-length = 120
+src = ["src"] # First-party code location (for import sorting)
+
+[lint]
+# The default ruleset is used (since no `select = ...` field is set):
+# https://docs.astral.sh/ruff/default-rules/
+
+ignore = [ # See https://docs.astral.sh/ruff/rules/ for the list of rules and rule codes.
+
+    # FIXME Definitively worth enabling. But in the current codebase,
+    # most issues raised by this check relates to missing imports for type annotations.
+    # Fixing them blindly by adding the missing imports often creates circular dependencies
+    # between modules. Significant refactoring would be necessary to split the modules
+    # involved in these circular dependencies.
+    "F821", # undefined-name
+
+    # FIXME Definitively worth enabling, but it would require to refactor the classes
+    # that open a file and keep it opened as an instance member (typically: the observers).
+    # These classes should declare methods __enter__() and __exit__(), turning them
+    # into custom context managers.
+    "SIM115", # open-file-with-context-handler
+]
+
+[format]
+exclude = ["*"] # Disable the Ruff formatter

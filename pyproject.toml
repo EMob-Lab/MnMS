@@ -52,6 +52,7 @@ doc = [ # Dependencies needed to generate the documenation.
 ]
 lint = [ # Dependencies needed for linting / static analysis.
     "pre-commit >= 4.6",
+    "ruff >= 0.16",
 ]
 test = [ # Dependencies needed for test tasks.
     "pytest >= 9.1",
