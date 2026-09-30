@@ -55,10 +55,10 @@ class Dt(object):
         minutes = self._minutes-other._minutes
         hours = self._hours-other._hours
         if seconds < 0:
-            seconds = 60 + seconds
+            seconds += 60
             minutes -= 1
         if minutes < 0:
-            minutes = 60 + seconds # FIXME Wrong normalization here
+            minutes += 60
             hours -= 1
 
         return Dt(hours, int(minutes), seconds)
