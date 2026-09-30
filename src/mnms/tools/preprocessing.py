@@ -1,10 +1,16 @@
 import multiprocessing
 import json
 import time
+from typing import AbstractSet, Mapping
 
+from hipop.graph import OrientedGraph
 from hipop.shortest_path import parallel_dijkstra, parallel_dijkstra_single_source, floyd_warshall
 
-def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile):
+def compute_all_shortest_paths_naive(
+        graph: OrientedGraph,
+        chosen_mservice: Mapping[str, str],
+        layer_name: str,
+        outfile: str) -> None:
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
     graph of a layer and write them to a file. By shortest we mean in distance.
     It is a naive approach that launches in parallel dijkstra for all pairs.
@@ -41,7 +47,11 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
     with open(outfile, 'w') as f:
         json.dump(sps, f)
 
-def compute_all_shortest_paths_floyd_warshall(graph, chosen_mservice, layer_name, outfile):
+def compute_all_shortest_paths_floyd_warshall(
+        graph: OrientedGraph,
+        chosen_mservice: Mapping[str, str],
+        layer_name: str,
+        outfile: str) -> None:
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
     graph of a layer and write them to a file. By shortest we mean in distance.
     It launches the Floyd-Warshall algorithm to do so.
@@ -81,7 +91,11 @@ def compute_all_shortest_paths_floyd_warshall(graph, chosen_mservice, layer_name
         json.dump(spts, f)
 
 
-def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
+def compute_all_shortest_paths(
+        graph: OrientedGraph,
+        chosen_mservice: Mapping[str, str],
+        layer_name: str,
+        outfile: str) -> None:
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
     graph of a layer and write them to a file. By shortest we mean in distance.
     It launches in parallel the single source dijkstra for all pairs.
@@ -110,7 +124,7 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
     with open(outfile, 'w') as f:
         json.dump(spts_dict, f)
 
-def decode_shortest_path_tree(spts, origin, destination):
+def decode_shortest_path_tree(spts: Mapping[str, Mapping[str, str]], origin: str, destination: str) -> list[str]:
     """Function to build the shortest path from the shortest path tree.
 
     Args:

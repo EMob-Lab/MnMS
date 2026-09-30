@@ -34,8 +34,11 @@ dependencies = [
     "numpy >= 2.2",
     "pandas >= 2.3",
     "scipy >= 1.15",
+    "scipy-stubs >= 1.15",
     "seaborn >= 0.13",
     "shapely >= 2.1",
+    "types-seaborn >= 0.13",
+    "types-shapely >= 2.1",
 ]
 
 [project.urls]

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import sys
 from decimal import Decimal
@@ -14,7 +16,7 @@ class Dt(object):
     def __init__(self,
                  hours: int = 0,
                  minutes: int = 0,
-                 seconds: float = 0):
+                 seconds: float | Decimal = 0) -> None:
         """
         Class representing a delta time
 
@@ -29,31 +31,29 @@ class Dt(object):
         assert seconds >= 0
 
         new_seconds = Decimal(seconds)%60
-        new_minutes = minutes + seconds//60
-        hours = hours + new_minutes//60
-        minutes = new_minutes%60
-        seconds = new_seconds%60
+        new_minutes = int(minutes + seconds//60)
+        new_hours = hours + new_minutes//60
 
-        self._hours = int(hours)
-        self._minutes = int(minutes)
-        self._seconds = Decimal(seconds)
+        self._hours = new_hours
+        self._minutes = new_minutes%60
+        self._seconds = new_seconds%60
 
-    def __mul__(self, other:int):
+    def __mul__(self, other: int) -> Dt:
         seconds = self._seconds*other
-        minutes = int(self._minutes*other)
-        hours = int(self._hours*other)
+        minutes = self._minutes*other
+        hours = self._hours*other
         return Dt(hours, minutes, seconds)
 
-    def __add__(self, other):
+    def __add__(self, other: Dt) -> Dt:
         seconds = self._seconds+other._seconds
-        minutes = int(self._minutes+other._minutes)
-        hours = int(self._hours+other._hours)
+        minutes = self._minutes+other._minutes
+        hours = self._hours+other._hours
         return Dt(hours, minutes, seconds)
 
-    def __sub__(self, other):
+    def __sub__(self, other: Dt) -> Dt:
         seconds = self._seconds-other._seconds
-        minutes = int(self._minutes-int(other._minutes))
-        hours = int(self._hours-int(other._hours))
+        minutes = self._minutes-other._minutes
+        hours = self._hours-other._hours
         if seconds < 0:
             seconds += 60
             minutes -= 1
@@ -61,30 +61,30 @@ class Dt(object):
             minutes += 60
             hours -= 1
 
-        return Dt(hours, minutes, seconds)
+        return Dt(hours, int(minutes), seconds)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"dt(hours:{self._hours}, minutes:{self._minutes}, seconds:{self._seconds})"
 
-    def __eq__(self, other):
-        return self.to_seconds() == other.to_seconds()
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Dt) and self.to_seconds() == other.to_seconds()
 
-    def __lt__(self, other):
+    def __lt__(self, other: Dt) -> bool:
         return self.to_seconds() < other.to_seconds()
 
-    def __le__(self, other):
+    def __le__(self, other: Dt) -> bool:
         return self.to_seconds() <= other.to_seconds()
 
-    def __gt__(self, other):
+    def __gt__(self, other: Dt) -> bool:
         return self.to_seconds() > other.to_seconds()
 
-    def __ge__(self, other):
+    def __ge__(self, other: Dt) -> bool:
         return self.to_seconds() >= other.to_seconds()
 
-    def to_seconds(self):
-        return float(int(self._hours * 3600) + int(self._minutes * 60) + self._seconds)
+    def to_seconds(self) -> float:
+        return float(self._hours * 3600 + self._minutes * 60 + self._seconds)
 
-    def copy(self):
+    def copy(self) -> Dt:
         copy = Dt()
         copy._hours = self._hours
         copy._minutes = self._minutes

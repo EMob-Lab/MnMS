@@ -1,8 +1,9 @@
 from math import ceil
 from time import perf_counter_ns
+from typing import Any, Callable, SupportsIndex
 
 
-def _format(timing):
+def _format(timing: float) -> str:
     timing = float(timing)
     if timing < 6e10:
         return f"{int(timing / 1e9)} s"
@@ -13,18 +14,25 @@ def _format(timing):
 
 
 class ProgressBar(object):
-    def __init__(self, stop: int, start=0, text='Run', size_bar=20, item='■'):
+    def __init__(
+            self,
+            stop: int,
+            start: int = 0,
+            text: str = 'Run',
+            size_bar: int = 20,
+            item: str = '■') -> None:
+
         self._max = stop
         self._index = start
         self._text = text
         self._size_bar = size_bar
         self._item = item
 
-        self._bar = None
-        self._ptime = None
-        self._mean_time = 0
+        self._bar: str | None = None
+        self._ptime: int | None = None
+        self._mean_time: float = 0
 
-    def update(self):
+    def update(self) -> None:
         timing = perf_counter_ns()
         cur = (self._index/self._max)*self._size_bar
         nb_hash = ceil(cur)
@@ -41,13 +49,13 @@ class ProgressBar(object):
         self._index += 1
         self._ptime = perf_counter_ns()
 
-    def show(self):
+    def show(self) -> None:
         print(self._bar, end='', flush=True)
 
     def end(self) -> None:
         print("")
 
-    def execute(self, func, *args, **kwargs):
+    def execute(self, func: Callable[[SupportsIndex | float], None], *args: Any, **kwargs: Any) -> None:
         func(*args, **kwargs)
         self.update()
         self.show()

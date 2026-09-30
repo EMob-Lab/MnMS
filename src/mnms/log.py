@@ -1,3 +1,4 @@
+from logging import Logger
 import logging
 
 
@@ -10,10 +11,10 @@ class LOGLEVEL():
     NOTSET   = 0
 
 
-def create_logger(logname,
-                  base_level=LOGLEVEL.WARNING,
+def create_logger(logname: str,
+                  base_level: int = LOGLEVEL.WARNING,
                   # stream_level=LOGLEVEL.INFO,
-                  ):
+                  ) -> Logger:
     # format = f'%(levelname)s(%(name)s): %(message)s'
     logger = logging.getLogger(logname)
     logger.setLevel(base_level)
@@ -26,23 +27,23 @@ def create_logger(logname,
     return logger
 
 
-def get_all_mnms_logger():
+def get_all_mnms_logger() -> list[Logger]:
     return [logging.getLogger(name) for name in logging.root.manager.loggerDict if name.startswith('mnms')]
 
 
-def get_logger(logger_name):
+def get_logger(logger_name: str) -> Logger:
     return logging.getLogger(logger_name)
 
 
-def set_mnms_logger_level(level, loggers=[]):
+def set_mnms_logger_level(level: int, loggers: list[Logger] = []) -> None:
     [logging.getLogger(logger).setLevel(level) if isinstance(logger, str) else logger.setLevel(level) for logger in loggers]
 
 
-def set_all_mnms_logger_level(level):
+def set_all_mnms_logger_level(level: int) -> None:
     set_mnms_logger_level(level, get_all_mnms_logger())
 
 
-def attach_log_file(filename:str, file_level=LOGLEVEL.INFO):
+def attach_log_file(filename: str, file_level: int = LOGLEVEL.INFO) -> None:
     loggers = get_all_mnms_logger()
     file_handler = logging.FileHandler(filename, mode="w")
     file_handler.setLevel(file_level)
