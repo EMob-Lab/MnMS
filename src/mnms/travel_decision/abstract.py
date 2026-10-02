@@ -1,25 +1,28 @@
-import sys
-from abc import ABC, abstractmethod
-from typing import List, Set, Dict, Callable
-from collections import defaultdict
-from enum import Enum
 import csv
-import multiprocessing
 import itertools
 import json
+import multiprocessing
+import sys
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from collections.abc import Callable
+from enum import Enum
 
 import numpy as np
+from hipop.shortest_path import (
+    compute_path_length,
+    dijkstra,
+    parallel_k_intermodal_shortest_path,
+    parallel_k_shortest_path,
+)
 from numpy.linalg import norm as _norm
 
-from mnms.demand.user import User, Path, UserState
+from mnms.demand.user import Path, User, UserState
 from mnms.graph.layers import MultiLayerGraph
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.log import create_logger
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.time import Time
 from mnms.tools.dict_tools import sum_dict
-from mnms.tools.exceptions import PathNotFound
-
-from hipop.shortest_path import parallel_k_shortest_path, parallel_k_intermodal_shortest_path, dijkstra, compute_path_length
 
 log = create_logger(__name__)
 
@@ -39,7 +42,7 @@ class AbstractDecisionModel(ABC):
                  cost_multiplier_to_find_k_paths: float = 10,
                  max_retry_to_find_k_paths: int = 50,
                  personal_mob_service_park_radius: float = 100,
-                 outfile: str = None,
+                 outfile: str | None = None,
                  verbose_file: bool = False,
                  cost: str = 'travel_time',
                  thread_number: int = multiprocessing.cpu_count(),
@@ -102,8 +105,8 @@ class AbstractDecisionModel(ABC):
         self._cost = cost
         self._verbose_file = verbose_file
 
-        self._refused_user: List[User] = list()
-        self._users_for_planning: List[Tuple[User, Event]] = list()
+        self._refused_user: list[User] = []
+        self._users_for_planning: list[tuple[User, Event]] = []
         self._waiting_cost_functions = {'travel_time': lambda wt: wt}
         self._additional_cost_functions = defaultdict(lambda: lambda p,u: 0)
 
@@ -123,9 +126,8 @@ class AbstractDecisionModel(ABC):
         # On retire l'attribut 'b' de la sérialisation
         state = self.__dict__.copy()
 
-        if self._write == True:
-            if '_csvhandler' in state:
-                del state['_csvhandler']
+        if self._write == True and '_csvhandler' in state:
+            del state['_csvhandler']
 
         return state
 
@@ -163,7 +165,7 @@ class AbstractDecisionModel(ABC):
         pass
 
     @abstractmethod
-    def path_choice(self, paths: List[Path]) -> Path:
+    def path_choice(self, paths: list[Path]) -> Path:
         pass
 
     @property
@@ -194,7 +196,7 @@ class AbstractDecisionModel(ABC):
         """
         self._additional_cost_functions[cost_name] = func
 
-    def add_users_for_planning(self, users:List[User], events:List[Event]):
+    def add_users_for_planning(self, users: list[User], events: list[Event]):
         """Add users in the list for (re)planning.
 
         Args:
@@ -202,7 +204,7 @@ class AbstractDecisionModel(ABC):
             -events: corresponding list of events which triggered the need for (re)planning
         """
         if users and events:
-            assert len(users) == len(events), f'The list of users and events should have the same length.'
+            assert len(users) == len(events), 'The list of users and events should have the same length.'
             users_already_in_list = list(zip(*self._users_for_planning))
             users_already_in_list = users_already_in_list[0] if users_already_in_list else []
             users_events = []
@@ -222,7 +224,7 @@ class AbstractDecisionModel(ABC):
         if user.path.layers == []:
             user.path.construct_layers_from_links(self._mlgraph.graph.nodes)
         if user.path.mobility_services == []:
-            if 'TRANSIT' not in user.forced_path_chosen_mobility_services.keys():
+            if 'TRANSIT' not in user.forced_path_chosen_mobility_services:
                 user.forced_path_chosen_mobility_services['TRANSIT'] = 'WALK'
             user.path.set_mobility_services([user.forced_path_chosen_mobility_services[l] for l,_ in user.path.layers])
         log.info(f'User {user.id} do not plan at departure, use forced path {user.path}')
@@ -248,7 +250,7 @@ class AbstractDecisionModel(ABC):
             # Check user's planning origin with regard to each currently available personal mobility service
             for personal_mob_service in personal_mob_services:
                 if (u.available_mobility_services) and (personal_mob_service in u.available_mobility_services):
-                    if personal_mob_service in u.parked_personal_vehicles.keys():
+                    if personal_mob_service in u.parked_personal_vehicles:
                         # User has already used and parked her personal vehicle, check if the parking location is nearby
                         parking_node = u.parked_personal_vehicles[personal_mob_service]
                         parking_pos = gnodes[parking_node].position
@@ -323,23 +325,23 @@ class AbstractDecisionModel(ABC):
                 if e == Event.DEPARTURE:
                     try:
                         u.set_available_mobility_services(set(u_graph['None']['DEPARTURE']))
-                    except:
+                    except KeyError:
                         log.warning(f'Cannot find transition None->DEPARTURE in {u.mobility_services_graph} mobility services events graph, all services available')
                         u.set_available_mobility_services(all_mob_services_ids)
                 elif e == Event.MATCH_FAILURE:
-                    ams_str = ' '.join(sorted(list(u.available_mobility_services)))
+                    ams_str = ' '.join(sorted(u.available_mobility_services))
                     # Find back the mob service for which there was a match failure
                     failed_mservice = u.get_failed_mobility_service()
                     try:
                         u.set_available_mobility_services(set(u_graph[ams_str][failed_mservice]))
-                    except:
+                    except KeyError:
                         log.warning(f'Cannot find transition {ams_str}->{failed_mservice} in {u.mobility_services_graph} mobility services events graph, {failed_mservice} removed')
                         u.remove_available_mobility_service(failed_mservice)
                 else:
-                    ams_str = ' '.join(sorted(list(u.available_mobility_services)))
+                    ams_str = ' '.join(sorted(u.available_mobility_services))
                     try:
                         u.set_available_mobility_services(set(u_graph[ams_str][e._name_]))
-                    except:
+                    except KeyError:
                         # No modification of the list of available mobility services
                         log.warning(f'Cannot find transition {ams_str}->{e._name_} in {u.mobility_services_graph} mobility services events graph, list unchanged')
 
@@ -418,7 +420,7 @@ class AbstractDecisionModel(ABC):
                 # User (re)plan from next node
                 u_origin = u.current_link[1]
             elif u.state == UserState.WALKING:
-                if u.current_link[1] in self._mlgraph.graph.nodes[u.current_link[0]].adj.keys():
+                if u.current_link[1] in self._mlgraph.graph.nodes[u.current_link[0]].adj:
                     # User (re)plan from next node if current transit link still exists
                     u_origin = u.current_link[1]
                 else:
@@ -468,38 +470,40 @@ class AbstractDecisionModel(ABC):
                 ams_combination_set = set(ams_combination)
                 ams_combination_set.add('WALK')
                 # Check if user has already found the proper nb of paths for this mob services combination
-                if saved_paths is not None:
-                    if u.id in saved_paths.keys():
-                        u_saved_paths = saved_paths[u.id]['paths']
-                        if intermodality is None:
-                            u_saved_paths_of_this_ms_combination = [set(sp.mobility_services).issubset(ams_combination_set) for sp in u_saved_paths]
-                        else:
-                            u_saved_paths_of_this_ms_combination_cond1 = [set(sp.mobility_services).issubset(ams_combination_set) for sp in u_saved_paths]
-                            u_saved_paths_of_this_ms_combination_cond2 = [True if (set([l for l,_ in sp.layers]) & intermodality[0]) and \
-                                (set([l for l,_ in sp.layers]) & intermodality[1]) else False for sp in u_saved_paths]
-                            #log.info(f'User {u.id} , intermodality={intermodality}, u_saved_paths={u_saved_paths}')
-                            u_saved_paths_of_this_ms_combination = [c1 and c2 for c1,c2 in zip(u_saved_paths_of_this_ms_combination_cond1,u_saved_paths_of_this_ms_combination_cond2)]
-                        nb_saved_paths_of_this_ms_combination = sum(u_saved_paths_of_this_ms_combination)
-                        #if nb_saved_paths_of_this_ms_combination > 0 and nb_saved_paths_of_this_ms_combination < k:
-                        #    log.info(f'User {u.id} already found some paths for modes combination {ams_combination} but not enough ({nb_saved_paths_of_this_ms_combination}/{k})')
-                        if nb_saved_paths_of_this_ms_combination == k:
-                            #log.info(f'User {u.id} already found the proper nb of paths for modes combination {ams_combination}')
-                            continue
-                        # NB: even if we have found some paths for this mode combination, we still look for k cause we may find the same as the one already saved...
-                        # TODO: how to improve this?
+                if saved_paths is not None and u.id in saved_paths:
+                    u_saved_paths = saved_paths[u.id]['paths']
+                    if intermodality is None:
+                        u_saved_paths_of_this_ms_combination = [set(sp.mobility_services).issubset(ams_combination_set) for sp in u_saved_paths]
+                    else:
+                        u_saved_paths_of_this_ms_combination_cond1 = [set(sp.mobility_services).issubset(ams_combination_set) for sp in u_saved_paths]
+                        u_saved_paths_of_this_ms_combination_cond2 = [
+                            bool({l for l,_ in sp.layers} & intermodality[0]) and
+                            bool({l for l,_ in sp.layers} & intermodality[1]) for sp in u_saved_paths
+                        ]
+                        #log.info(f'User {u.id} , intermodality={intermodality}, u_saved_paths={u_saved_paths}')
+                        u_saved_paths_of_this_ms_combination = [c1 and c2 for c1,c2 in zip(u_saved_paths_of_this_ms_combination_cond1,u_saved_paths_of_this_ms_combination_cond2)]
+                    nb_saved_paths_of_this_ms_combination = sum(u_saved_paths_of_this_ms_combination)
+                    #if nb_saved_paths_of_this_ms_combination > 0 and nb_saved_paths_of_this_ms_combination < k:
+                    #    log.info(f'User {u.id} already found some paths for modes combination {ams_combination} but not enough ({nb_saved_paths_of_this_ms_combination}/{k})')
+                    if nb_saved_paths_of_this_ms_combination == k:
+                        #log.info(f'User {u.id} already found the proper nb of paths for modes combination {ams_combination}')
+                        continue
+                    # NB: even if we have found some paths for this mode combination, we still look for k cause we may find the same as the one already saved...
+                    # TODO: how to improve this?
 
                 # Check if a specific planning origin should be used for this mobility services
                 # combination to be able to use a personal mobility service
-                if u.id in personal_ms_planning_origins.keys():
+                if u.id in personal_ms_planning_origins:
                     available_personal_mss = set(personal_ms_planning_origins[u.id].keys())
                     intersection = ams_combination_set.intersection(available_personal_mss)
                     # Launch a warning if intersection has more than one item
-                    if len(intersection) > 1 and len(set([personal_ms_planning_origins[u.id][elem] for elem in intersection])) > 1:
+                    if len(intersection) > 1 and len({personal_ms_planning_origins[u.id][elem] for elem in intersection}) > 1:
                         log.warning(f'User {u.id} have several personal mob services available with different planning origins,'\
                             f' check what to do, for now we take the first arbitrarily ! (user intersection = {intersection})')
                     if len(intersection) >= 1:
-                        u_origin = personal_ms_planning_origins[u.id][list(intersection)[0]]
-                        log.info(f'User {u.id} consider planning origin {u_origin} to be able to access personal mob service {list(intersection)[0]}')
+                        mob_service = next(iter(intersection))
+                        u_origin = personal_ms_planning_origins[u.id][mob_service]
+                        log.info(f'User {u.id} consider planning origin {u_origin} to be able to access personal mob service {mob_service}')
 
                 # Append all info to the proper lists
                 uids.append(u.id)
@@ -526,7 +530,7 @@ class AbstractDecisionModel(ABC):
         """
         gnodes = self._mlgraph.graph.nodes
 
-        for uid, d in users_paths.items():
+        for d in users_paths.values():
             user = d['user']
             user_paths = d['paths']
             event = d['event']
@@ -565,7 +569,7 @@ class AbstractDecisionModel(ABC):
                     user.start_path(gnodes)
                 elif user.state == UserState.WALKING:
                     dist = _norm(user.position - gnodes[chosen_path.nodes[0]].position)
-                    current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj.keys()
+                    current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj
                     if dist <= self.personal_mob_service_park_radius:
                         # User starts the chosen path right now, eventually teleport
                         user.set_path(chosen_path, gnodes=gnodes, max_teleport_dist=self.personal_mob_service_park_radius,
@@ -637,7 +641,7 @@ class AbstractDecisionModel(ABC):
                     f'turns to DEADEND.')
                 user.set_state_deadend(tcurrent)
             elif user.state == UserState.WALKING:
-                current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj.keys()
+                current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj
                 if not current_transit_link_exists:
                     # User turns immediatly DEADEND
                     log.warning(f'User {uid} has found no path during the (re)planning, '\
@@ -670,7 +674,7 @@ class AbstractDecisionModel(ABC):
 
         else:
             # TODO: Define what user should do when path not found following other events
-            log.error(f'Case not yet developped')
+            log.error('Case not yet developped')
             sys.exit(-1)
 
     def parse_paths(self, paths, uids, chosen_mservices, nb_paths, users_paths, intermodality=None):
@@ -844,7 +848,7 @@ class AbstractDecisionModel(ABC):
         ### Path selection
         self.path_selection(users_paths, tcurrent)
 
-    def compute_path(self, origin: str, destination: str, accessible_layers: Set[str], chosen_services: Dict[str, str]):
+    def compute_path(self, origin: str, destination: str, accessible_layers: set[str], chosen_services: dict[str, str]):
         try:
             return dijkstra(self._mlgraph.graph,
                             origin,
@@ -945,7 +949,7 @@ class AbstractDecisionModel(ABC):
         mss_list = [l + ':' + ms for (l,ms) in mss_list]
         casted = ','.join(mss_list)
         if intermodality is not None:
-            intermod_list = sorted(['+'.join(sorted(list(s))) for s in intermodality])
+            intermod_list = sorted(['+'.join(sorted(s)) for s in intermodality])
             casted = casted + '__' + '-INTERMODAL-'.join(intermod_list)
 
         return casted

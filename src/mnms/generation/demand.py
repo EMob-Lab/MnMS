@@ -1,13 +1,13 @@
-from operator import attrgetter
 from itertools import count
-import numpy as np
+from operator import attrgetter
 from random import choice
 
-
+import numpy as np
 from hipop.shortest_path import dijkstra
+
+from mnms.demand.manager import BaseDemandManager
 from mnms.demand.user import User
 from mnms.time import Time
-from mnms.demand.manager import BaseDemandManager
 
 
 def generate_random_demand(mlgraph: "MultiLayerGraph",
@@ -52,7 +52,7 @@ def generate_random_demand(mlgraph: "MultiLayerGraph",
     graph = mlgraph.graph
     user_count = 0
 
-    map_layer_services = {lid:list(layer.mobility_services.keys())[0] for lid, layer in mlgraph.layers.items()}
+    map_layer_services = {lid:next(iter(layer.mobility_services)) for lid, layer in mlgraph.layers.items()}
     map_layer_services["TRANSIT"] = "WALK"
 
     while user_count <= nb_user:
@@ -79,7 +79,7 @@ def generate_random_demand(mlgraph: "MultiLayerGraph",
 if __name__ == "__main__":
 
     from mnms.generation.mlgraph import generate_manhattan_passenger_car
-    from mnms.io.graph import save_odlayer, save_graph
+    from mnms.io.graph import save_graph, save_odlayer
 
     mlgraph = generate_manhattan_passenger_car(20, 100)
 

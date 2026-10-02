@@ -1,12 +1,13 @@
-from mnms.log import create_logger
 import numpy as np
+
+from mnms.log import create_logger
 
 log = create_logger(__name__)
 
-class OriginDestinationLayer(object):
+class OriginDestinationLayer:
     def __init__(self):
-        self.origins = dict()
-        self.destinations = dict()
+        self.origins = {}
+        self.destinations = {}
         self.id = "ODLAYER"
 
     def create_origin_node(self, nid, pos: np.ndarray):

@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 import numpy as np
 
 from mnms.graph.road import RoadDescriptor
@@ -26,7 +24,7 @@ def generate_one_zone(roads: RoadDescriptor, zone_id: str) -> Zone:
     return Zone(zone_id, {s for s in roads.sections}, bbox)
 
 
-def generate_line_road(start: List[float], end: List[float], n: int, zone_id: Optional[str] = "RES", bothways: bool = True) -> RoadDescriptor:
+def generate_line_road(start: list[float], end: list[float], n: int, zone_id: str | None = "RES", bothways: bool = True) -> RoadDescriptor:
     """
     Generate a simple line road
 
@@ -364,7 +362,7 @@ def generate_nested_manhattan_road(n_list, link_length_list, zone_id='RES', crea
 
     return merged_road
 
-def generate_pt_line_road(roads, start: List[float], end: List[float], n: int, line_id, length, bothways: bool = True):
+def generate_pt_line_road(roads, start: list[float], end: list[float], n: int, line_id, length, bothways: bool = True):
     """
     Generate a Public Transportation line,
     Can be used to create Metro or Tram lines where all the stops belongs between two nodes

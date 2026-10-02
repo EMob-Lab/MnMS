@@ -1,15 +1,12 @@
-from abc import ABC, abstractmethod, ABCMeta
-from typing import List, Tuple, Optional, Dict
-from mnms.time import Time, Dt
-from mnms.mobility_service.abstract import AbstractMobilityService, Request
-from mnms.log import create_logger
-from mnms.vehicles.veh_type import Vehicle, VehicleActivity
-from mnms.demand.user import User, UserState
-from mnms.tools.observer import TimeDependentSubject
-from mnms.tools.cost import create_service_costs
-from mnms.vehicles.veh_type import VehicleActivityStop, VehicleActivityPickup, VehicleActivityServing, ActivityType
-from mnms.travel_decision.abstract import Event, AbstractDecisionModel
+from mnms.demand.user import User
 from mnms.flow.user_flow import UserFlow
+from mnms.log import create_logger
+from mnms.mobility_service.abstract import AbstractMobilityService, Request
+from mnms.time import Dt
+from mnms.tools.cost import create_service_costs
+from mnms.tools.observer import TimeDependentSubject
+from mnms.travel_decision.abstract import AbstractDecisionModel
+from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity, VehicleActivityServing, VehicleActivityStop
 
 log = create_logger(__name__)
 
@@ -57,15 +54,15 @@ class VehicleSharingMobilityService(AbstractMobilityService):
             -beta: parameter controlling the shape of the estimated pickup time
              curve
         """
-        super(VehicleSharingMobilityService, self).__init__(id, veh_capacity=1, dt_matching=dt_matching,
+        super().__init__(id, veh_capacity=1, dt_matching=dt_matching,
             dt_periodic_maintenance=dt_periodic_maintenance)
 
         self.free_floating_possible = free_floating_possible
         self.critical_nb_vehs = critical_nb_vehs
         self.alpha = alpha
         self.beta = beta
-        self.stations = dict()
-        self.map_node_station = dict()
+        self.stations = {}
+        self.map_node_station = {}
 
     def create_station(self, id_station: str, dbroads_node: str, layer_node:str='', capacity: int=30, nb_initial_veh: int = 0, free_floating=False) \
             -> Station:
@@ -113,7 +110,7 @@ class VehicleSharingMobilityService(AbstractMobilityService):
 
         return station
 
-    def remove_station(self, id_station: str, matched_user_id: str, new_users: List[User], user_flow: UserFlow, decision_model: AbstractDecisionModel):
+    def remove_station(self, id_station: str, matched_user_id: str, new_users: list[User], user_flow: UserFlow, decision_model: AbstractDecisionModel):
         """Method that disconnects and deletes a (free-floating) station from the
         rest of the multi layer graph.
 
@@ -161,7 +158,7 @@ class VehicleSharingMobilityService(AbstractMobilityService):
         """
         id_station = 'ff_station_' + self.id + '_' + veh.current_node
 
-        if id_station in self.stations.keys():
+        if id_station in self.stations:
             self.stations[id_station].waiting_vehicles.append(veh)
         else:
             station = self.create_station(id_station, '', veh.current_node, 1, 0, True)
@@ -225,7 +222,7 @@ class VehicleSharingMobilityService(AbstractMobilityService):
             return 0
         else:
             # Find back the station at pickup node
-            if pu_node in self.map_node_station.keys():
+            if pu_node in self.map_node_station:
                 station_id = self.map_node_station[pu_node]
                 station = self.stations[station_id]
                 estimated_putime = self.alpha * (1 - (len(station.waiting_vehicles)/self.critical_nb_vehs)**self.beta)
@@ -263,7 +260,7 @@ class VehicleSharingMobilityService(AbstractMobilityService):
 
         return service_dt
 
-    def matching(self, request: Request, new_users: List[User], user_flow: UserFlow, decision_model: AbstractDecisionModel, dt: Dt):
+    def matching(self, request: Request, new_users: list[User], user_flow: UserFlow, decision_model: AbstractDecisionModel, dt: Dt):
         """Method that proceeds to the matching between a requesting user and an identified vehicle.
 
         Args:
@@ -280,12 +277,11 @@ class VehicleSharingMobilityService(AbstractMobilityService):
         """
         user = request.user
         drop_node = request.drop_node
-        veh_id, veh_path = self._cache_request_vehicles[user.id]
+        veh_id, _ = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh_id} of mobility service {self._id}')
         upath = list(user.path.nodes)
         upath = upath[user.get_current_node_index():user.get_node_index_in_path(drop_node) + 1]
         user_path = self.construct_veh_path(upath)
-        veh_path = user_path
 
         activities = [
             VehicleActivityServing(node=drop_node,
@@ -316,18 +312,18 @@ class VehicleSharingMobilityService(AbstractMobilityService):
         users_canceling = []
         return users_canceling
 
-    def replanning(self, veh: Vehicle, new_activities: List[VehicleActivity]) -> List[VehicleActivity]:
+    def replanning(self, veh: Vehicle, new_activities: list[VehicleActivity]) -> list[VehicleActivity]:
         pass
 
-    def rebalancing(self, next_demand: List[User], horizon: Dt):
+    def rebalancing(self, next_demand: list[User], horizon: Dt):
         pass
 
-    def service_level_costs(self, nodes: List[str]) -> dict:
+    def service_level_costs(self, nodes: list[str]) -> dict:
         return create_service_costs()
 
     def __dump__(self):
         return {
-            "TYPE": ".".join([VehicleSharingMobilityService.__module__, VehicleSharingMobilityService.__name__]),
+            "TYPE": f"{VehicleSharingMobilityService.__module__}.{VehicleSharingMobilityService.__name__}",
             "DT_MATCHING": self._dt_matching,
             "VEH_CAPACITY": self._veh_capacity,
             "ID": self.id,

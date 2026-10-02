@@ -1,16 +1,16 @@
 import matplotlib.pyplot as plt
-import pandas as pd
-from matplotlib.collections import LineCollection
-from matplotlib.patches import Patch
 import numpy as np
+import pandas as pd
 import seaborn as sns
+from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 from mnms.time import Time
 
 
 def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=True, draw_stops=True, label_size=5, highlight_section=None, display_axes=False):
-    lines = list()
+    lines = []
 
     for section_data in roads.sections.values():
         unode = section_data.upstream
@@ -46,9 +46,9 @@ def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=Tru
 
 
 def draw_path(ax, mlgraph, path, color='orange', linkwidth=2, alpha=1, nodes=False, markersize=10, label_size=5, colors=None):
-    lines = list()
+    lines = []
     if colors is not None:
-        lines_colors = list()
+        lines_colors = []
     gnodes = mlgraph.graph.nodes
     if path is not None:
         pnodes = path.nodes if not nodes else path
@@ -83,11 +83,11 @@ def draw_path(ax, mlgraph, path, color='orange', linkwidth=2, alpha=1, nodes=Fal
         plt.legend()
 
 def draw_paths(ax, mlgraph, paths, color='orange', linkwidth=2, alpha=1, nodes=False, markersize=10, label_size=5, colors=None):
-    lines = list()
-    oposs = list()
-    dposs = list()
+    lines = []
+    oposs = []
+    dposs = []
     if colors is not None:
-        lines_colors = list()
+        lines_colors = []
     gnodes = mlgraph.graph.nodes
     for i, path in enumerate(paths):
         if not path:
@@ -130,7 +130,7 @@ def draw_paths(ax, mlgraph, paths, color='orange', linkwidth=2, alpha=1, nodes=F
 
 def draw_line(ax, mlgraph, line, color='green', linkwidth=6, stopmarkeredgewidth=1, alpha=0.6, draw_stops=True,
     nodesize=6, line_label='', label_size=5):
-    lines = list()
+    lines = []
     starting_stop = mlgraph.roads.stops[line['stops'][0]]
     ending_stop = mlgraph.roads.stops[line['stops'][-1]]
     for i,sections in enumerate(line['sections']):
@@ -176,8 +176,7 @@ def draw_veh_activity(ax, veh_result_file: str, veh_id: str):
     start_time = Time(df.iloc[0]["TIME"])
     current_passengers = df.iloc[0]["PASSENGERS"] if not pd.isna(df.iloc[0]["PASSENGERS"]) else ""
     xticks = []
-    i = 0
-    for idx, row in df.iterrows():
+    for i, (idx, row) in enumerate(df.iterrows()):
         next_state = row.STATE
         next_passengers = row.PASSENGERS if not pd.isna(row.PASSENGERS) else ""
         end_time = Time(row.TIME)
@@ -202,7 +201,6 @@ def draw_veh_activity(ax, veh_result_file: str, veh_id: str):
             current_state = next_state
             start_time = end_time
             current_passengers = next_passengers
-        i += 1
 
     ax.set_xticks(xticks)
     ax.set_xticklabels([Time.from_seconds(x).time for x in xticks])
@@ -222,8 +220,8 @@ def draw_links_load(ax, graph, loads, n, linkwidth=1, lmin=None, lmax=None):
         -loads: dict with links ids and associated loads.
         -n: granularity of the colormap
     """
-    lines = list()
-    colors_load = list()
+    lines = []
+    colors_load = []
     min_load = min(loads.values())
     gnodes = graph.nodes
     glinks = graph.links
@@ -237,7 +235,7 @@ def draw_links_load(ax, graph, loads, n, linkwidth=1, lmin=None, lmax=None):
     loads_sorted = [(lid,load) for lid,load in loads.items()]
     loads_sorted = sorted(loads_sorted, key=lambda x:x[1])
     for lid, load in loads_sorted:
-        assert lid in glinks.keys(), f'Cannot find link {lid} in the graph provided...'
+        assert lid in glinks, f'Cannot find link {lid} in the graph provided...'
         color_idx = int(divmod(load-min_load, color_step)[0])
         colors_load.append(colors[color_idx])
         unode = glinks[lid].upstream
@@ -260,8 +258,8 @@ def draw_sections_load(ax, mlgraph, loads, n, linkwidth=1, lmin=None, lmax=None)
         -loads: dict with sections ids and associated loads
         -n: granularity of the colormap
     """
-    lines = list()
-    colors_load = list()
+    lines = []
+    colors_load = []
     min_load = min(loads.values())
     gnodes = mlgraph.roads.nodes
     gsections = mlgraph.roads.sections
@@ -275,7 +273,7 @@ def draw_sections_load(ax, mlgraph, loads, n, linkwidth=1, lmin=None, lmax=None)
     loads_sorted = [(sid,load) for sid,load in loads.items()]
     loads_sorted = sorted(loads_sorted, key=lambda x:x[1])
     for sid, load in loads_sorted:
-        assert sid in gsections.keys(), f'Cannot find section {sid} in the graph provided...'
+        assert sid in gsections, f'Cannot find section {sid} in the graph provided...'
         color_idx = int(divmod(load-min_load, color_step)[0])
         colors_load.append(colors[color_idx])
         unode = gsections[sid].upstream
@@ -300,7 +298,7 @@ def draw_layer(ax, layer, color='black', linkwidth=1, nodesize=2, node_label=Tru
         -node_label: annotate the graph if True with nodes IDs
         -label_size: applied if node_label is True
     """
-    lines = list()
+    lines = []
     lnodes = layer.graph.nodes
 
     for link_data in layer.graph.links.values():
@@ -340,7 +338,7 @@ def draw_reservoirs(ax, roads, linkwidth=1, colors=None, label_size=3):
         assert len(colors) == nb_res, f'Provide the same number of colors than the number of reservoirs ({len(roads.zone)})'
 
     for i,(resid,res) in enumerate(roads.zones.items()):
-        lines = list()
+        lines = []
         color = colors[i]
         res_sections = [s for sid,s in roads.sections.items() if sid in res.sections]
         for section_data in res_sections:
@@ -352,7 +350,7 @@ def draw_reservoirs(ax, roads, linkwidth=1, colors=None, label_size=3):
 
     for i, (zid, z) in enumerate(roads.zones.items()):
         t = ax.annotate(zid,z.centroid(), size=label_size, color=colors[i])
-        t.set_bbox(dict(facecolor='white', alpha=1, edgecolor=colors[i]))
+        t.set_bbox({"facecolor": "white", "alpha": 1, "edgecolor": colors[i]})
 
     ax.margins(0.05, 0.05)
     ax.axis("equal")

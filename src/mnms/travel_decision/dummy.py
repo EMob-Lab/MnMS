@@ -1,13 +1,12 @@
-from typing import List
 import numpy as np
 
-from mnms.graph.layers import MultiLayerGraph
 from mnms.demand.user import Path
+from mnms.graph.layers import MultiLayerGraph
 from mnms.travel_decision.abstract import AbstractDecisionModel
 
 
 class DummyDecisionModel(AbstractDecisionModel):
-    def __init__(self, mmgraph: MultiLayerGraph, considered_modes=None, cost='travel_time', outfile:str=None,
+    def __init__(self, mmgraph: MultiLayerGraph, considered_modes=None, cost='travel_time', outfile: str | None = None,
         verbose_file=False, personal_mob_service_park_radius:float=100, random_choice_for_equal_costs:bool=False,
         save_routes_dynamically_and_reapply: bool = False):
         """
@@ -29,7 +28,7 @@ class DummyDecisionModel(AbstractDecisionModel):
                                                   dynamically and reapply for next departing users with
                                                   the same origin, destination and mode
         """
-        super(DummyDecisionModel, self).__init__(mmgraph, considered_modes=considered_modes,
+        super().__init__(mmgraph, considered_modes=considered_modes,
                                                  n_shortest_path=1, outfile=outfile,
                                                  verbose_file=verbose_file,
                                                  cost=cost, personal_mob_service_park_radius=personal_mob_service_park_radius,
@@ -49,7 +48,7 @@ class DummyDecisionModel(AbstractDecisionModel):
             rng = np.random.default_rng(self._seed)
             self._rng = rng
 
-    def path_choice(self, paths:List[Path]) -> Path:
+    def path_choice(self, paths: list[Path]) -> Path:
         """Method that proceeds to the selection of the path.
 
         Args:

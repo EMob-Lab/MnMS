@@ -12,7 +12,7 @@ def _format(timing):
         return f"{int(timing /  3.6e+12)} hours"
 
 
-class ProgressBar(object):
+class ProgressBar:
     def __init__(self, stop: int, start=0, text='Run', size_bar=20, item='■'):
         self._max = stop
         self._index = start
@@ -45,7 +45,7 @@ class ProgressBar(object):
         print(self._bar, end='', flush=True)
 
     def end(self) -> None:
-        print("")
+        print()
 
     def execute(self, func, *args, **kwargs):
         func(*args, **kwargs)

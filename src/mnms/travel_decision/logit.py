@@ -1,20 +1,18 @@
-import logging
 from math import exp, fsum
-from typing import List, Tuple
 
 import numpy as np
 
 from mnms import create_logger
 from mnms.demand.user import Path
-from mnms.travel_decision.abstract import AbstractDecisionModel
 from mnms.graph.layers import MultiLayerGraph
-
+from mnms.travel_decision.abstract import AbstractDecisionModel
 
 log = create_logger(__name__)
 
 
 class LogitDecisionModel(AbstractDecisionModel):
-    def __init__(self, mmgraph: MultiLayerGraph, theta=0.01, considered_modes=None, n_shortest_path=3, cost='travel_time', outfile:str=None, verbose_file=False,
+    def __init__(self, mmgraph: MultiLayerGraph, theta=0.01, considered_modes=None, n_shortest_path=3,
+        cost='travel_time', outfile: str | None = None, verbose_file=False,
         personal_mob_service_park_radius:float=100, save_routes_dynamically_and_reapply:bool=False):
         """Logit decision model for the path of a user.
         All routes computed are considered on an equal footing for the choice.
@@ -36,7 +34,7 @@ class LogitDecisionModel(AbstractDecisionModel):
                                                   dynamically and reapply for next departing users with
                                                   the same origin, destination and mode
         """
-        super(LogitDecisionModel, self).__init__(mmgraph,
+        super().__init__(mmgraph,
                                                  considered_modes=considered_modes,
                                                  n_shortest_path=n_shortest_path,
                                                  outfile=outfile,
@@ -59,7 +57,7 @@ class LogitDecisionModel(AbstractDecisionModel):
             rng = np.random.default_rng(self._seed)
             self._rng = rng
 
-    def path_choice(self, paths:List[Path]) -> Path:
+    def path_choice(self, paths: list[Path]) -> Path:
         """Method that proceeds to the selection of the path.
 
         Args:
@@ -85,7 +83,8 @@ class LogitDecisionModel(AbstractDecisionModel):
         return path_selected
 
 class ModeCentricLogitDecisionModel(AbstractDecisionModel):
-    def __init__(self, mmgraph: MultiLayerGraph, considered_modes, theta=0.01, cost='travel_time', outfile:str=None, verbose_file=False,
+    def __init__(self, mmgraph: MultiLayerGraph, considered_modes, theta=0.01, cost='travel_time',
+        outfile: str | None = None, verbose_file=False,
         personal_mob_service_park_radius:float=100, save_routes_dynamically_and_reapply:bool=False):
         """Mode centric logit decision model for the path selection of a user.
         In this decision model, the choice for a mode route is deterministic, the choice
@@ -105,7 +104,7 @@ class ModeCentricLogitDecisionModel(AbstractDecisionModel):
                                                   dynamically and reapply for next departing users with
                                                   the same origin, destination and mode
         """
-        super(ModeCentricLogitDecisionModel, self).__init__(mmgraph,
+        super().__init__(mmgraph,
                                                             considered_modes=considered_modes,
                                                             outfile=outfile,
                                                             verbose_file=verbose_file,
@@ -127,7 +126,7 @@ class ModeCentricLogitDecisionModel(AbstractDecisionModel):
             rng = np.random.default_rng(self._seed)
             self._rng = rng
 
-    def path_choice(self, paths:List[Path]) -> Path:
+    def path_choice(self, paths: list[Path]) -> Path:
         # Group paths per considered modes
         grouped_paths = {}
         for mi, m in enumerate(self._considered_modes):
@@ -136,7 +135,7 @@ class ModeCentricLogitDecisionModel(AbstractDecisionModel):
             grouped_paths[mi] = []
             # NB: one path can belong to several considered modes
             for p in paths:
-                layers_set = set([l for l,_ in p.layers])
+                layers_set = {l for l,_ in p.layers}
                 layers_set.remove('TRANSIT')
                 if intermodality is None:
                     if layers_set.issubset(layers_group):
@@ -147,7 +146,7 @@ class ModeCentricLogitDecisionModel(AbstractDecisionModel):
 
         # Start by selecting the best route for each mode
         preselected_paths = []
-        for k,v in grouped_paths.items():
+        for v in grouped_paths.values():
             if v:
                 v.sort(key=lambda p: p.path_cost)
                 preselected_paths.append(v[0])

@@ -1,9 +1,8 @@
-from abc import ABC, abstractmethod
 import csv
-from typing import List
+from abc import ABC, abstractmethod
 
-from mnms.time import Time
 from mnms.log import create_logger
+from mnms.time import Time
 
 log = create_logger(__name__)
 
@@ -41,7 +40,7 @@ class Subject(ABC):
 
     def __init__(self):
         """Create an empty observer list"""
-        self._observers: List[Observer] = []
+        self._observers: list[Observer] = []
 
     def attach(self, obs):
         """If the observer is not in the list,
@@ -66,7 +65,7 @@ class TimeDependentSubject(ABC):
 
     def __init__(self):
         """Create an empty observer list"""
-        self._observers: List[TimeDependentObserver] = []
+        self._observers: list[TimeDependentObserver] = []
 
     def attach(self, obs):
         """If the observer is not in the list,

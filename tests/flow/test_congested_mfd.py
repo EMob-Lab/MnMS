@@ -1,25 +1,27 @@
-import pytest
 import unittest
 from tempfile import TemporaryDirectory
+
 import pandas as pd
+import pytest
+
 pd.options.mode.chained_assignment = None
 
-from mnms.demand import User
+from mnms.demand import BaseDemandManager, User
 from mnms.demand.user import Path
-from mnms.graph.road import RoadDescriptor
 from mnms.flow.congested_MFD import CongestedMFDFlowMotor, CongestedReservoir
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
 from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.abstract import Request
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.time import Time, Dt
-from mnms.demand import User, BaseDemandManager
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.simulation import Supervisor
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
+
 
 class TestCongestedMFD(unittest.TestCase):
     def setUp(self):
@@ -166,7 +168,7 @@ def test_congested_mfd_no_congestion():
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
 
-    veh = list(personal_car.fleet.vehicles.values())[0]
+    veh = next(iter(personal_car.fleet.vehicles.values()))
     approx_dist = 11
     assert approx_dist == pytest.approx(user.distance)
     assert approx_dist == pytest.approx(veh.distance)
@@ -229,8 +231,9 @@ def test_congested_mfd_congestion():
     flow.step(Dt(seconds=1))
     flow.step(Dt(seconds=1))
 
-    veh1 = list(personal_car.fleet.vehicles.values())[0]
-    veh2 = list(personal_car.fleet.vehicles.values())[1]
+    it = iter(personal_car.fleet.vehicles.values())
+    veh1 = next(it)
+    veh2 = next(it)
 
     assert 1 == flow.reservoirs["LEFT"].car_in_outgoing_queues
     approx_dist1 = 15

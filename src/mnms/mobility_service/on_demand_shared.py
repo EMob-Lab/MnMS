@@ -1,26 +1,29 @@
+import math
+import sys
 from collections import deque
 from dataclasses import dataclass, field
-from typing import List, Dict, Tuple, Optional, Deque, Any
 from queue import PriorityQueue
-import sys
-import numpy as np
-import math
+from typing import Any
 
-from hipop.shortest_path import dijkstra, compute_path_length
+import numpy as np
+from hipop.shortest_path import compute_path_length, dijkstra
 
 from mnms import create_logger
 from mnms.demand import User
-from mnms.demand.horizon import AbstractDemandHorizon
-from mnms.graph.zone import Zone
-from mnms.mobility_service.abstract import AbstractOnDemandMobilityService, compute_path_travel_time, Request
-from mnms.mobility_service.interfaces import Depot
-from mnms.mobility_service.filters import FilterProtocol, IsWaiting, InRadiusFilter
+from mnms.mobility_service.abstract import AbstractOnDemandMobilityService, Request, compute_path_travel_time
+from mnms.mobility_service.filters import InRadiusFilter
 from mnms.time import Dt, Time
 from mnms.tools.exceptions import PathNotFound
-from mnms.vehicles.veh_type import Vehicle, VehicleActivity, ActivityType, VehicleActivityStop, VehicleActivityPickup, \
-    VehicleActivityServing, VehicleActivityRepositioning
-from mnms.tools.cost import create_service_costs
-from mnms.tools.geometry import polygon_area, get_bounding_box
+from mnms.tools.geometry import get_bounding_box, polygon_area
+from mnms.vehicles.veh_type import (
+    ActivityType,
+    Vehicle,
+    VehicleActivity,
+    VehicleActivityPickup,
+    VehicleActivityRepositioning,
+    VehicleActivityServing,
+    VehicleActivityStop,
+)
 
 log = create_logger(__name__)
 
@@ -46,7 +49,7 @@ class UserInfo:
         """
         self.traveled_distance = self.request.user.distance - self.initial_distance
 
-def truncate_plan(user: User, vehicle_plan: List[VehicleActivity]) -> List[VehicleActivity]:
+def truncate_plan(user: User, vehicle_plan: list[VehicleActivity]) -> list[VehicleActivity]:
     """Function that truncates a plan from user's pickup if it is in plan, or from
     current activity otherwise, to user's dropoff.
 
@@ -76,7 +79,7 @@ def truncate_plan(user: User, vehicle_plan: List[VehicleActivity]) -> List[Vehic
 
     return truncate
 
-def get_remaining_distance(veh: Vehicle, plan: List[VehicleActivity]) -> float:
+def get_remaining_distance(veh: Vehicle, plan: list[VehicleActivity]) -> float:
     """Method that computes the remaining distance vehicle has to run to achieve
     the plan.
     """
@@ -91,7 +94,7 @@ def get_remaining_distance(veh: Vehicle, plan: List[VehicleActivity]) -> float:
         remaining_dist = sum(flatten_path_dist)
     return remaining_dist
 
-def path_to_nodes(path) -> List[str]:
+def path_to_nodes(path) -> list[str]:
     """Method that converts a built path into a list of nodes.
 
     Args:
@@ -106,7 +109,7 @@ def path_to_nodes(path) -> List[str]:
         path_nodes = []
     return path_nodes
 
-def get_user_nodes_from_plan(uid: str, plan: List[VehicleActivity]) -> List[str]:
+def get_user_nodes_from_plan(uid: str, plan: list[VehicleActivity]) -> list[str]:
     """Method that deduce the nodes user will go through based on a plan.
 
     Args:
@@ -162,14 +165,14 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             -radius: radius in meters used by matching strategies
             -detour_ratio: distance on the actual road network to straight line distance
         """
-        super(OnDemandSharedMobilityService, self).__init__(id, veh_capacity, dt_matching,
+        super().__init__(id, veh_capacity, dt_matching,
             dt_periodic_maintenance, default_waiting_time=default_waiting_time)
         self.matching_strategy = matching_strategy
         self.replanning_strategy = replanning_strategy
         self.radius = radius
         self.detour_ratio = detour_ratio
 
-        self._users: Dict[str, UserInfo] = dict()
+        self._users: dict[str, UserInfo] = {}
         self._requests_history = []
 
         self.gnodes = None
@@ -195,7 +198,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             -drop_node: drop node id
             -request_time: time at which request is placed
         """
-        super(OnDemandSharedMobilityService, self).add_request(user, drop_node, request_time)
+        super().add_request(user, drop_node, request_time)
         # Save the request in the proper zone to be able to compute request arrival rate
         self._requests_history.append(Request(user, drop_node, request_time))
 
@@ -239,8 +242,8 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         ## Compute disutility of adding user's pickup and dropoff activities
         #  in each vehicle in radius
         candidate_vehicles = PriorityQueue()
-        veh_pickup = dict()
-        veh_new_plan = dict()
+        veh_pickup = {}
+        veh_new_plan = {}
         for veh in vehs_in_radius:
             if self.able_to_serve_new_request(veh):
                 activities = [VehicleActivityPickup(node=user.current_node,
@@ -267,7 +270,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
 
         return service_dt
 
-    def estimate_user_pickup_time_at_match(self, user: User, plan: List[VehicleActivity]) -> Dt:
+    def estimate_user_pickup_time_at_match(self, user: User, plan: list[VehicleActivity]) -> Dt:
         """Method that estimates the time a user will wait before being picked up
         by a vehicle of this service given its plan.
 
@@ -285,7 +288,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 break
         return pickup_time
 
-    def replanning(self, veh: Vehicle, new_activities: List[VehicleActivity]) -> List[VehicleActivity]:
+    def replanning(self, veh: Vehicle, new_activities: list[VehicleActivity]) -> list[VehicleActivity]:
         """Method that inserts new activities in vehicle's plan.
 
         Args:
@@ -301,7 +304,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             log.error(f'Unknown replanning strategy {self.replanning_strategy} for {self.id} service...')
             sys.exit(-1)
 
-    def replanning_all_pickups_first_fifo(self, veh: Vehicle, new_activities: List[VehicleActivity]) -> List[VehicleActivity]:
+    def replanning_all_pickups_first_fifo(self, veh: Vehicle, new_activities: list[VehicleActivity]) -> list[VehicleActivity]:
         """Method that inserts all new pickup activities in the order in which they are
         passed right after the last pickup activity of vehicle's current plan, and all
         serving activities in the order in which they are passed in the end of vehicle's
@@ -328,7 +331,6 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 sys.exit(-1)
 
         new_plan = [veh.activity.copy()] + [activity.copy() for activity in veh.activities]
-        veh_current_node = veh.current_node
         veh_next_node = veh.current_link[1] if (not isinstance(veh.activity, VehicleActivityStop) and veh.current_link is not None) else None
         remaining_first_link_length = veh.remaining_link_length if veh_next_node is not None else None
 
@@ -354,7 +356,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
 
         return new_plan
 
-    def insert_activity_by_index_in_plan(self, plan: List[VehicleActivity], activity: VehicleActivity, index: int, start_node: str, forced_next_node: str = None, remaining_first_link_length: float = None) -> List[VehicleActivity]:
+    def insert_activity_by_index_in_plan(self, plan: list[VehicleActivity], activity: VehicleActivity, index: int, start_node: str, forced_next_node: str | None = None, remaining_first_link_length: float | None = None) -> list[VehicleActivity]:
         """Method that insert an activity in a plan by index.
         NB: if activity at this index before the insertion is of type VehicleActivityStop
         or VehicleActivityRepositioning, it is removed from the plan.
@@ -415,7 +417,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         ## Overwrite first activity path and remaining length on first link if relevant
         if forced_next_node is not None and not add_current_node:
             assert remaining_first_link_length is not None
-            found = False if len(plan[0].path) > 0 else True
+            found = len(plan[0].path) == 0
             for i in range(len(plan[0].path)):
                 if plan[0].path[i][0] == (start_node, forced_next_node):
                     first_a_new_path = plan[0].path[i:]
@@ -430,7 +432,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
 
         ## Modify path of the next activity consequently or remove activity
         #  if STOP or REPOSITIONING
-        if isinstance(next_a, VehicleActivityStop) or isinstance(next_a, VehicleActivityRepositioning):
+        if isinstance(next_a, (VehicleActivityStop, VehicleActivityRepositioning)):
             del plan[index+1]
             next_a = plan[index+1] if index+1 < len(plan) else None
         if next_a is not None:
@@ -472,7 +474,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             veh.dt_move = self._tcurrent - request.request_time
 
         ## Update user's and (future) passengers' paths' with regard to this match
-        passengers = set([a.user for a in new_plan])
+        passengers = {a.user for a in new_plan}
         for passenger in passengers:
             nodes_at_match = get_user_nodes_from_plan(passenger.id, new_plan)
             service_index = passenger.get_mobility_service_index_in_path(self.id)
@@ -496,7 +498,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             -decision_model: the AbstractDecisionModel object of the simulation
             -dt: time since last call of this method (flow time step)
         """
-        super(OnDemandSharedMobilityService, self).launch_matching(new_users, user_flow, decision_model, dt)
+        super().launch_matching(new_users, user_flow, decision_model, dt)
         if self._counter_matching == 0:
             # (Re)compute estimated pickup times after this matching phase
             self.update_estimated_pickup_times(dt)
@@ -534,7 +536,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         ## (Re)compute estimated pickup times
         self.update_estimated_pickup_times(dt)
 
-    def compute_disutility(self, vehicle: Vehicle, new_plan: List[VehicleActivity], new_user: User):
+    def compute_disutility(self, vehicle: Vehicle, new_plan: list[VehicleActivity], new_user: User):
         """Method that computes the disutility of a new plan for the vehicle compared
         to its current plan. The disutility is the sum of the disutilities for all expected
         passengers, plus eventually the disutility for the new user.
@@ -562,7 +564,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
 
         return total_disutility
 
-    def compute_user_disutility(self, user: User, vehicle: Vehicle, new_plan: List[VehicleActivity]) -> float:
+    def compute_user_disutility(self, user: User, vehicle: Vehicle, new_plan: list[VehicleActivity]) -> float:
         """Method that computes user's disutility for a new plan compared to vehicle's
         current plan.
         User's disutility is infinite if user's maximum detour ratio is overcome in
@@ -623,9 +625,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             all_activities = [veh.activity] + list(veh.activities)
             pickups_count = sum([1 for a in all_activities if isinstance(a,VehicleActivityPickup)])
             awaited_nb_passengers = pickups_count + len(veh.passengers)
-            if awaited_nb_passengers >= veh.capacity:
-                return False
-            return True
+            return awaited_nb_passengers < veh.capacity
         else:
             log.error(f'Unknown replanning strategy {self.replanning_strategy} for {self.id} service...')
             sys.exit(-1)
@@ -712,7 +712,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 open_reqs_density = len(open_reqs) / area
                 # Compute mean requests arrival rate on these links
                 reqs_hist = self.requests_history
-                assert len(reqs_hist) > 0, f'There is no request history, impossible to estimate pickup time there...'
+                assert len(reqs_hist) > 0, 'There is no request history, impossible to estimate pickup time there...'
                 delta_t = (max(reqs_hist).request_time - min(reqs_hist).request_time).to_seconds()
                 if delta_t == 0:
                     delta_t = dt.to_seconds() # dt is the smallest time step
@@ -724,7 +724,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             self._estimated_pickup_times['default'] = w
 
     def __dump__(self) -> dict:
-        return {"TYPE": ".".join([OnDemandSharedMobilityService.__module__, OnDemandSharedMobilityService.__name__]),
+        return {"TYPE": f"{OnDemandSharedMobilityService.__module__}.{OnDemandSharedMobilityService.__name__}",
                 "VEH_CAPACITY": self.veh_capacity,
                 "DT_MATCHING": self.dt_matching,
                 "DT_PERIODIC_MAINTENANCE": self._dt_periodic_maintenance,

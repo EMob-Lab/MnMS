@@ -1,5 +1,7 @@
 import numpy as np
+
 from mnms.graph.layers import PublicTransportLayer
+
 
 def connect_layers(mlgraph, max_transfer_dist, personal_mob_service_park_radius):
     _norm = np.linalg.norm

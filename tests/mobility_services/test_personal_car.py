@@ -1,19 +1,19 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
+
 import pandas as pd
 
 from mnms.demand import BaseDemandManager, User
-from mnms.generation.roads import generate_manhattan_road
-from mnms.generation.layers import generate_layer_from_roads, generate_grid_origin_destination_layer
-from mnms.graph.layers import MultiLayerGraph
-
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_grid_origin_destination_layer, generate_layer_from_roads
+from mnms.generation.roads import generate_manhattan_road
+from mnms.graph.layers import MultiLayerGraph
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt
+from mnms.time import Dt, Time
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
 
 
@@ -35,7 +35,6 @@ class TestPersonalCar(unittest.TestCase):
                                               mobility_services=[personal_car])
 
         odlayer = generate_grid_origin_destination_layer(0, 0, 300, 300, 3, 3)
-        #
         mlgraph = MultiLayerGraph([car_layer],
                                   odlayer,
                                   1e-3)

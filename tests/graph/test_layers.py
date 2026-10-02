@@ -1,11 +1,11 @@
 import unittest
 
-from mnms.graph.layers import CarLayer, BusLayer
+from mnms.graph.layers import BusLayer, CarLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import TimeTable, Dt
+from mnms.time import Dt, TimeTable
 
 
 class TestLayers(unittest.TestCase):

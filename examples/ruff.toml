@@ -1,0 +1,10 @@
+extend = "../ruff.toml"
+
+[lint]
+ignore = [ # See https://docs.astral.sh/ruff/rules/ for the list of rules and rule codes.
+
+    # Example codes may assign variables that are never used afterwards,
+    # to show how an API is used or what it returns.
+    # This should not be done in production code, but is OK for demos and examples.
+    "F841", # unused-variable
+]

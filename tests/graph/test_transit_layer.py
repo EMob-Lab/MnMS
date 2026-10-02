@@ -1,14 +1,13 @@
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from mnms.generation.layers import generate_matching_origin_destination_layer
-from mnms.graph.layers import CarLayer, BusLayer, MultiLayerGraph
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import Zone
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.time import TimeTable, Dt
-from mnms.io.graph import save_graph, load_graph
+from mnms.time import Dt, TimeTable
 
 
 class TestTransitLayer(unittest.TestCase):

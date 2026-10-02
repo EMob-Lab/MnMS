@@ -2,12 +2,12 @@ import unittest
 from tempfile import TemporaryDirectory
 
 from mnms.generation.layers import generate_matching_origin_destination_layer
-from mnms.graph.layers import CarLayer, BusLayer, MultiLayerGraph
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import Zone
+from mnms.io.graph import load_graph, save_graph
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.time import TimeTable, Dt
-from mnms.io.graph import save_graph, load_graph
+from mnms.time import Dt, TimeTable
 
 
 class TestIOGraph(unittest.TestCase):
@@ -57,7 +57,7 @@ class TestIOGraph(unittest.TestCase):
         """
 
     def test_read_write(self):
-        tempdir = TemporaryDirectory()
+        tempdir = TemporaryDirectory(ignore_cleanup_errors=True)
         tempdir_name = tempdir.name
 
         save_graph(self.mlgraph, tempdir_name+"/graph.json")
@@ -71,7 +71,4 @@ class TestIOGraph(unittest.TestCase):
         self.assertEqual(set(self.mlgraph.graph.links.keys()), set(new_graph.graph.links.keys()))
         self.assertDictEqual(self.mlgraph.transitlayer.links, new_graph.transitlayer.links)
 
-        try:
-            tempdir.cleanup()
-        except:
-            pass
+        tempdir.cleanup()

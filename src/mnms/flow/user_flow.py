@@ -1,36 +1,32 @@
-from typing import Dict, List, Optional
-
-import numpy as np
-import sys
 import csv
 
+import numpy as np
 
-from mnms.graph.layers import MultiLayerGraph
 from mnms.demand.user import User, UserState
-# from mnms.graph.core import ConnectionLink, TransitLink
-from mnms.time import Dt, Time
+from mnms.graph.layers import MultiLayerGraph
 from mnms.log import create_logger
 from mnms.mobility_service.abstract import AbstractMobilityService
+from mnms.time import Dt, Time
 from mnms.travel_decision.abstract import Event
 
 log = create_logger(__name__)
 
 
-class UserFlow(object):
-    def __init__(self, walk_speed: float=1.42, outfile: str=None):
+class UserFlow:
+    def __init__(self, walk_speed: float=1.42, outfile: str | None = None):
         """
         Manage the motion and state update of users.
 
         Args:
             -walk_speed: The speed of the User walk
         """
-        self._graph: Optional[MultiLayerGraph] = None
-        self.users:Dict[str, User] = dict()
-        self._walking: Dict = dict()
+        self._graph: MultiLayerGraph | None = None
+        self.users:dict[str, User] = {}
+        self._walking: dict = {}
         self._walk_speed: float = walk_speed
-        self._tcurrent: Optional[Time] = None
+        self._tcurrent: Time | None = None
 
-        self._waiting_answer: Dict[str, tuple[Time, AbstractMobilityService]] = dict()
+        self._waiting_answer: dict[str, tuple[Time, AbstractMobilityService]] = {}
 
         self._gnodes = None
 
@@ -46,9 +42,8 @@ class UserFlow(object):
 
         state = self.__dict__.copy()
 
-        if self._write == True:
-            if '_csvhandler' in state:
-                del state['_csvhandler']
+        if self._write == True and '_csvhandler' in state:
+            del state['_csvhandler']
         if '_gnodes' in state:
             del state['_gnodes']
         return state
@@ -112,11 +107,11 @@ class UserFlow(object):
         Args:
             -dt: duration for which users walk (usually corresponds to the flow time step)
         """
-        finish_walk_and_request = list()
-        finish_walk = list()
-        finish_trip = list()
+        finish_walk_and_request = []
+        finish_walk = []
+        finish_trip = []
         gnodes = self._graph.graph.nodes
-        for uid in self._walking.keys():
+        for uid in self._walking:
             user = self.users[uid]
             if user.state == UserState.WALKING:
                 upath = user.path.nodes
@@ -216,14 +211,13 @@ class UserFlow(object):
                     mservice.add_request(user, upath[slice_nodes][-1], request_time)
                     user.requested_service = mservice
                     return mservice
-            else:
-                log.warning(f"No mobility service found for user {user.id}")
+            log.warning(f"No mobility service found for user {user.id}")
         else:
             log.warning(f'User {user.id} has no path, cannot find any mobility service '\
                 'to which formulating a request.')
         return None
 
-    def step(self, dt: Dt, new_users: List[User]):
+    def step(self, dt: Dt, new_users: list[User]):
         """Method corresponding to one step of the user flow module.
 
         Args:
@@ -252,7 +246,7 @@ class UserFlow(object):
     def determine_user_states(self):
         """Method to manage users who are in STOP state.
         """
-        to_del = list()
+        to_del = []
         for u in self.users.values():
             if u.state is UserState.STOP and u.path is not None:
                 upath = u.path.nodes
@@ -294,8 +288,8 @@ class UserFlow(object):
             -dt: duration for which users have been waiting since the last call of this method
                  (usually corresponds to a flow time step duration)
         """
-        to_del = list()
-        refused_users = list()
+        to_del = []
+        refused_users = []
 
         for uid, (time, requested_mservice) in self._waiting_answer.items():
             if self.users[uid].state is UserState.WAITING_ANSWER:
@@ -348,7 +342,7 @@ class UserFlow(object):
                         f'trigger an INTERRUPTION event (current node = {u.current_node}, state = {u.state})")
                     interrupted_users.append(u)
                     # Clean eventual request already formulated by user to this service
-                    if u.id in service._user_buffer.keys():
+                    if u.id in service._user_buffer:
                         if u.state == UserState.WAITING_ANSWER:
                             # This user is waiting to be matched with a vehicle of the station we have just removed,
                             # turn her to STOP state, and save the fact that she should cancel her request
@@ -387,7 +381,7 @@ class UserFlow(object):
             try:
                 link = self._gnodes[path_nodes[i]].adj[path_nodes[i+1]]
                 links.append(link.id)
-            except:
+            except KeyError:
                 log.error(f'Cannot find link between {path_nodes[i]} and {path_nodes[i+1]}...')
         return links
 

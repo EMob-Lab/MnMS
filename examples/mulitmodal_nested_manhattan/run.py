@@ -4,32 +4,38 @@
 ## Casuals
 import os
 import random
-import pandas as pd
-import numpy as np
 import time
-from stepfunction import stepfunction as sf # install with pip install -i https://test.pypi.org/simple/ stepfunction-kit4a
+
+import numpy as np
+import pandas as pd
+from layers_connection import connect_layers
+from stepfunction import (
+    stepfunction as sf,  # install with pip install -i https://test.pypi.org/simple/ stepfunction-kit4a
+)
+from transit_network_generation import (
+    generate_daganzo_hybrid_transit_network_lines,
+    generate_daganzo_hybrid_transit_network_stops,
+)
+
+from mnms.demand.manager import CSVDemandManager
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_nested_manhattan_road
+from mnms.generation.zones import generate_grid_zones
+from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
+from mnms.graph.zone import MLZone
 
 ## MnMS & HiPOP
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
-from mnms.generation.roads import generate_nested_manhattan_road
-from transit_network_generation import generate_daganzo_hybrid_transit_network_stops, generate_daganzo_hybrid_transit_network_lines
-from mnms.generation.zones import generate_grid_zones
-from mnms.tools.observer import CSVVehicleObserver, CSVUserObserver
-from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.vehicles.veh_type import Bus, Metro, Car, Train
-from mnms.time import TimeTable, Time, Dt
-from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
-from layers_connection import connect_layers
-from mnms.demand.manager import CSVDemandManager
-from mnms.graph.zone import MLZone
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.mobility_service.public_transport import PublicTransportMobilityService
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.travel_decision.logit import LogitDecisionModel, ModeCentricLogitDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
-from mnms.log import LOGLEVEL
+from mnms.vehicles.veh_type import Bus, Car, Metro, Train
 
 ##################
 ### Parameters ###
@@ -297,7 +303,7 @@ def create_on_demand_vehicles(on_demand_mob_service, vehicles_positions_file):
         [on_demand_mob_service.create_waiting_vehicle(n) for n in df.NODE]
 
 
-def generate_ridehailing_vehicles_init_pos_f(rh, nb_vehs, file, banned_nodes=[]):
+def generate_ridehailing_vehicles_init_pos_f(rh, nb_vehs, file, banned_nodes=None):
     """Randomly generates a set of initial positions for ride-hailing vehciles.
 
     Args:
@@ -308,7 +314,9 @@ def generate_ridehailing_vehicles_init_pos_f(rh, nb_vehs, file, banned_nodes=[])
                        an initial position
     """
     vehs = []
-    possible_nodes = [n for n in rh.layer.graph.nodes.keys() if n not in banned_nodes]
+    if banned_nodes is None:
+        banned_nodes = []
+    possible_nodes = [n for n in rh.layer.graph.nodes if n not in banned_nodes]
     for i in range(nb_vehs):
         # Draw a random node where veh starts
         node = random.choice(possible_nodes)
@@ -317,7 +325,7 @@ def generate_ridehailing_vehicles_init_pos_f(rh, nb_vehs, file, banned_nodes=[])
     if not os.path.isfile(file):
         rh_supply.to_csv(file, sep=';', index=False)
     else:
-        print(f"A ridehailing initial positions file already exist. Nothing is generated to prevent overwriting.")
+        print("A ridehailing initial positions file already exist. Nothing is generated to prevent overwriting.")
 
 def generate_mlzones(zid_prefix, mlgraph, Nx, Ny, zones_file):
     """Generates a grid zoning on the MultiLayerGraph.
@@ -336,7 +344,7 @@ def generate_mlzones(zid_prefix, mlgraph, Nx, Ny, zones_file):
     if not os.path.isfile(zones_file):
         df_zones.to_csv(zones_file, sep=';', index=False)
     else:
-        print(f"A zones file already exist. Nothing is generated to prevent overwriting.")
+        print("A zones file already exist. Nothing is generated to prevent overwriting.")
 
 def create_mlzones(mlgraph, file):
     with open(file, 'r'):
@@ -371,9 +379,9 @@ def generate_demand_scenario(mlgraph, dep_rates, tstart, tend, proba, stats, dem
     zones = list(proba.keys())
     car_nodes_per_zone = {zid: [mlgraph.graph.links[l].upstream for l in mlgraph.zones[zid].links if mlgraph.graph.links[l].label == 'CAR'] for zid in zones}
     assert len(zones) == len(mlgraph.zones.keys()) and set(zones) == set(mlgraph.zones.keys()), \
-        f"All zones should have a probability associated."
+        "All zones should have a probability associated."
     assert sum([proba[z]['origin'] for z in zones]) == 1 and sum([proba[z]['destination'] for z in zones]), \
-        f"Sum of origin (resp. destination) probas should be equal to 1. "
+        "Sum of origin (resp. destination) probas should be equal to 1. "
     while True:
         dep_rate = dep_rates.get(t)
         t += random.expovariate(dep_rate)
@@ -416,7 +424,7 @@ def generate_demand_scenario(mlgraph, dep_rates, tstart, tend, proba, stats, dem
     if not os.path.isfile(demand_file):
         df.to_csv(demand_file, sep=';', index=False)
     else:
-        print(f"A demand file already exist. Nothing is generated to prevent overwriting.")
+        print("A demand file already exist. Nothing is generated to prevent overwriting.")
 
 
 ############

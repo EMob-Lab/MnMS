@@ -1,5 +1,4 @@
 import unittest
-from dataclasses import asdict
 
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import Zone

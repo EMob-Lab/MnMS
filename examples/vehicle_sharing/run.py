@@ -4,21 +4,21 @@
 ## Casuals
 import pathlib
 
+from mnms.demand import CSVDemandManager
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_grid_origin_destination_layer, generate_layer_from_roads
+
 # MnMS
 from mnms.generation.roads import generate_manhattan_road
+from mnms.graph.layers import MultiLayerGraph, SharedVehicleLayer
+from mnms.io.graph import load_graph, save_graph
+from mnms.log import LOGLEVEL, attach_log_file, set_mnms_logger_level
 from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.tools.observer import CSVVehicleObserver, CSVUserObserver
-from mnms.generation.layers import generate_layer_from_roads, generate_grid_origin_destination_layer
-from mnms.graph.layers import SharedVehicleLayer, MultiLayerGraph
-from mnms.vehicles.veh_type import Bike
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.simulation import Supervisor
-from mnms.demand import CSVDemandManager
-from mnms.time import Time, Dt
-from mnms.log import set_mnms_logger_level, LOGLEVEL, attach_log_file
-from mnms.io.graph import save_graph, load_graph
-
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
+from mnms.vehicles.veh_type import Bike
 
 ##################
 ### Parameters ###

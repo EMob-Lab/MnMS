@@ -1,16 +1,14 @@
 import json
-from typing import Union
 from pathlib import Path
 
-from hipop.graph import link_to_dict, dict_to_link
+from hipop.graph import dict_to_link, link_to_dict
 
-from mnms.graph.layers import OriginDestinationLayer
-from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.layers import MultiLayerGraph, OriginDestinationLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.io.utils import MNMSEncoder, load_class_by_module_name
 
 
-def save_graph(mlgraph: MultiLayerGraph, filename: Union[str, Path], indent=2):
+def save_graph(mlgraph: MultiLayerGraph, filename: str | Path, indent=2):
     """Save a MultiModalGraph as a JSON file
 
     Args:
@@ -34,7 +32,7 @@ def save_graph(mlgraph: MultiLayerGraph, filename: Union[str, Path], indent=2):
         json.dump(d, f, indent=indent, cls=MNMSEncoder)
 
 
-def load_graph(filename: Union[str, Path]):
+def load_graph(filename: str | Path):
     """
     Load the graph from a JSON file
 
@@ -66,7 +64,7 @@ def load_graph(filename: Union[str, Path]):
     return mlgraph
 
 
-def save_odlayer(odlayer: OriginDestinationLayer, filename: Union[str, Path], indent=2):
+def save_odlayer(odlayer: OriginDestinationLayer, filename: str | Path, indent=2):
     """
     Save the OriginDestinationLayer
 
@@ -84,7 +82,7 @@ def save_odlayer(odlayer: OriginDestinationLayer, filename: Union[str, Path], in
         json.dump(d, f, indent=indent, cls=MNMSEncoder)
 
 
-def save_transit_link_odlayer(mlgraph: MultiLayerGraph, filename: Union[str, Path], indent=2):
+def save_transit_link_odlayer(mlgraph: MultiLayerGraph, filename: str | Path, indent=2):
     """
     Save only the transit links between the OriginDestinationLayer and the MultiLayerGraph
 
@@ -111,7 +109,7 @@ def save_transit_link_odlayer(mlgraph: MultiLayerGraph, filename: Union[str, Pat
         json.dump(data, f, indent=indent, cls=MNMSEncoder)
 
 
-def save_transit_links(mlgraph: MultiLayerGraph, filename: Union[str, Path], indent=2):
+def save_transit_links(mlgraph: MultiLayerGraph, filename: str | Path, indent=2):
     """
     Save all the transit links in the MultiLayerGraph
 
@@ -133,7 +131,7 @@ def save_transit_links(mlgraph: MultiLayerGraph, filename: Union[str, Path], ind
         json.dump(data, f, indent=indent, cls=MNMSEncoder)
 
 
-def load_transit_links(mlgraph: MultiLayerGraph, filename: Union[str, Path]):
+def load_transit_links(mlgraph: MultiLayerGraph, filename: str | Path):
     """
     Load the transit kinks in a MultiLayerGraph
 
@@ -153,7 +151,7 @@ def load_transit_links(mlgraph: MultiLayerGraph, filename: Union[str, Path]):
         dict_to_link(oriented_graph, link)
 
 
-def load_odlayer(filename: Union[str, Path]) -> OriginDestinationLayer:
+def load_odlayer(filename: str | Path) -> OriginDestinationLayer:
     """
     Load the OriginDestinationLayer from a file
 

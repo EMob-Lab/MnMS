@@ -1,17 +1,16 @@
+import sys
 from collections import defaultdict
 from copy import copy, deepcopy
 from enum import Enum
-from typing import Union, List, Tuple, Optional, Dict
-
-from mnms.time import Time, Dt
-from mnms.tools.observer import TimeDependentSubject
-from mnms.log import create_logger
-from mnms.tools.dict_tools import sum_dict
+from typing import Optional
 
 import numpy as np
 from numpy.linalg import norm as _norm
 
-import sys
+from mnms.log import create_logger
+from mnms.time import Dt, Time
+from mnms.tools.dict_tools import sum_dict
+from mnms.tools.observer import TimeDependentSubject
 
 log = create_logger(__name__)
 
@@ -39,15 +38,15 @@ class User(TimeDependentSubject):
 
     def __init__(self,
                  id: str,
-                 origin: Union[str, Union[np.ndarray, List]],
-                 destination: Union[str, Union[np.ndarray, List]],
+                 origin: str | np.ndarray | list,
+                 destination: str | np.ndarray | list,
                  departure_time: Time,
                  available_mobility_services=None,
-                 mobility_services_graph: str=None,
+                 mobility_services_graph: str | None = None,
                  path: Optional["Path"] = None,
-                 response_dt: Optional[Dt] = None,
-                 pickup_dt: Optional[Dt] = None,
-                 forced_path_chosen_mobility_services: Optional[Dict[str,str]] = None):
+                 response_dt: Dt | None = None,
+                 pickup_dt: Dt | None = None,
+                 forced_path_chosen_mobility_services: dict[str, str] | None = None):
         """
         Class representing a User in the simulation.
 
@@ -66,7 +65,7 @@ class User(TimeDependentSubject):
              mobility services id on each layer as values, it is used when one want to
              force the initial path of a user with the CSVDemandManager
         """
-        super(User, self).__init__()
+        super().__init__()
         self.id = id
         self.origin = origin if not isinstance(origin, list) else np.array(origin)
         self.destination = destination if not isinstance(destination, list) else np.array(destination)
@@ -77,26 +76,26 @@ class User(TimeDependentSubject):
         self.response_dt = User.default_response_dt.copy() if response_dt is None else response_dt
         self.pickup_dt = defaultdict(lambda: User.default_pickup_dt.copy()) if pickup_dt is None else defaultdict(lambda: pickup_dt)
 
-        self.parameters: Dict = dict()
+        self.parameters: dict = {}
 
         self._current_node = None
         self._current_link = None
         self._remaining_link_length = None
         self._position = None
-        self._achieved_path = list()
-        self._achieved_path_ms = list()
+        self._achieved_path = []
+        self._achieved_path_ms = []
         self._vehicle = None
         self._waited_vehicle = None
         self._requested_service = None
-        self._parked_personal_vehicles = dict()
-        self._personal_vehicles = dict()
+        self._parked_personal_vehicles = {}
+        self._personal_vehicles = {}
         self._distance = 0
         self._interrupted_path = None
         self._state = UserState.STOP
         self._deadend_at_next_node = False
 
         if path is None:
-            self.path: Optional[Path] = None
+            self.path: Path | None = None
             self.forced_path_chosen_mobility_services = None
         else:
             self.set_path(path)
@@ -118,7 +117,7 @@ class User(TimeDependentSubject):
         return self._current_link
 
     @current_link.setter
-    def current_link(self, l : Tuple[str,str]):
+    def current_link(self, l : tuple[str,str]):
         self._current_link = l
 
     @property
@@ -142,7 +141,7 @@ class User(TimeDependentSubject):
         return self._achieved_path
 
     @achieved_path.setter
-    def achieved_path(self, ap: List[str]):
+    def achieved_path(self, ap: list[str]):
         self._achieved_path = ap
 
     @property
@@ -150,7 +149,7 @@ class User(TimeDependentSubject):
         return self._achieved_path_ms
 
     @achieved_path_ms.setter
-    def achieved_path_ms(self, ap_ms: List[str]):
+    def achieved_path_ms(self, ap_ms: list[str]):
         self._achieved_path_ms = ap_ms
 
     @property
@@ -219,7 +218,7 @@ class User(TimeDependentSubject):
 
     @property
     def max_detour_ratio(self):
-        assert 'max_detour_ratio' in self.parameters.keys()
+        assert 'max_detour_ratio' in self.parameters
         return self.parameters['max_detour_ratio']
 
     def get_current_node_index(self, path_nodes=None):
@@ -333,9 +332,9 @@ class User(TimeDependentSubject):
         """
         # Remove user pickup and serving activity from waited vehicle's plan
         veh = self.waited_vehicle
-        assert veh is not None and self.state == UserState.WAITING_VEHICLE, f'Wrong call of cancel_match method...'
+        assert veh is not None and self.state == UserState.WAITING_VEHICLE, 'Wrong call of cancel_match method...'
         veh_ms = veh.mobility_service
-        veh_ms_obj = [ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms][0]
+        veh_ms_obj = next(ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms)
         if type(veh_ms_obj).__name__ == 'PublicTransportMobilityService':
             veh_ms_obj.remove_user_activities(self)
         else:
@@ -400,7 +399,7 @@ class User(TimeDependentSubject):
             ##TODO: Update path cost if it is used somehow after path leg modification because of ridesharing detour
             pass
 
-    def update_path(self, path: "Path", gnodes, mlgraph, cost: str, max_teleport_dist: float = None):
+    def update_path(self, path: "Path", gnodes, mlgraph, cost: str, max_teleport_dist: float | None = None):
         """Method that updates the path of user.
 
         Args:
@@ -449,7 +448,10 @@ class User(TimeDependentSubject):
             if self.state == UserState.INSIDE_VEHICLE:
                 if new_mobservices[-1] == path.mobility_services[0]:
                     new_mobservices.extend(path.mobility_services[1:])
-                    current_layer = [(lid,sl) for lid,sl in new_path.layers if current_node_ind >= sl.start and path_first_node_ind < sl.stop][0]
+                    current_layer = next(
+                        (lid,sl) for lid,sl in new_path.layers
+                        if current_node_ind >= sl.start and path_first_node_ind < sl.stop
+                    )
                     new_drop_node = new_path_nodes[current_layer[1].stop-1]
                 else:
                     new_mobservices.extend(path.mobility_services)
@@ -549,7 +551,7 @@ class User(TimeDependentSubject):
         ### Update vehicle's plan consequently
         veh = self.waited_vehicle
         veh_ms = veh.mobility_service
-        veh_ms_obj = [ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms][0]
+        veh_ms_obj = next(ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms)
 
         if new_drop_node == self.current_node or new_drop_node is None:
             # User will not take the vehicle she was waiting for, remove user pickup and
@@ -562,7 +564,10 @@ class User(TimeDependentSubject):
         else:
             # Find user serving activity in the waited vehicle's plan and former drop node
             all_activities = [self.waited_vehicle.activity] + list(self.waited_vehicle.activities)
-            u_serving_act_ind = [i for i in range(len(all_activities)) if all_activities[i].user == self and type(all_activities[i]).__name__=='VehicleActivityServing'][0]
+            u_serving_act_ind = next(
+                i for i in range(len(all_activities))
+                if all_activities[i].user == self and type(all_activities[i]).__name__=='VehicleActivityServing'
+            )
             former_drop_node = all_activities[u_serving_act_ind].node
             if new_drop_node != former_drop_node:
                 # User will ride the vehicle she is waiting for but changes drop node
@@ -608,14 +613,14 @@ class User(TimeDependentSubject):
 
         # Find user serving activity in current vehicle's plan and former drop node
         all_activities = [self.vehicle.activity] + list(self.vehicle.activities)
-        u_serving_act_ind = [i for i in range(len(all_activities)) if all_activities[i].user == self][0] # pickup activity already done because user is in the veh
+        u_serving_act_ind = next(i for i in range(len(all_activities)) if all_activities[i].user == self) # pickup activity already done because user is in the veh
         former_drop_node = all_activities[u_serving_act_ind].node
 
         # Update vehicle's plan if required
         if new_drop_node != former_drop_node:
             # Differentiate update plan of public transport and non public transport vehicles
             veh_ms = self.vehicle.mobility_service
-            veh_ms_obj = [ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms][0]
+            veh_ms_obj = next(ms for ms in mlgraph.get_all_mobility_services() if ms.id == veh_ms)
             # 1. For public transportation vehicles, we keep the order in which stops are visited,
             #    not necessarily the order in which activities are ordered
             if type(veh_ms_obj).__name__ == 'PublicTransportMobilityService':
@@ -686,7 +691,7 @@ class User(TimeDependentSubject):
             self.achieved_path_ms = []
         return teleported
 
-    def set_position(self, current_link:Tuple[str, str], current_node:str, remaining_length:float, position:np.ndarray, tcurrent: Time):
+    def set_position(self, current_link:tuple[str, str], current_node:str, remaining_length:float, position:np.ndarray, tcurrent: Time):
         """Method that updates user's position (including current node, link,
         remaining link length, position and achieved path).
 
@@ -809,8 +814,8 @@ class User(TimeDependentSubject):
         self._parked_personal_vehicles[ms] = node
 
 
-class Path(object):
-    def __init__(self, cost: float=None, nodes: Union[List[str], Tuple[str]] = None):
+class Path:
+    def __init__(self, cost: float, nodes: list[str] | tuple[str]):
         """
         Path object describing a User path in the simulation
         Parameters
@@ -819,11 +824,11 @@ class Path(object):
         nodes: The nodes describing the path
         """
         self.path_cost: float = cost
-        self.nodes: Tuple[str] = nodes
+        self.nodes: tuple[str] = nodes
 
-        self.layers: List[Tuple[str, slice]] = list()
-        self.mobility_services = list()
-        self.service_costs = dict()
+        self.layers: list[tuple[str, slice]] = []
+        self.mobility_services = []
+        self.service_costs = {}
 
     def set_mobility_services(self, ms):
         self.mobility_services = ms
@@ -866,7 +871,7 @@ class Path(object):
         same_ms = (self.mobility_services == other.mobility_services)
         return same_nodes and same_ms
 
-    def __deepcopy__(self, memo={}):
+    def __deepcopy__(self, memo):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result

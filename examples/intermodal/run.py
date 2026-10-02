@@ -4,19 +4,20 @@
 ## Casuals
 import pathlib
 
-## MnMS
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
 from mnms.demand import BaseDemandManager, User
-from mnms.generation.roads import generate_line_road
-from mnms.generation.layers import generate_matching_origin_destination_layer
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer, CarLayer
-from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_line_road
+from mnms.graph.layers import CarLayer, MultiLayerGraph, PublicTransportLayer
+
+## MnMS
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt, TimeTable
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.veh_type import Bus
 
 ##################

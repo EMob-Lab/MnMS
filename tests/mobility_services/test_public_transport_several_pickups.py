@@ -1,8 +1,7 @@
-import tempfile
 import unittest
 from pathlib import Path
-
 from tempfile import TemporaryDirectory
+
 from mnms.demand import BaseDemandManager, User
 from mnms.demand.user import UserState
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
@@ -11,11 +10,10 @@ from mnms.generation.roads import generate_line_road
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt, TimeTable
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.vehicles.veh_type import Bus
-from mnms.vehicles.veh_type import ActivityType
+from mnms.vehicles.veh_type import ActivityType, Bus
 
 
 class TestPublicTransportSeveralPickups(unittest.TestCase):

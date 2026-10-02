@@ -1,21 +1,22 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
+
 import pandas as pd
 
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.demand import BaseDemandManager, User
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
 from mnms.graph.layers import MultiLayerGraph
-from mnms.time import Time, Dt
+from mnms.mobility_service.on_demand import OnDemandMobilityService
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
 from mnms.tools.observer import CSVUserObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
 from mnms.vehicles.manager import VehicleManager
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
+
 
 class TestMobilityServicesGraph(unittest.TestCase):
     def setUp(self):

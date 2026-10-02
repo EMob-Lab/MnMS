@@ -1,21 +1,22 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
+
 import pandas as pd
 
 from mnms.demand import BaseDemandManager, User
-from mnms.generation.roads import generate_line_road
-from mnms.generation.layers import generate_layer_from_roads, generate_grid_origin_destination_layer, \
-    generate_matching_origin_destination_layer
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer, CarLayer
-from mnms.mobility_service.public_transport import PublicTransportMobilityService
-
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import (
+    generate_matching_origin_destination_layer,
+)
+from mnms.generation.roads import generate_line_road
+from mnms.graph.layers import CarLayer, MultiLayerGraph, PublicTransportLayer
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt, TimeTable
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
@@ -54,7 +55,6 @@ class TestMultiModal(unittest.TestCase):
                             timetable=TimeTable.create_table_freq('07:00:00', '08:00:00', Dt(minutes=10)))
 
         odlayer = generate_matching_origin_destination_layer(roads)
-        #
         mlgraph = MultiLayerGraph([car_layer, pblayer],
                                   odlayer,
                                   1e-3)

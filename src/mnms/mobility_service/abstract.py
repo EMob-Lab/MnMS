@@ -1,19 +1,19 @@
-from abc import ABC, abstractmethod, ABCMeta
-from typing import List, Tuple, Optional, Dict
-import numpy as np
+from abc import ABC, ABCMeta, abstractmethod
+from typing import Optional
 
-from mnms.log import create_logger
+import numpy as np
+from hipop.shortest_path import dijkstra
+
 from mnms.demand.horizon import AbstractDemandHorizon
 from mnms.demand.user import User
-from mnms.tools.cost import create_service_costs
-from mnms.time import Time, Dt
-from mnms.vehicles.fleet import FleetManager
-from mnms.vehicles.veh_type import Vehicle, VehicleActivity, VehicleActivityStop, ActivityType
-from hipop.shortest_path import dijkstra
-from mnms.graph.zone import LayerZone
-from mnms.mobility_service.interfaces import Depot
-from mnms.tools.geometry import polygon_area, get_bounding_box, voronoi_zones
 from mnms.graph.zone import LayerZone, construct_zone_from_contour
+from mnms.log import create_logger
+from mnms.mobility_service.interfaces import Depot
+from mnms.time import Dt, Time
+from mnms.tools.cost import create_service_costs
+from mnms.tools.geometry import get_bounding_box, voronoi_zones
+from mnms.vehicles.fleet import FleetManager
+from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity, VehicleActivityStop
 
 log = create_logger(__name__)
 
@@ -60,7 +60,7 @@ def compute_path_nodes_travel_time(path_nodes, gnodes, ms_id):
     return tt
 
 
-class Request(object):
+class Request:
 
     def __init__(self, user, drop_node, request_time):
         """Constructor of a Request object.
@@ -79,16 +79,10 @@ class Request(object):
         return f'Request({self.user.id}, {self.pickup_node}, {self.drop_node}, {self.request_time})'
 
     def __leq__(self, other):
-        if self.request_time <= other.request_time:
-            return True
-        else:
-            return False
+        return self.request_time <= other.request_time
 
     def __lt__(self, other):
-        if self.request_time < other.request_time:
-            return True
-        else:
-            return False
+        return self.request_time < other.request_time
 
 class AbstractMobilityService(ABC):
     def __init__(self,
@@ -108,20 +102,20 @@ class AbstractMobilityService(ABC):
              call of the periodic maintenance
         """
         self._id: str = id
-        self.layer: "AbstractLayer" = None
-        self.fleet: Optional[FleetManager] = None
+        self.layer: AbstractLayer = None
+        self.fleet: FleetManager | None = None
         self._veh_capacity: int = veh_capacity
 
         self._dt_periodic_maintenance: int = dt_periodic_maintenance
         self._dt_matching: int = dt_matching
 
-        self._tcurrent: Optional[Time] = None
+        self._tcurrent: Time | None = None
 
         self._counter_maintenance: int = 0
         self._counter_matching: int = 0
 
-        self._user_buffer: Dict[str, Request] = dict()     # Dynamic list of user with request
-        self._cache_request_vehicles = dict()              # Result of requests for each user
+        self._user_buffer: dict[str, Request] = {}     # Dynamic list of user with request
+        self._cache_request_vehicles = {}              # Result of requests for each user
 
         self._observer: Optional = None
 
@@ -161,8 +155,8 @@ class AbstractMobilityService(ABC):
     def is_personal(self):
         return False
 
-    def construct_veh_path(self, upath: List[str]):
-        veh_path = list()
+    def construct_veh_path(self, upath: list[str]):
+        veh_path = []
         for i in range(len(upath)-1):
             unode = upath[i]
             dnode = upath[i+1]
@@ -172,7 +166,7 @@ class AbstractMobilityService(ABC):
         return veh_path
 
     @abstractmethod
-    def service_level_costs(self, nodes:List[str]) -> dict:
+    def service_level_costs(self, nodes: list[str]) -> dict:
         """
         Returns a dict of costs representing the cost of the service computed from a path
         Parameters
@@ -184,7 +178,6 @@ class AbstractMobilityService(ABC):
 
         """
         #return create_service_costs()
-        pass
 
     def add_request(self, user: "User", drop_node:str, request_time:Time) -> None:
         """
@@ -228,7 +221,7 @@ class AbstractMobilityService(ABC):
         Returns:
 
         """
-        if user.id in self._user_buffer.keys():
+        if user.id in self._user_buffer:
             self._user_buffer[user.id] = Request(user, drop_node, self._user_buffer[user.id].request_time)
         else:
             log.warning(f'User {user.id} tried to update a request addressed to {self.id} '\
@@ -292,7 +285,7 @@ class AbstractMobilityService(ABC):
                         self.cancel_request(uid)
                     else:
                         log.info(f"{uid} refused {self.id} offer (predicted pickup time ({service_dt}) is too long, wait for better proposition...")
-                    self._cache_request_vehicles = dict()
+                    self._cache_request_vehicles = {}
             for uid in users_canceling:
                 self.cancel_request(uid)
         else:
@@ -383,9 +376,8 @@ class AbstractMobilityService(ABC):
                             f'and {next_a_dnode} on layer {veh_layer.id}'
                 # Effectively update next activity path
                 built_next_a_modified_path = self.construct_veh_path(next_a_modified_path)
-                if check_remaining_link_length:
-                    if built_next_a_modified_path[0][0] == veh._current_link:
-                        built_next_a_modified_path[0] = (built_next_a_modified_path[0][0], veh._remaining_link_length)
+                if check_remaining_link_length and built_next_a_modified_path[0][0] == veh._current_link:
+                    built_next_a_modified_path[0] = (built_next_a_modified_path[0][0], veh._remaining_link_length)
                 next_a.modify_path(built_next_a_modified_path)
             # Remove activity from plan
             del veh.activities[index-1]
@@ -406,12 +398,18 @@ class AbstractMobilityService(ABC):
 
         ## Remove user pickup activity
         all_activities = [veh.activity] + list(veh.activities)
-        user_pu_act_ind = [i for i in range(len(all_activities)) if all_activities[i].user == user][0] # pickup is necessarily before serving
+        user_pu_act_ind = next(
+            i for i in range(len(all_activities))
+            if all_activities[i].user == user  # pickup is necessarily before serving
+        )
         self.remove_activity_by_index(veh, user_pu_act_ind, mlgraph, cost)
 
         ## Remove user serving activity
         all_activities = [veh.activity] + list(veh.activities)
-        user_serving_act_ind = [i for i in range(len(all_activities)) if all_activities[i] is not None and all_activities[i].user == user][0]
+        user_serving_act_ind = next(
+            i for i in range(len(all_activities))
+            if all_activities[i] is not None and all_activities[i].user == user
+        )
         self.remove_activity_by_index(veh, user_serving_act_ind, mlgraph, cost)
 
     def modify_user_drop_node(self, user, veh, new_drop_node, former_drop_node, gnodes, mlgraph, cost):
@@ -467,13 +465,16 @@ class AbstractMobilityService(ABC):
                 users_potentially_impacted = [a.user for i,a in enumerate(all_activities) if i < user_serving_act_ind and type(a).__name__=='VehicleActivityPickup']
                 users_impacted = []
                 for puser in list(veh.passengers.values()) + users_potentially_impacted:
-                    puser_serving_act_ind = [i for i,a in enumerate(all_activities) if a.user == puser and type(a).__name__=='VehicleActivityServing'][0]
+                    puser_serving_act_ind = next(
+                        i for i, a in enumerate(all_activities)
+                        if a.user == puser and type(a).__name__ == 'VehicleActivityServing'
+                    )
                     if puser_serving_act_ind > user_serving_act_ind:
                         users_impacted.append(puser)
                 if users_impacted:
                     log.warning(f'User {user.id} who were matched with vehicle {veh.id} of the {self.id} mobility service '\
                         f'is about to modify her drop node, it will directly impact the achieved path of users {users_impacted}')
-                    log.error(f'Case not yet developped: when other users than the one who want to modify her drop node are directly impacted')
+                    log.error('Case not yet developped: when other users than the one who want to modify her drop node are directly impacted')
                     sys.exit(-1)
                 veh.activities[user_serving_act_ind-1].modify_path(u_serving_act_new_path)
             all_activities = [veh.activity] + list(veh.activities)
@@ -544,7 +545,6 @@ class AbstractMobilityService(ABC):
         Returns:
             None
         """
-        pass
 
     @abstractmethod
     def step_maintenance(self, dt: Dt):
@@ -558,7 +558,6 @@ class AbstractMobilityService(ABC):
         -------
 
         """
-        pass
 
     @abstractmethod
     def matching(self, request: Request):
@@ -568,7 +567,6 @@ class AbstractMobilityService(ABC):
             -request: the request to match
         Returns:
         """
-        pass
 
     def request(self, user: User, drop_node: str) -> Dt:
         """
@@ -580,9 +578,8 @@ class AbstractMobilityService(ABC):
         Returns: waiting time before pick-up
 
         """
-    pass
 
-    def rebalancing(self, next_demand: List[User], horizon: Dt):
+    def rebalancing(self, next_demand: list[User], horizon: Dt):
         """
         Rebalancing of the mobility service fleet
 
@@ -595,9 +592,8 @@ class AbstractMobilityService(ABC):
         -------
 
         """
-        pass
 
-    def replanning(self, veh: Vehicle, new_activities: List[VehicleActivity]) -> List[VehicleActivity]:
+    def replanning(self, veh: Vehicle, new_activities: list[VehicleActivity]) -> list[VehicleActivity]:
         """
         Update the activities of a vehicle
 
@@ -610,7 +606,6 @@ class AbstractMobilityService(ABC):
         -------
 
         """
-        pass
 
     @classmethod
     @abstractmethod
@@ -629,7 +624,7 @@ class AbstractPredictiveMobilityService(AbstractMobilityService, metaclass=ABCMe
                  dt_matching: int,
                  dt_rebalancing: int,
                  horizon: AbstractDemandHorizon):
-        super(AbstractPredictiveMobilityService, self).__init__(id, veh_capacity, dt_matching, dt_rebalancing)
+        super().__init__(id, veh_capacity, dt_matching, dt_rebalancing)
         self._horizon: AbstractDemandHorizon = horizon
 
     def update(self, dt: Dt):
@@ -665,7 +660,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
              the moment of their planning, it is applied initially and when there is no
              idle vehicle nor open request
         """
-        super(AbstractOnDemandMobilityService, self).__init__(id, veh_capacity, dt_matching, dt_periodic_maintenance)
+        super().__init__(id, veh_capacity, dt_matching, dt_periodic_maintenance)
         self._zones = {}
         self.default_waiting_time = default_waiting_time
         self._estimated_pickup_times = {'default': default_waiting_time}
@@ -706,7 +701,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
             -zone: the zone to add to this service
         """
         # Check that this zone id has not been already added
-        assert zone.id not in self._zones.keys(), f'Try to add zone {zone.id} in {self.id} '\
+        assert zone.id not in self._zones, f'Try to add zone {zone.id} in {self.id} '\
             'mobility service but another zone with the same id already exists...'
         # Check consistency of the zone
         if self.layer is not None:
@@ -716,7 +711,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
         self._zones[zone.id] = zone
         self._estimated_pickup_times[zone.id] = self.default_waiting_time
 
-    def add_zoning(self, zones: List[LayerZone]):
+    def add_zoning(self, zones: list[LayerZone]):
         """Method to add a zoning to the service.
 
         Args:
@@ -754,8 +749,10 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
         """Method that returns the array of idle vehicles of this service.
         """
         all_vehs = self.get_all_vehicles()
-        mask = [True if (veh.activity_type in [ActivityType.STOP, ActivityType.REPOSITIONING]) and (not veh.activities) \
-            else False for veh in all_vehs]
+        mask = [
+            (veh.activity_type in [ActivityType.STOP, ActivityType.REPOSITIONING]) and (not veh.activities)
+            for veh in all_vehs
+        ]
         idle_vehs = all_vehs[mask]
         return idle_vehs
 
@@ -765,7 +762,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
         vehs = np.array(list(self.fleet.vehicles.values()))
         return vehs
 
-    def service_level_costs(self, nodes: List[str]) -> dict:
+    def service_level_costs(self, nodes: list[str]) -> dict:
         return create_service_costs()
 
 
@@ -789,9 +786,9 @@ class AbstractOnDemandDepotMobilityService(AbstractOnDemandMobilityService):
              the moment of their planning, it is applied initially and when there is no
              idle vehicle nor open request
         """
-        super(AbstractOnDemandDepotMobilityService, self).__init__(id, veh_capacity, dt_matching,
+        super().__init__(id, veh_capacity, dt_matching,
             dt_periodic_maintenance, default_waiting_time)
-        self.depots = dict()
+        self.depots = {}
 
     def add_depot(self, node: str, capacity: int, fill: bool = True):
         """Method to create a depot full of vehicles.
@@ -808,7 +805,7 @@ class AbstractOnDemandDepotMobilityService(AbstractOnDemandMobilityService):
                 new_veh = self.create_waiting_vehicle(node)
                 self.depots[node].add_vehicle(new_veh, None)
 
-    def add_zoning(self, zones: List[LayerZone] = None):
+    def add_zoning(self, zones: list[LayerZone] | None = None):
         """Method to add a zoning to the service. This method should be called after
         the MultiLayerGraph creation when no argument is passed to it.
 

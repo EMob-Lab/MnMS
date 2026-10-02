@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+
 import pandas as pd
 
 from mnms.demand import BaseDemandManager, User
@@ -10,7 +11,7 @@ from mnms.generation.roads import generate_line_road
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt, TimeTable
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager

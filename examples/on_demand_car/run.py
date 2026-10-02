@@ -4,20 +4,20 @@
 ## Casuals
 import pathlib
 
+from mnms.demand.manager import CSVDemandManager
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_grid_origin_destination_layer, generate_layer_from_roads
+
 ## MnMS
 from mnms.generation.roads import generate_manhattan_road
-from mnms.generation.layers import generate_layer_from_roads, generate_grid_origin_destination_layer
 from mnms.graph.layers import MultiLayerGraph
-from mnms.demand.manager import CSVDemandManager
-from mnms.io.graph import save_graph
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
-from mnms.travel_decision.dummy import DummyDecisionModel
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.on_demand import OnDemandDepotMobilityService
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
-from mnms.time import Time, Dt
-from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 
 ##################
 ### Parameters ###

@@ -1,15 +1,15 @@
-from typing import Tuple, List, Dict
 
 from mnms.demand import User
 from mnms.demand.user import UserState
 from mnms.mobility_service.abstract import AbstractMobilityService, Request
 from mnms.time import Dt
-from mnms.vehicles.veh_type import VehicleActivityServing, ActivityType, Vehicle, VehicleActivity
 from mnms.tools.cost import create_service_costs
+from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity, VehicleActivityServing
+
 
 class PersonalMobilityService(AbstractMobilityService):
     def __init__(self, id: str = 'PersonalVehicle'):
-        super(PersonalMobilityService, self).__init__(id, veh_capacity=1, dt_matching=0, dt_periodic_maintenance=0)
+        super().__init__(id, veh_capacity=1, dt_matching=0, dt_periodic_maintenance=0)
 
     def is_personal(self):
         return True
@@ -23,9 +23,10 @@ class PersonalMobilityService(AbstractMobilityService):
             -dt: time elapsed since the previous maintenance phase
         """
         for veh in list(self.fleet.vehicles.values()):
-            if veh.activity_type is ActivityType.STOP:
-                if veh.last_dropped_off_user is None or (veh.last_dropped_off_user is not None and veh.last_dropped_off_user.state == UserState.ARRIVED):
-                    self.fleet.delete_vehicle(veh.id)
+            if veh.activity_type is ActivityType.STOP and (
+                veh.last_dropped_off_user is None or veh.last_dropped_off_user.state == UserState.ARRIVED
+            ):
+                self.fleet.delete_vehicle(veh.id)
 
     def periodic_maintenance(self, dt: Dt):
         pass
@@ -84,13 +85,13 @@ class PersonalMobilityService(AbstractMobilityService):
             # current flow step
             new_veh.dt_move = self._tcurrent - request.request_time if self._tcurrent is not None else None
 
-    def replanning(self, veh: Vehicle, new_activities: List[VehicleActivity]) -> List[VehicleActivity]:
+    def replanning(self, veh: Vehicle, new_activities: list[VehicleActivity]) -> list[VehicleActivity]:
         pass
 
-    def rebalancing(self, next_demand: List[User], horizon: List[Vehicle]):
+    def rebalancing(self, next_demand: list[User], horizon: list[Vehicle]):
         pass
 
-    def service_level_costs(self, nodes: List[str]) -> dict:
+    def service_level_costs(self, nodes: list[str]) -> dict:
         return create_service_costs()
 
     @classmethod
@@ -99,5 +100,5 @@ class PersonalMobilityService(AbstractMobilityService):
         return new_obj
 
     def __dump__(self):
-        return {"TYPE": ".".join([PersonalMobilityService.__module__, PersonalMobilityService.__name__]),
+        return {"TYPE": f"{PersonalMobilityService.__module__}.{PersonalMobilityService.__name__}",
                 "ID": self.id}

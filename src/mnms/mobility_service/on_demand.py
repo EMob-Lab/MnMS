@@ -1,24 +1,38 @@
-from typing import Tuple, Dict, List
 
-import numpy as np
-from scipy.optimize import linear_sum_assignment
+import math
 import multiprocessing
 import sys
-import math
 
+import numpy as np
 from hipop.shortest_path import dijkstra, parallel_dijkstra
+from scipy.optimize import linear_sum_assignment
 
 from mnms import create_logger
 from mnms.demand import User
-from mnms.mobility_service.abstract import AbstractOnDemandMobilityService, AbstractOnDemandDepotMobilityService, Request, compute_path_travel_time, compute_path_nodes_travel_time
-from mnms.mobility_service.filters import PlanEndsInRadiusFilter, IsIdle, InRadiusFilter, DepotIsNotFull, IsNearestDepotFilter
+from mnms.mobility_service.abstract import (
+    AbstractOnDemandDepotMobilityService,
+    AbstractOnDemandMobilityService,
+    Request,
+    compute_path_nodes_travel_time,
+    compute_path_travel_time,
+)
+from mnms.mobility_service.filters import (
+    DepotIsNotFull,
+    InRadiusFilter,
+    IsIdle,
+    IsNearestDepotFilter,
+    PlanEndsInRadiusFilter,
+)
 from mnms.time import Dt, Time
 from mnms.tools.exceptions import PathNotFound
-from mnms.vehicles.veh_type import ActivityType, VehicleActivityServing, VehicleActivityStop, \
-    VehicleActivityPickup, VehicleActivityRepositioning, Vehicle, VehicleActivity
-from mnms.tools.cost import create_service_costs
-from mnms.tools.geometry import polygon_area, get_bounding_box
+from mnms.tools.geometry import get_bounding_box, polygon_area
 from mnms.tools.preprocessing import decode_shortest_path_tree
+from mnms.vehicles.veh_type import (
+    ActivityType,
+    VehicleActivityPickup,
+    VehicleActivityRepositioning,
+    VehicleActivityServing,
+)
 
 log = create_logger(__name__)
 
@@ -48,9 +62,9 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             -radius: radius in meters used by matching strategies
             -detour_ratio: distance on the actual road network to straight line distance
         """
-        super(OnDemandMobilityService, self).__init__(id, veh_capacity=1, dt_matching=dt_matching,
+        super().__init__(id, veh_capacity=1, dt_matching=dt_matching,
             dt_periodic_maintenance=dt_periodic_maintenance, default_waiting_time=default_waiting_time)
-        self.gnodes = dict()
+        self.gnodes = {}
         self.detour_ratio = detour_ratio
 
         self._matching_strategy = matching_strategy
@@ -78,7 +92,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             -drop_node: drop node id
             -request_time: time at which request is placed
         """
-        super(OnDemandMobilityService, self).add_request(user, drop_node, request_time)
+        super().add_request(user, drop_node, request_time)
         # Save the request in the proper zone to be able to compute request arrival rate
         self._requests_history.append(Request(user, drop_node, request_time))
 
@@ -179,7 +193,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 open_reqs_density = len(open_reqs) / area
                 # Compute mean requests arrival rate on these links
                 reqs_hist = self.requests_history
-                assert len(reqs_hist) > 0, f'There is no request history, impossible to estimate pickup time there...'
+                assert len(reqs_hist) > 0, 'There is no request history, impossible to estimate pickup time there...'
                 delta_t = (max(reqs_hist).request_time - min(reqs_hist).request_time).to_seconds()
                 if delta_t == 0:
                     delta_t = dt.to_seconds() # dt is the smallest time step
@@ -243,7 +257,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 self.cancel_request(user.id)
             else:
                 log.info(f"{user.id} refused {self.id} offer (predicted pickup time ({service_dt}) is too long, wait for better proposition...")
-            self._cache_request_vehicles = dict()
+            self._cache_request_vehicles = {}
 
     def launch_matching_batch(self, dt):
         """Method that launches the matching phase by treating the requests jointly.
@@ -339,7 +353,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 self._cache_request_vehicles[req.user.id] = veh, veh_path
                 self.matching(req, dt)
                 self.cancel_request(req.user.id)
-                self._cache_request_vehicles = dict()
+                self._cache_request_vehicles = {}
 
     def request_nearest_idle_vehicle_in_radius_fifo(self, user: User, drop_node: str) -> Dt:
         """The nearest (in time) idle vehicle located within a certain radius around the
@@ -559,7 +573,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 veh.dt_move = self._tcurrent - request.request_time
 
     def __dump__(self):
-        return {"TYPE": ".".join([OnDemandMobilityService.__module__, OnDemandMobilityService.__name__]),
+        return {"TYPE": f"{OnDemandMobilityService.__module__}.{OnDemandMobilityService.__name__}",
                 "DT_MATCHING": self.dt_matching,
                 "DT_PERIODIC_MAINTENANCE": self._dt_periodic_maintenance,
                 "ID": self.id,
@@ -585,12 +599,12 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                  matching_strategy: str = 'nearest_idle_vehicle_in_radius_fifo',
                  radius: float = 10000,
                  detour_ratio: float = 1.343):
-        super(OnDemandDepotMobilityService, self).__init__(id, dt_matching, dt_periodic_maintenance=dt_periodic_maintenance,
+        super().__init__(id, dt_matching, dt_periodic_maintenance=dt_periodic_maintenance,
             matching_strategy=matching_strategy, radius=radius, detour_ratio=detour_ratio, default_waiting_time=default_waiting_time)
         #NB: super is the first mother class, do not init the second mother class because
         #    it contains the same attributes except depots
         self.gnodes = None
-        self.depots = dict()
+        self.depots = {}
 
     def step_maintenance(self, dt: Dt):
         """Method that proceeds to the maintenance phase.
@@ -697,7 +711,7 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                 self.depots[veh._current_node].remove_vehicle(veh)
 
     def __dump__(self):
-        return {"TYPE": ".".join([OnDemandMobilityService.__module__, OnDemandMobilityService.__name__]),
+        return {"TYPE": f"{OnDemandMobilityService.__module__}.{OnDemandMobilityService.__name__}",
                 "DT_MATCHING": self.dt_matching,
                 "DT_PERIODIC_MAINTENANCE": self._dt_periodic_maintenance,
                 "ID": self.id,

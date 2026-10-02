@@ -1,11 +1,10 @@
 from collections import deque
 from dataclasses import dataclass, field
-from typing import List, Deque, Tuple
 
 from mnms.time import Time
 from mnms.vehicles.veh_type import Vehicle
 
-ItemVehicleQueue = Tuple[Vehicle, Time]
+ItemVehicleQueue = tuple[Vehicle, Time]
 
 
 @dataclass(slots=True)
@@ -13,7 +12,7 @@ class Depot:
     id: str
     node: str
     capacity: int
-    vehicles: Deque[ItemVehicleQueue] = field(default_factory=deque)
+    vehicles: deque[ItemVehicleQueue] = field(default_factory=deque)
 
     def add_vehicle(self, vehicle: Vehicle, time: Time) -> None:
         if self.contains(vehicle):
@@ -27,7 +26,7 @@ class Depot:
         return veh, time
 
     def remove_vehicle(self, veh: Vehicle) -> ItemVehicleQueue:
-        veh_index = [i for i,item in enumerate(self.vehicles) if item[0] == veh][0]
+        veh_index = next(i for i,item in enumerate(self.vehicles) if item[0] == veh)
         _, time = self.remove_vehicle_by_index(veh_index)
         return veh, time
 

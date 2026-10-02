@@ -1,13 +1,16 @@
-from collections import deque, defaultdict
-from typing import List, Callable, Dict, Optional, Deque
+# ruff: file-ignore[N999] This module do not respect the PEP8 naming convention
+# (module names should be lowercase), but changing it would break legacy code.
+
+from collections import defaultdict, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from mnms.flow.MFD import MFDFlowMotor
 from mnms.flow.abstract import AbstractReservoir
+from mnms.flow.MFD import MFDFlowMotor
 from mnms.graph.zone import Zone
-from mnms.time import Time, Dt
-from mnms.vehicles.veh_type import Vehicle, Car
 from mnms.log import create_logger
+from mnms.time import Dt, Time
+from mnms.vehicles.veh_type import Car, Vehicle
 
 log = create_logger(__name__)
 
@@ -25,8 +28,8 @@ class QueuedVehicle:
 class CongestedReservoir(AbstractReservoir):
     def __init__(self,
                  zone: Zone,
-                 modes: List[str],
-                 f_speed: Callable[[Dict[str, float], int], Dict[str, float]],
+                 modes: list[str],
+                 f_speed: Callable[[dict[str, float], int], dict[str, float]],
                  f_entry: Callable[[int, int], float],
                  n_car_max: int):
         """
@@ -39,11 +42,11 @@ class CongestedReservoir(AbstractReservoir):
             -f_entry: The entry function
             -n_car_max: The max number of car in this reservoir
         """
-        super(CongestedReservoir, self).__init__(zone, modes)
+        super().__init__(zone, modes)
         self.f_entry: Callable[[int, int], float] = f_entry
         self.f_speed = f_speed
         self.n_car_max: int = n_car_max
-        self.car_queue: Deque[QueuedVehicle] = deque()
+        self.car_queue: deque[QueuedVehicle] = deque()
         self.last_car_entrance = None
         self.time_interval = Time("00:00:00")
         self.car_in_outgoing_queues = 0
@@ -77,7 +80,7 @@ class CongestedReservoir(AbstractReservoir):
     def update_accumulations(self, dict_accumulations):
         """Method that updates the dict of accumulation of this reservoir.
         """
-        for mode in dict_accumulations.keys():
+        for mode in dict_accumulations:
             if mode in self.modes:
                 self.dict_accumulations[mode] = dict_accumulations[mode]
 
@@ -90,7 +93,7 @@ class CongestedReservoir(AbstractReservoir):
         """
         qc = {}
         for qv in self.car_queue:
-            if qv.previous_reservoir in qc.keys():
+            if qv.previous_reservoir in qc:
                 qc[qv.previous_reservoir] += 1
             else:
                 qc[qv.previous_reservoir] = 1
@@ -98,7 +101,7 @@ class CongestedReservoir(AbstractReservoir):
 
 
 class CongestedMFDFlowMotor(MFDFlowMotor):
-    def __init__(self, outfile: Optional[str] = None):
+    def __init__(self, outfile: str | None = None):
         """
         Congested flow motor with waiting queues between the reservoirs.
         NB: The inter reservoir congestion only concern the Car vehicle type.
@@ -106,9 +109,9 @@ class CongestedMFDFlowMotor(MFDFlowMotor):
         Args:
             -outfile: If not None, write ouptut in that file
         """
-        super(CongestedMFDFlowMotor, self).__init__(outfile, writeheader=False)
+        super().__init__(outfile, writeheader=False)
 
-        self.reservoirs: Dict[str, CongestedReservoir] = dict()
+        self.reservoirs: dict[str, CongestedReservoir] = {}
         self.car_in_queues = set()
         self.car_previous_zone = defaultdict(set)
 
@@ -162,12 +165,12 @@ class CongestedMFDFlowMotor(MFDFlowMotor):
             res.car_in_outgoing_queues = len(self.car_previous_zone[resid])
 
         # Treat intra reservoir movements
-        super(CongestedMFDFlowMotor, self).step(dt)
+        super().step(dt)
 
     def move_veh(self, veh: Vehicle, tcurrent: Time, dt: float, speed: float) -> float:
         if isinstance(veh, Car):
             previous_veh_zone = self.get_vehicle_zone(veh)
-            elapsed_time = super(CongestedMFDFlowMotor, self).move_veh(veh, tcurrent, dt, speed)
+            elapsed_time = super().move_veh(veh, tcurrent, dt, speed)
             next_veh_zone = self.get_vehicle_zone(veh)
 
             if previous_veh_zone != next_veh_zone:
@@ -188,17 +191,17 @@ class CongestedMFDFlowMotor(MFDFlowMotor):
                     veh.update_distance(veh_remaining_length-link_length)
                     veh.speed = 0
                     self.set_vehicle_position(veh)
-                    for passenger_id, passenger in veh.passengers.items():
+                    for passenger in veh.passengers.values():
                         passenger.set_position(veh._current_link, veh._current_node, veh.remaining_link_length, veh.position, tcurrent)
                     return dt
         else:
-            elapsed_time = super(CongestedMFDFlowMotor, self).move_veh(veh, tcurrent, dt, speed)
+            elapsed_time = super().move_veh(veh, tcurrent, dt, speed)
 
         return elapsed_time
 
     def count_moving_vehicle(self, veh: Vehicle, current_vehicles):
         if veh.id not in self.car_in_queues:
-            super(CongestedMFDFlowMotor, self).count_moving_vehicle(veh, current_vehicles)
+            super().count_moving_vehicle(veh, current_vehicles)
 
     def add_reservoir(self, res: CongestedReservoir):
         self.reservoirs[res.id] = res
@@ -208,7 +211,7 @@ class CongestedMFDFlowMotor(MFDFlowMotor):
         for resid, res in self.reservoirs.items():
             resid = res.id
             for mode in res.modes:
-                trip_lengths = res.trip_lengths[mode] if mode in res.trip_lengths else None
+                trip_lengths = res.trip_lengths.get(mode, None)
                 trip_lengths = ' '.join([str(round(l,2)) for l in trip_lengths]) if trip_lengths is not None else None
                 self._csvhandler.writerow([str(step_affectation),
                     str(step_flow),

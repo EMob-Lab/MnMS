@@ -1,21 +1,20 @@
+import json
 import unittest
 from tempfile import TemporaryDirectory
-import pandas as pd
-import json
 
-from mnms.demand import User, BaseDemandManager
+import pandas as pd
+
+from mnms.demand import BaseDemandManager, User
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.graph.layers import MultiLayerGraph, CarLayer, BusLayer, OriginDestinationLayer
+from mnms.graph.layers import BusLayer, MultiLayerGraph, OriginDestinationLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Dt, TimeTable, Time
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.vehicles.veh_type import Vehicle
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
 
 
 class TestCostsFunctions(unittest.TestCase):
@@ -55,8 +54,8 @@ class TestCostsFunctions(unittest.TestCase):
                         TimeTable.create_table_freq('07:05:00', '08:00:00', Dt(minutes=1)))
 
         odlayer = OriginDestinationLayer()
-        odlayer.create_origin_node(f"ORIGIN", [0,0])
-        odlayer.create_destination_node(f"DESTINATION", [2000,0])
+        odlayer.create_origin_node("ORIGIN", [0,0])
+        odlayer.create_destination_node("DESTINATION", [2000,0])
 
         mlgraph = MultiLayerGraph([bus_layer], odlayer, 1)
 

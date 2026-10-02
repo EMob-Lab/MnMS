@@ -3,12 +3,12 @@ import unittest
 from tempfile import TemporaryDirectory
 
 from mnms.generation.layers import generate_matching_origin_destination_layer
-from mnms.graph.layers import CarLayer, BusLayer, MultiLayerGraph
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import Zone
+from mnms.io.graph import load_transit_links, save_transit_link_odlayer, save_transit_links
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.time import TimeTable, Dt
-from mnms.io.graph import save_graph, load_graph, save_transit_links, save_transit_link_odlayer, load_transit_links
+from mnms.time import Dt, TimeTable
 
 
 class TestIOGraphTransit(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestIOGraphTransit(unittest.TestCase):
         """Initiates the test.
         """
 
-        self.tempdir = TemporaryDirectory()
+        self.tempdir = TemporaryDirectory(ignore_cleanup_errors=True)
 
         self.roads = RoadDescriptor()
         self.roads.register_node("0", [0, 0])
@@ -59,10 +59,7 @@ class TestIOGraphTransit(unittest.TestCase):
     def tearDown(self):
         """Concludes and closes the test.
         """
-        try:
-            self.tempdir.cleanup()
-        except:
-            pass
+        self.tempdir.cleanup()
 
     def test_read_write_all(self):
         save_transit_links(self.mlgraph, self.tempdir.name+"/all_transit.json")
@@ -101,7 +98,7 @@ class TestIOGraphTransit(unittest.TestCase):
         with open(self.tempdir.name+"/odlayer_transit.json", "r") as f:
             data = json.load(f)
 
-        data = set(l["ID"] for l in data["LINKS"])
+        data = {l["ID"] for l in data["LINKS"]}
 
         for origin in self.mlgraph.odlayer.origins:
             for link in self.mlgraph.graph.nodes[origin].adj.values():

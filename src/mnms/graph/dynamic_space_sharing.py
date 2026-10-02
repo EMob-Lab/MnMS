@@ -1,17 +1,17 @@
-from dataclasses import dataclass
-from typing import Optional, Dict, Callable, List, Tuple
-import sys
 import multiprocessing
-
-from mnms.time import Time
-from mnms.vehicles.veh_type import Vehicle, VehicleActivity, ActivityType
-from mnms.log import create_logger
+import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from hipop.shortest_path import parallel_dijkstra_heterogeneous_costs
 
+from mnms.log import create_logger
+from mnms.time import Time
+from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity
+
 log = create_logger(__name__)
 
-def path_to_nodes(path) -> List[str]:
+def path_to_nodes(path) -> list[str]:
     """Method that converts a built path into a list of nodes.
 
     Args:
@@ -34,7 +34,7 @@ class BannedLink:
     period: int
 
 
-class DynamicSpaceSharing(object):
+class DynamicSpaceSharing:
     def __init__(self, graph: "MultiLayerGraph"):
         """
         Allow to ban links in the MultiLayerGraph for certain mobility services.
@@ -42,13 +42,13 @@ class DynamicSpaceSharing(object):
         Args:
             -graph: The MultiLayerGraph
         """
-        self.graph: Optional["MultiLayerGraph"] = graph
+        self.graph: MultiLayerGraph | None = graph
 
-        self.cost: Optional[str] = None
-        self.banned_links: Dict[str, BannedLink] = dict()
+        self.cost: str | None = None
+        self.banned_links: dict[str, BannedLink] = {}
         self._dt = 0
         self._flow_step_counter = 0
-        self._dynamic: Callable[["MultiLayerGraph", Time], List[Tuple[str, str, int]]] = lambda x, tcurrent: list()
+        self._dynamic: Callable[[MultiLayerGraph, Time], list[tuple[str, str, int]]] = lambda x, tcurrent: []
 
     def set_dt(self, dt: int):
         """Method to define the calling frequency of the banning phase.
@@ -67,7 +67,7 @@ class DynamicSpaceSharing(object):
         """
         self.cost = cost
 
-    def ban_link(self, lid: str, mobility_service: str, period: int, vehicles: List[Vehicle]) -> List[Tuple[Vehicle, VehicleActivity]]:
+    def ban_link(self, lid: str, mobility_service: str, period: int, vehicles: list[Vehicle]) -> list[tuple[Vehicle, VehicleActivity]]:
         """Method to ban a link for a specific mobility service during a certain number of flow time steps.
         It sets the cost of this link to infinity.
 
@@ -118,7 +118,7 @@ class DynamicSpaceSharing(object):
 
         return vehicles_to_reroute
 
-    def unban_link(self, lid: str, gnodes: List["Nodes"]):
+    def unban_link(self, lid: str, gnodes: list["Nodes"]):
         """Method to unban a banned link for a specific mobility service.
         It recomputes the travel time and cost on that link.
 
@@ -146,7 +146,7 @@ class DynamicSpaceSharing(object):
         self.graph.graph.update_link_costs(lid, costs)
         layer.graph.links[lid].update_costs(costs)
 
-    def update(self, tcurrent: Time, vehicles: List[Vehicle]) -> List[Tuple[Vehicle, VehicleActivity]]:
+    def update(self, tcurrent: Time, vehicles: list[Vehicle]) -> list[tuple[Vehicle, VehicleActivity]]:
         """Method that updates the banned links every _dt.
 
         Args:
@@ -157,7 +157,7 @@ class DynamicSpaceSharing(object):
         gnodes = self.graph.graph.nodes
 
         # Unban links for which the banning period elapsed
-        to_del = list()
+        to_del = []
         for lid, banned_link in self.banned_links.items():
             banned_link.period -= 1
             if banned_link.period <= 0:
@@ -172,7 +172,7 @@ class DynamicSpaceSharing(object):
         if self._flow_step_counter >= self._dt:
             self._flow_step_counter = 0
             #new_banned_links = self._dynamic(self.graph, tcurrent)
-            new_banned_links = list()
+            new_banned_links = []
 
             for lid, mobility_service, period in new_banned_links:
                 if lid not in self.banned_links:
@@ -254,11 +254,14 @@ class DynamicSpaceSharing(object):
 
                 # Find all users concerned by this rerouting
                 all_activities = [veh.activity] + list(veh.activities)
-                act_ind = [i for i in range(len(all_activities)) if all_activities[i] == activity][0]
+                act_ind = next(i for i in range(len(all_activities)) if all_activities[i] == activity)
                 users_potentially_impacted = [a.user for i,a in enumerate(all_activities) if i < act_ind and type(a).__name__=='VehicleActivityPickup']
                 users_impacted = []
                 for puser in list(veh.passengers.values()) + users_potentially_impacted:
-                    puser_serving_act_ind = [i for i,a in enumerate(all_activities) if a.user == puser and type(a).__name__=='VehicleActivityServing'][0]
+                    puser_serving_act_ind = next(
+                        i for i, a in enumerate(all_activities)
+                        if a.user == puser and type(a).__name__=='VehicleActivityServing'
+                    )
                     if puser_serving_act_ind >= act_ind:
                         users_impacted.append(puser)
                 # Modify their path
@@ -268,7 +271,7 @@ class DynamicSpaceSharing(object):
                         # Find part to effectively modify (remove the part of old path already achieved)
                         try:
                             idx = old_veh_path_nodes.index(new_path[0])
-                        except:
+                        except ValueError:
                             log.error(f'Cannot find new path first node {new_path[0]} into old path {old_veh_path_nodes}...')
                             sys.exit(-1)
                         old_veh_path_nodes = old_veh_path_nodes[idx:]
@@ -278,7 +281,7 @@ class DynamicSpaceSharing(object):
                 log.warning(f'Cannot find an alternative route '\
                     f'for vehicle {veh.id} and activity {activity}...')
 
-    def set_dynamic(self, dynamic: Callable[["MultiLayerGraph", Time], List[Tuple[str, str, int]]], call_every: int):
+    def set_dynamic(self, dynamic: Callable[["MultiLayerGraph", Time], list[tuple[str, str, int]]], call_every: int):
         """Method to define the banning strategy.
 
         Args:

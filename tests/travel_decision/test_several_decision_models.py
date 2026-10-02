@@ -1,26 +1,26 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
+
 import pandas as pd
 
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.generation.roads import generate_manhattan_road
-from mnms.graph.zone import construct_zone_from_sections
-from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.demand import BaseDemandManager, User
-from mnms.generation.roads import generate_line_road
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_manhattan_road
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
+from mnms.graph.zone import construct_zone_from_sections
+from mnms.mobility_service.on_demand import OnDemandMobilityService
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import Time, Dt, TimeTable
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.travel_decision.logit import LogitDecisionModel, ModeCentricLogitDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
 from mnms.vehicles.manager import VehicleManager
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
 from mnms.vehicles.veh_type import Bus
+
 
 def common_rel_dist(pn, pn_, graph):
     common_dist = 0
@@ -91,7 +91,7 @@ class TestMobilityServicesGraph(unittest.TestCase):
         z1_sections = ["0_10", "10_20", "20_30",
             "30_40", "40_50", "50_60", "60_70", "70_80", "80_90", "90_91", "91_92", "92_93",
             "93_94", "94_95", "95_96", "96_97", "97_98", "98_99"]
-        z0_sections = [s for s in roads.sections.keys() if s not in z1_sections]
+        z0_sections = [s for s in roads.sections if s not in z1_sections]
         roads.add_zone(construct_zone_from_sections(roads, "Z0", z0_sections))
         roads.add_zone(construct_zone_from_sections(roads, "Z1", z1_sections))
 
@@ -268,8 +268,10 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             dummy_dfd_u = dummy_dfd[dummy_dfd['ID'] == u]
             logit_dfd_u = logit_dfd[logit_dfd['ID'] == u]
-            self.assertEqual(set([(p,ms) for p,ms in zip(dummy_dfd_u['PATH'], dummy_dfd_u['SERVICES'])]),
-                set([(p,ms) for p,ms in zip(logit_dfd_u['PATH'], logit_dfd_u['SERVICES'])]))
+            self.assertEqual(
+                {(p,ms) for p,ms in zip(dummy_dfd_u['PATH'], dummy_dfd_u['SERVICES'])},
+                {(p,ms) for p,ms in zip(logit_dfd_u['PATH'], logit_dfd_u['SERVICES'])}
+            )
             dummy_dfd_u_chosen = dummy_dfd_u[dummy_dfd_u['CHOSEN'] == 1].drop_duplicates()
             logit_dfd_u_chosen = logit_dfd_u[logit_dfd_u['CHOSEN'] == 1].drop_duplicates()
             same_choices = same_choices and (dummy_dfd_u_chosen['PATH'].iloc[0] == logit_dfd_u_chosen['PATH'].iloc[0]) \
@@ -340,8 +342,10 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             df1_u = df1[df1['ID'] == u]
             df2_u = df2[df2['ID'] == u]
-            self.assertEqual(set([(p,ms) for p,ms in zip(df1_u['PATH'], df1_u['SERVICES'])]),
-                set([(p,ms) for p,ms in zip(df2_u['PATH'], df2_u['SERVICES'])]))
+            self.assertEqual(
+                {(p,ms) for p,ms in zip(df1_u['PATH'], df1_u['SERVICES'])},
+                {(p,ms) for p,ms in zip(df2_u['PATH'], df2_u['SERVICES'])}
+            )
             df1_u_chosen = df1_u[df1_u['CHOSEN'] == 1].drop_duplicates()
             df2_u_chosen = df2_u[df2_u['CHOSEN'] == 1].drop_duplicates()
             same_choices = same_choices and (df1_u_chosen['PATH'].iloc[0] == df2_u_chosen['PATH'].iloc[0]) \
@@ -368,7 +372,7 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             dfu = df[df['ID'] == u]
             cost_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['COST']
-            path_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['PATH']
+            path_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['PATH'] # ruff: ignore[F841] FIXME The path should be checked.
             ms_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['SERVICES']
             if 'CAR' in ms_chosen:
                 dfu_CAR = dfu[dfu['SERVICES'] == 'WALK CAR WALK']

@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from mnms.time import Time, Dt
+from mnms.time import Dt, Time
 
 
 class TestTime(unittest.TestCase):
@@ -52,13 +52,13 @@ class TestDt(unittest.TestCase):
 
         self.assertEqual(12, dt._hours)
         self.assertEqual(35, dt._minutes)
-        self.assertAlmostEqual(Decimal(13.45), dt._seconds)
+        self.assertAlmostEqual(Decimal("13.45"), dt._seconds)
 
         dt = Dt(12, 135, 73.45)
 
         self.assertEqual(14, dt._hours)
         self.assertEqual(16, dt._minutes)
-        self.assertAlmostEqual(Decimal(13.45), dt._seconds)
+        self.assertAlmostEqual(Decimal("13.45"), dt._seconds)
 
     def test_to_sec(self):
         dt = Dt(12, 35, 13.45)

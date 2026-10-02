@@ -35,6 +35,9 @@ jobs:
       - name: Check file formatting (with pre-commit)
         run: pre-commit run --all-files
 
+      - name: Run linter (with Ruff)
+        run: ruff check --output-format=github
+
   build-and-test:
     name: Build & test (py ${{ matrix.python-version }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}

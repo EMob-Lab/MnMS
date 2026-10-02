@@ -1,8 +1,9 @@
-import multiprocessing
 import json
+import multiprocessing
 import time
 
-from hipop.shortest_path import parallel_dijkstra, parallel_dijkstra_single_source, floyd_warshall
+from hipop.shortest_path import floyd_warshall, parallel_dijkstra, parallel_dijkstra_single_source
+
 
 def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile):
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
@@ -32,7 +33,7 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
     # Build a dict of shortest paths
     sps = {}
     for i,(o,d) in enumerate(all_ods):
-        if o in sps.keys():
+        if o in sps:
             sps[o][d] = paths[i][0][0]
         else:
             sps[o] = {d: paths[i][0][0]}
@@ -124,7 +125,6 @@ def decode_shortest_path_tree(spts, origin, destination):
     spt = spts[origin]
     d = destination
     path = [d]
-    valid = True
     while d != origin:
         d = spt[d]
         if d == '':
