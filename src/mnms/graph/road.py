@@ -1,5 +1,4 @@
-from dataclasses import dataclass, asdict
-from typing import List, Optional, Dict
+from dataclasses import asdict, dataclass
 
 import numpy as np
 
@@ -22,7 +21,7 @@ class RoadSection:
     upstream: str
     downstream: str
     length: float
-    zone: Optional[str] = None
+    zone: str | None = None
 
 
 @dataclass(slots=True)
@@ -33,24 +32,24 @@ class RoadStop:
     absolute_position: np.ndarray
 
 
-class RoadDescriptor(object):
-    __slots__ = ('nodes', 'sections', 'zones', 'stops')
+class RoadDescriptor:
+    __slots__ = ('nodes', 'sections', 'stops', 'zones')
 
     def __init__(self):
         """
         Object describing the physical roads
         """
-        self.nodes: Dict[str, RoadNode] = dict()
-        self.stops: Dict[str, RoadStop] = dict()
-        self.sections: Dict[str, RoadSection] = dict()
+        self.nodes: dict[str, RoadNode] = {}
+        self.stops: dict[str, RoadStop] = {}
+        self.sections: dict[str, RoadSection] = {}
 
-        self.zones = dict()
+        self.zones = {}
 
-    def register_node(self, nid: str, pos: List[float]):
+    def register_node(self, nid: str, pos: list[float]):
         self.nodes[nid] = RoadNode(nid, np.array(pos))
 
     def register_stop(self, sid: str, lid: str, relative_position: float):
-        assert 0 <= relative_position <= 1, f"relative_position must be between 0 and 1"
+        assert 0 <= relative_position <= 1, "relative_position must be between 0 and 1"
 
         sec = self.sections[lid]
         up_node_pos = self.nodes[sec.upstream].position
@@ -61,11 +60,11 @@ class RoadDescriptor(object):
         self.stops[sid] = RoadStop(sid, lid, relative_position, abs_pos)
 
     def register_stop_abs(self, sid: str, lid: str, relative_position: float, abs_pos):
-        assert 0 <= relative_position <= 1, f"relative_position must be between 0 and 1"
+        assert 0 <= relative_position <= 1, "relative_position must be between 0 and 1"
 
         self.stops[sid] = RoadStop(sid, lid, relative_position, abs_pos)
 
-    def register_section(self, lid: str, upstream: str, downstream: str, length: Optional[float] = None):
+    def register_section(self, lid: str, upstream: str, downstream: str, length: float | None = None):
         assert upstream in self.nodes, f"{upstream} node is not registered"
         assert downstream in self.nodes, f"{downstream} node is not registered "
 
@@ -82,7 +81,7 @@ class RoadDescriptor(object):
         for l in zone.sections:
             self.sections[l].zone = zid
 
-    def delete_nodes(self, nids: List[str]):
+    def delete_nodes(self, nids: list[str]):
         for nid in nids:
             assert nid in list(self.nodes.keys()), f'Node {nid} does not exists in RoadDescriptor'
             # Remove node and all links from and to this node
@@ -95,11 +94,11 @@ class RoadDescriptor(object):
                  self.delete_section(lid)
 
     def delete_section(self, lid: str):
-        assert lid in self.sections.keys(), f'In delete_section: section id {lid} not found in roads sections'
+        assert lid in self.sections, f'In delete_section: section id {lid} not found in roads sections'
         del self.sections[lid]
 
-    def translate(self, v: List[float]):
-        for n in self.nodes.keys():
+    def translate(self, v: list[float]):
+        for n in self.nodes:
             self.nodes[n].position = np.add(self.nodes[n].position, v)
 
     def __dump__(self):

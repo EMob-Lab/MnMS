@@ -1,25 +1,24 @@
-from typing import Optional, Type, List, Annotated
+from typing import Annotated
 
 import numpy as np
 
-from mnms.graph.layers import AbstractLayer
-from mnms.graph.layers import OriginDestinationLayer, SimpleLayer
+from mnms.graph.layers import AbstractLayer, OriginDestinationLayer, SimpleLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.mobility_service.abstract import AbstractMobilityService
 from mnms.tools.geometry import get_bounding_box, points_in_polygon
-from mnms.vehicles.veh_type import Vehicle, Car
+from mnms.vehicles.veh_type import Car, Vehicle
 
-Point = Annotated[List[float], 2]
-PointList = List[Point]
+Point = Annotated[list[float], 2]
+PointList = list[Point]
 
 def generate_layer_from_roads(roads: RoadDescriptor,
                               layer_id: str,
                               class_layer = SimpleLayer,
-                              veh_type:Type[Vehicle] = Car,
+                              veh_type: type[Vehicle] = Car,
                               default_speed: float = 14,
-                              mobility_services: Optional[List[AbstractMobilityService]] = None,
-                              banned_nodes: List[str] = None,
-                              banned_sections: List[str] = None) -> AbstractLayer:
+                              mobility_services: list[AbstractMobilityService] | None = None,
+                              banned_nodes: list[str] | None = None,
+                              banned_sections: list[str] | None= None) -> AbstractLayer:
     """
     Generate a whole layer from the RoadDescriptor.
 
@@ -41,11 +40,11 @@ def generate_layer_from_roads(roads: RoadDescriptor,
     layer = class_layer(roads, layer_id, veh_type, default_speed, mobility_services)
 
     for n in roads.nodes:
-        if banned_nodes is None or (banned_nodes is not None and n not in banned_nodes):
+        if banned_nodes is None or n not in banned_nodes:
             layer.create_node(f"{layer_id}_{n}", n, {})
 
     for lid, data in roads.sections.items():
-        if banned_sections is None or (banned_sections is not None and lid not in banned_sections):
+        if banned_sections is None or lid not in banned_sections:
             cost = {}
             if mobility_services is not None:
                 for mservice in mobility_services:
@@ -82,8 +81,8 @@ def generate_grid_origin_destination_layer(xmin: float,
                                            xmax: float,
                                            ymax: float,
                                            nx: int,
-                                           ny: Optional[int] = None,
-                                           polygon: Optional[PointList] = None):
+                                           ny: int | None = None,
+                                           polygon: PointList | None = None):
     """
     Generate a rectangular structured grid for the OriginDestinationLayer
 
@@ -115,16 +114,15 @@ def generate_grid_origin_destination_layer(xmin: float,
     for j in range(ny):
         for i in range(nx):
             pos = np.array([xmin + i * dx, ymin + j * dy])
-            if polygon is not None:
-                if not points_in_polygon(np.array(polygon), [pos])[0]:
-                    continue
-            odlayer.create_destination_node(f"DESTINATION_{str(i + j * nx)}", pos)
-            odlayer.create_origin_node(f"ORIGIN_{str(i + j * nx)}", pos)
+            if polygon is not None and not points_in_polygon(np.array(polygon), [pos])[0]:
+                continue
+            odlayer.create_destination_node(f"DESTINATION_{i + j * nx}", pos)
+            odlayer.create_origin_node(f"ORIGIN_{i + j * nx}", pos)
 
     return odlayer
 
 
-def generate_bbox_origin_destination_layer(roads: RoadDescriptor, nx: int, ny: Optional[int] = None, polygon: Optional[PointList] = None) -> OriginDestinationLayer:
+def generate_bbox_origin_destination_layer(roads: RoadDescriptor, nx: int, ny: int | None = None, polygon: PointList | None = None) -> OriginDestinationLayer:
     """
     Generate a grid OriginDestinationLayer based on the bounding box of the roads nodes
 

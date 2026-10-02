@@ -1,13 +1,13 @@
-from mnms.simulation import Supervisor
 from mnms.demand import CSVDemandManager
-from mnms.flow.MFD import Reservoir, MFDFlowMotor
-from mnms.log import attach_log_file, LOGLEVEL, set_mnms_logger_level, set_all_mnms_logger_level
-from mnms.time import Time, Dt
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.io.graph import load_graph, load_odlayer
-from mnms.travel_decision.logit import LogitDecisionModel
-from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.log import LOGLEVEL, attach_log_file, set_all_mnms_logger_level
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.logit import LogitDecisionModel
 
 indir = "INPUTS"
 outdir = "OUTPUTS"
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     flow_motor = MFDFlowMotor(outfile=outdir+"/flow.csv")
 
-    for k, res in mmgraph.roads.zones.items():
+    for res in mmgraph.roads.zones.values():
         flow_motor.add_reservoir(Reservoir(res, ["CAR","BUS","TRAM","METRO"], calculate_V_MFD))
 
     travel_decision = LogitDecisionModel(mmgraph, outfile=outdir+"/path.csv", n_shortest_path=3)

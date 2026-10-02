@@ -1,22 +1,21 @@
-import sys
+# ruff: file-ignore[N999] This module do not respect the PEP8 naming convention
+# (module names should be lowercase), but changing it would break legacy code.
+
+import csv
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
-from typing import Callable, Dict
 
 import numpy as np
-import csv
-
 from hipop.graph import Link
 
-from mnms.demand import User
 from mnms.flow.abstract import AbstractMFDFlowMotor, AbstractReservoir
+from mnms.graph.layers import PublicTransportLayer
 from mnms.graph.zone import Zone
 from mnms.log import create_logger
 from mnms.time import Dt, Time
 from mnms.vehicles.manager import VehicleManager
-from mnms.vehicles.veh_type import Vehicle, ActivityType
-from mnms.graph.layers import PublicTransportLayer
+from mnms.vehicles.veh_type import Vehicle
 
 log = create_logger(__name__)
 
@@ -27,14 +26,14 @@ _dist = np.linalg.norm
 class LinkInfo:
     link: Link
     veh: str
-    sections: List[Tuple[str, float]]
+    sections: list[tuple[str, float]]
 
 
 class Reservoir(AbstractReservoir):
     def __init__(self,
                  zone: Zone,
-                 modes: List[str],
-                 f_speed: Callable[[Dict[str, float]], Dict[str, float]]):
+                 modes: list[str],
+                 f_speed: Callable[[dict[str, float]], dict[str, float]]):
         """
         Implementation of an MFD Reservoir
 
@@ -43,14 +42,14 @@ class Reservoir(AbstractReservoir):
             modes: The modes in the Reservoir
             f_speed: The MFD speed function
         """
-        super(Reservoir, self).__init__(zone, modes)
+        super().__init__(zone, modes)
         self.f_speed = f_speed
         self.update_speeds()
 
     def update_accumulations(self, dict_accumulations):
         """Method that updates the dict of accumulation of this reservoir.
         """
-        for mode in dict_accumulations.keys():
+        for mode in dict_accumulations:
             if mode in self.modes:
                 self.dict_accumulations[mode] = dict_accumulations[mode]
 
@@ -62,21 +61,21 @@ class Reservoir(AbstractReservoir):
 
 
 class MFDFlowMotor(AbstractMFDFlowMotor):
-    def __init__(self, outfile: str = None, writeheader: bool = True):
-        super(MFDFlowMotor, self).__init__(outfile=outfile)
+    def __init__(self, outfile: str | None = None, writeheader: bool = True):
+        super().__init__(outfile=outfile)
         if outfile is not None and writeheader:
             self._csvhandler.writerow(['AFFECTATION_STEP', 'FLOW_STEP', 'TIME', 'RESERVOIR', 'VEHICLE_TYPE', 'SPEED', 'ACCUMULATION', 'TRIP_LENGTHS'])
 
-        self.reservoirs: Dict[str, Reservoir] = dict()
+        self.reservoirs: dict[str, Reservoir] = {}
 
-        self.dict_accumulations: Optional[Dict] = None
-        self.dict_speeds: Optional[Dict] = None
+        self.dict_accumulations: dict | None = None
+        self.dict_speeds: dict | None = None
 
-        self.veh_manager: Optional[VehicleManager] = None
-        self.graph_nodes: Optional[Dict] = None
+        self.veh_manager: VehicleManager | None = None
+        self.graph_nodes: dict | None = None
 
-        self._layer_link_length_mapping: Dict[str, LinkInfo] = dict()
-        self._section_to_reservoir: Dict[str, Union[str, None]] = dict()
+        self._layer_link_length_mapping: dict[str, LinkInfo] = {}
+        self._section_to_reservoir: dict[str, str | None] = {}
 
     def __getstate__(self):
 
@@ -98,7 +97,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
         self._csvhandler.writerow(['AFFECTATION_STEP', 'FLOW_STEP', 'TIME', 'RESERVOIR', 'VEHICLE_TYPE', 'SPEED', 'ACCUMULATION', 'TRIP_LENGTHS'])
 
-        self._layer_link_length_mapping: Dict[str, LinkInfo] = dict()
+        self._layer_link_length_mapping: dict[str, LinkInfo] = {}
 
     def _reset_mapping(self):
         graph = self._graph.graph
@@ -107,7 +106,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         rnodes = roads.nodes
         for lid, link in graph.links.items():
             if link.label != "TRANSIT":
-                sections_length = list()
+                sections_length = []
                 link_layer = self._graph.layers[link.label]
                 if isinstance(link_layer, PublicTransportLayer):
                     unode_pos = np.array(gnodes[link.upstream].position)
@@ -133,9 +132,9 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
         res_links = {res.id: roads.zones[res.id] for res in self.reservoirs.values()}
         res_dict = {res.id: res for res in self.reservoirs.values()}
-        for section in roads.sections.keys():
+        for section in roads.sections:
             self._section_to_reservoir[section] = None
-            for resid, zone in res_links.items():
+            for resid in res_links:
                 res = res_dict[resid]
                 if section in res.zone.sections:
                     self._section_to_reservoir[section] = res.id
@@ -215,14 +214,14 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                 veh.next_activity(tcurrent)
                 if not veh.is_moving:
                     elapsed_time = dt
-            for passenger_id, passenger in veh.passengers.items():
+            for passenger in veh.passengers.values():
                 passenger.set_position(veh._current_link, veh._current_node, veh.remaining_link_length, veh.position, tcurrent)
             return elapsed_time
         else:
             veh._remaining_link_length -= dist_travelled
             veh.update_distance(dist_travelled)
             self.set_vehicle_position(veh)
-            for passenger_id, passenger in veh.passengers.items():
+            for passenger in veh.passengers.values():
                 passenger.set_position(veh._current_link, veh._current_node, veh.remaining_link_length, veh.position, tcurrent)
             return dt
 
@@ -244,7 +243,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                         break
             # Get section zone
             res_id = self._graph.roads.sections[sid].zone
-        except:
+        except (KeyError, TypeError, UnboundLocalError): # FIXME The situations leading to these errors should be handled more explicitly.
             log.warning(f'Could not find zone of vehicle {veh.id} (current link = {veh.current_link}) with direct method...')
             pos = veh.position
             res_id = None
@@ -271,8 +270,8 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             new_veh.notify(self._tcurrent)
 
         # Calculate accumulations
-        current_vehicles = dict()
-        for veh_id, veh in self.veh_manager._vehicles.items():
+        current_vehicles = {}
+        for veh in self.veh_manager._vehicles.values():
             if veh.activity is None:
                 veh.next_activity(self._tcurrent)
             while veh.activity.is_done:
@@ -287,7 +286,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             self.update_reservoir_speed(res, self.dict_accumulations[res.id])
 
         # Move the vehicles
-        for veh_id, veh in current_vehicles.items():
+        for veh in current_vehicles.values():
             veh_dt = veh.dt_move.to_seconds() if veh.dt_move is not None else dt.to_seconds()
             veh.dt_move = None
             veh_type = veh.type.upper()
@@ -329,8 +328,8 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         banned_links = self._graph.dynamic_space_sharing.banned_links
         banned_cost = self._graph.dynamic_space_sharing.cost
 
-        link_layers = list()
-        for _, layer in self._graph.layers.items():
+        link_layers = []
+        for layer in self._graph.layers.values():
             link_layers.append(layer.graph.links)
 
         linkcosts = {}
@@ -342,7 +341,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             total_len = 0
             new_speed = 0
             layer = self._graph.layers[link.label]
-            old_speed = link.costs[list(layer.mobility_services.keys())[0]]["speed"]
+            old_speed = link.costs[next(iter(layer.mobility_services))]["speed"]
             for section, length in link_info.sections:
                 res_id = self._section_to_reservoir[section]
                 res = self.reservoirs[res_id]
@@ -357,7 +356,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                 costs = defaultdict(dict)
 
                 # Update critical costs first
-                for mservice in link.costs.keys():
+                for mservice in link.costs:
                     costs[mservice] = {'travel_time': total_len / new_speed,
                                        'speed': new_speed,
                                        'length': total_len}
@@ -390,7 +389,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         for resid, res in self.reservoirs.items():
             resid = res.id
             for mode in res.modes:
-                trip_lengths = res.trip_lengths[mode] if mode in res.trip_lengths else None
+                trip_lengths = res.trip_lengths.get(mode, None)
                 trip_lengths = ' '.join([str(round(l,2)) for l in trip_lengths]) if trip_lengths is not None else None
                 self._csvhandler.writerow([str(step_affectation),
                     str(step_flow),

@@ -1,24 +1,24 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
+
 import pandas as pd
 
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.generation.roads import generate_manhattan_road
-from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.demand import BaseDemandManager, User
-from mnms.generation.roads import generate_line_road
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_line_road, generate_manhattan_road
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
+from mnms.mobility_service.on_demand import OnDemandMobilityService
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import Time, Dt, TimeTable
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
 from mnms.vehicles.manager import VehicleManager
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
 from mnms.vehicles.veh_type import Bus
+
 
 class TestMobilityServicesGraph(unittest.TestCase):
     def setUp(self):
@@ -220,70 +220,70 @@ class TestMobilityServicesGraph(unittest.TestCase):
 
         df0 = df[df['ID'] == 'U0']
         ms0 = [ms.split(' ') for ms in df0['SERVICES']]
-        ms0 = set([x for l in ms0 for x in l])
+        ms0 = {x for l in ms0 for x in l}
         correct_ms0 = ms0.issubset({'WALK', 'CAR1', 'CAR2', 'RIDEHAILING1', 'RIDEHAILING2', 'BUS'})
         self.assertEqual(correct_ms0, 1)
         self.assertEqual(len(df0), 12)
 
         df1 = df[df['ID'] == 'U1']
         ms1 = [ms.split(' ') for ms in df1['SERVICES']]
-        ms1 = set([x for l in ms1 for x in l])
+        ms1 = {x for l in ms1 for x in l}
         correct_ms1 = ms1.issubset({'WALK', 'CAR1', 'CAR2'})
         self.assertEqual(correct_ms1, 1)
         self.assertEqual(len(df1), 6)
 
         df2 = df[df['ID'] == 'U2']
         ms2 = [ms.split(' ') for ms in df2['SERVICES']]
-        ms2 = set([x for l in ms2 for x in l])
+        ms2 = {x for l in ms2 for x in l}
         correct_ms2 = ms2.issubset({'WALK', 'CAR1', 'CAR2', 'RIDEHAILING1'})
         self.assertEqual(correct_ms2, 1)
         self.assertEqual(len(df2), 6)
 
         df3 = df[df['ID'] == 'U3']
         ms3 = [ms.split(' ') for ms in df3['SERVICES']]
-        ms3 = set([x for l in ms3 for x in l])
+        ms3 = {x for l in ms3 for x in l}
         correct_ms3 = ms3.issubset({'WALK', 'CAR1', 'CAR2', 'RIDEHAILING1', 'RIDEHAILING2'})
         self.assertEqual(correct_ms3, 1)
         self.assertEqual(len(df3), 12)
 
         df4 = df[df['ID'] == 'U4']
         ms4 = [ms.split(' ') for ms in df4['SERVICES']]
-        ms4 = set([x for l in ms4 for x in l])
+        ms4 = {x for l in ms4 for x in l}
         correct_ms4 = ms4.issubset({'WALK', 'CAR1', 'RIDEHAILING2'})
         self.assertEqual(correct_ms4, 1)
         self.assertEqual(len(df4), 3)
 
         df5 = df[df['ID'] == 'U5']
         ms5 = [ms.split(' ') for ms in df5['SERVICES']]
-        ms5 = set([x for l in ms5 for x in l])
+        ms5 = {x for l in ms5 for x in l}
         correct_ms5 = ms5.issubset({'WALK', 'BUS', 'RIDEHAILING1'})
         self.assertEqual(correct_ms5, 1)
         self.assertEqual(len(df5), 3)
 
         df6 = df[df['ID'] == 'U6']
         ms6 = [ms.split(' ') for ms in df6['SERVICES']]
-        ms6 = set([x for l in ms6 for x in l])
+        ms6 = {x for l in ms6 for x in l}
         correct_ms6 = ms6.issubset({'WALK', 'CAR1', 'CAR2', 'BUS'})
         self.assertEqual(correct_ms6, 1)
         self.assertEqual(len(df6), 6)
 
         df7 = df[df['ID'] == 'U7']
         ms7 = [ms.split(' ') for ms in df7['SERVICES']]
-        ms7 = set([x for l in ms7 for x in l])
+        ms7 = {x for l in ms7 for x in l}
         correct_ms7 = ms7.issubset({'WALK', 'CAR1', 'RIDEHAILING2', 'BUS'})
         self.assertEqual(correct_ms7, 1)
         self.assertEqual(len(df7), 3)
 
         df8 = df[df['ID'] == 'U8']
         ms8 = [ms.split(' ') for ms in df8['SERVICES']]
-        ms8 = set([x for l in ms8 for x in l])
+        ms8 = {x for l in ms8 for x in l}
         correct_ms8 = ms8.issubset({'WALK', 'BUS'})
         self.assertEqual(correct_ms8, 1)
         self.assertEqual(len(df8), 3)
 
         df9 = df[df['ID'] == 'U9']
         ms9 = [ms.split(' ') for ms in df9['SERVICES']]
-        ms9 = set([x for l in ms9 for x in l])
+        ms9 = {x for l in ms9 for x in l}
         correct_ms9 = ms9.issubset({'WALK', 'RIDEHAILING1'})
         self.assertEqual(correct_ms9, 1)
         self.assertEqual(len(df9), 3)

@@ -1,30 +1,39 @@
 from abc import ABC, abstractmethod
-from typing import List, Union, Protocol, runtime_checkable, Iterable
+from collections.abc import Iterable
+from typing import Protocol, runtime_checkable
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 from mnms.graph.layers import AbstractLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.mobility_service.interfaces import Depot
-from mnms.vehicles.veh_type import Vehicle, ActivityType
+from mnms.vehicles.veh_type import ActivityType, Vehicle
+
+Mask = NDArray[bool] | list[bool]
 
 
-Mask = Union[NDArray[bool], List[bool]]
-
+# ruff: file-ignore[RUF013] FIXME This disables warnings abount implicit Optional in this file,
+# especially for the get_mask(..) methods, that all have arguments typed as `list[something]`
+# but with a default value set to None. The intent in terms of typing is unclear here:
+# - Should the type annotation be `list[something] | None`, to indicate that the corresponding arguments
+#   is actually optional? But the `None` value is not handled in the `get_mask(..)` methods.
+# - Or should the default value `None` be removed, implying that the corresponding arguments are mandatory?
+#   But this would break the interface, as the `get_mask(..)` methods are not always called with all the arguments
+#   in the codebase.
+# To be clarified...
 
 @runtime_checkable
 class FilterProtocol(Protocol):
-    def get_mask(self, layer: AbstractLayer, vehicles: Iterable[Vehicle], position: List[float] = None,  deposits: List[Depot] = None) -> Mask:
+    def get_mask(self, layer: AbstractLayer, vehicles: Iterable[Vehicle], position: list[float] = None,  deposits: list[Depot] = None) -> Mask:
         ...
 
 
-def get_zone(roads: RoadDescriptor, position: List[float]) -> str:
+def get_zone(roads: RoadDescriptor, position: list[float]) -> str:
     for zid, zone in roads.zones.items():
         if zone.is_inside(position):
             return zid
-    else:
-        return ""
+    return ""
 
 
 class VehicleFilter(ABC):
@@ -32,8 +41,8 @@ class VehicleFilter(ABC):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         pass
 
     def __and__(self, other):
@@ -50,8 +59,8 @@ class InvertedVehicleFilter:
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
 
         mask = np.array(self.veh_filter.get_mask(layer, vehicles, position, deposits))
         return ~mask
@@ -65,20 +74,20 @@ class NestedVehicleFilter(ABC):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         pass
 
 
-class CombinedVehicleFilter(object):
-    def __init__(self, filters: List[FilterProtocol]):
+class CombinedVehicleFilter:
+    def __init__(self, filters: list[FilterProtocol]):
         self.filters = filters
 
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         all_masks = []
         for f in self.filters:
             all_masks.append(f.get_mask(layer, vehicles, position, deposits))
@@ -99,8 +108,8 @@ class InRadiusFilter(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle in self.radius True else False
         """
@@ -118,8 +127,8 @@ class PlanEndsInRadiusFilter(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle in radius around position at the
         end of its plan True, else False.
@@ -135,8 +144,8 @@ class IsNearestFilter(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is nearest vehicle from position True else False
         """
@@ -154,34 +163,36 @@ class IsWaiting(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is STOP True else False
         """
 
-        return [True if veh.activity_type is ActivityType.STOP else False for veh in vehicles]
+        return [veh.activity_type is ActivityType.STOP for veh in vehicles]
 
 class IsIdle(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is idle (i.e. stop or repositionning without
         coming acitivities) True else False.
         """
-        return [True if (veh.activity_type in [ActivityType.STOP, ActivityType.REPOSITIONING]) and (not veh.activities) \
-            else False for veh in vehicles]
+        return [
+            (veh.activity_type in [ActivityType.STOP, ActivityType.REPOSITIONING]) and (not veh.activities)
+            for veh in vehicles
+        ]
 
 
 class InZoneFilter(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle and position in same zone True else False
         """
@@ -204,8 +215,8 @@ class InZonalDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is in a depot that is the zone of position True, else False
         If self.multiple is False, only return True for the first vehicle that entered the depot, else True for
@@ -234,8 +245,8 @@ class InNearestDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array).
         If self.multiple: if vehicle is in the nearest depot from position True, else False
@@ -269,8 +280,8 @@ class InNearestZonalDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array).
         If self.multiple: if vehicle is in the nearest zonal depot (depot and user are in the same zone) from position True, else False
@@ -304,8 +315,8 @@ class ToNearestDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is heading to the nearest depot from position True, else False
         """
@@ -329,8 +340,8 @@ class ToZonalDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is heading to a depot that is the zone of position True, else False
         """
@@ -351,8 +362,8 @@ class ToNearestZonalDepot(VehicleFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  vehicles: Iterable[Vehicle],
-                 position: List[float] = None,
-                 deposits: List[Depot] = None) -> Mask:
+                 position: list[float] = None,
+                 deposits: list[Depot] = None) -> Mask:
         """
         Return a mask (boolean array), if vehicle is heading to the nearest zonal depot (depot and user are in the same zone) from position True, else False
         """
@@ -379,8 +390,8 @@ class DepotFilter(ABC):
     def get_mask(self,
                  layer: AbstractLayer,
                  depots: Iterable[Depot],
-                 position: List[float] = None,
-                 vehicles: List[Vehicle] = None) -> Mask:
+                 position: list[float] = None,
+                 vehicles: list[Vehicle] = None) -> Mask:
         pass
 
     def __and__(self, other):
@@ -389,15 +400,15 @@ class DepotFilter(ABC):
     def __invert__(self):
         return InvertedDepotFilter(self)
 
-class CombinedDepotFilter(object):
-    def __init__(self, filters: List[FilterProtocol]):
+class CombinedDepotFilter:
+    def __init__(self, filters: list[FilterProtocol]):
         self.filters = filters
 
     def get_mask(self,
                  layer: AbstractLayer,
                  depots: Iterable[Depot],
-                 position: List[float] = None,
-                 vehicles: List[Vehicle] = None) -> Mask:
+                 position: list[float] = None,
+                 vehicles: list[Vehicle] = None) -> Mask:
         all_masks = []
         for f in self.filters:
             all_masks.append(f.get_mask(layer, depots, position, vehicles))
@@ -417,8 +428,8 @@ class InvertedDepotFilter:
     def get_mask(self,
                  layer: AbstractLayer,
                  depots: Iterable[Depot],
-                 position: List[float] = None,
-                 vehicles: List[Vehicle] = None) -> Mask:
+                 position: list[float] = None,
+                 vehicles: list[Vehicle] = None) -> Mask:
 
         mask = np.array(self.depot_filter.get_mask(layer, depots, position, vehicles))
         return ~mask
@@ -427,8 +438,8 @@ class DepotIsNotFull(DepotFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  depots: Iterable[Depot],
-                 position: List[float] = None,
-                 vehicles: List[Vehicle] = None) -> Mask:
+                 position: list[float] = None,
+                 vehicles: list[Vehicle] = None) -> Mask:
         """
         Return a mask (boolean array), if depot is not full True else False.
         """
@@ -438,8 +449,8 @@ class IsNearestDepotFilter(DepotFilter):
     def get_mask(self,
                  layer: AbstractLayer,
                  depots: Iterable[Depot],
-                 position: List[float] = None,
-                 vehicles: List[Vehicle] = None) -> Mask:
+                 position: list[float] = None,
+                 vehicles: list[Vehicle] = None) -> Mask:
         """
         Return a mask (boolean array), if depot is the closest to position True
         else False.

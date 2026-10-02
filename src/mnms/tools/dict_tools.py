@@ -1,6 +1,4 @@
-from typing import Dict
-
-def sum_dict(*dicts: Dict[str, float]) -> Dict[str, float]:
+def sum_dict(*dicts: dict[str, float]) -> dict[str, float]:
     """
     Sum per key of several dictionaries
     Parameters

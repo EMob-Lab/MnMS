@@ -1,31 +1,31 @@
 from abc import abstractmethod
-from collections import defaultdict
-from typing import Optional, Dict, List, Type, Callable, Set
-from collections import ChainMap
-import numpy as np
+from collections import ChainMap, defaultdict
+from collections.abc import Callable
+from typing import Optional
 
-from mnms.graph.road import RoadDescriptor
-from mnms.mobility_service.abstract import AbstractMobilityService
-from mnms.tools.observer import CSVVehicleObserver
-from mnms.vehicles.fleet import FleetManager
-from mnms.graph.specific_layers import OriginDestinationLayer
+import numpy as np
+from hipop.graph import OrientedGraph, graph_to_dict, link_to_dict, merge_oriented_graph, node_to_dict
+
 from mnms.graph.dynamic_space_sharing import DynamicSpaceSharing
+from mnms.graph.road import RoadDescriptor
+from mnms.graph.specific_layers import OriginDestinationLayer
+from mnms.graph.zone import MLZone
 from mnms.io.utils import load_class_by_module_name
 from mnms.log import create_logger
+from mnms.mobility_service.abstract import AbstractMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.time import TimeTable
-from mnms.vehicles.veh_type import Vehicle, Car, Bus
-from mnms.graph.zone import MLZone
-
-from hipop.graph import OrientedGraph, merge_oriented_graph, graph_to_dict, node_to_dict, link_to_dict
+from mnms.tools.observer import CSVVehicleObserver
+from mnms.vehicles.fleet import FleetManager
+from mnms.vehicles.veh_type import Bus, Car, Vehicle
 
 log = create_logger(__name__)
 
-class CostFunctionLayer(object):
+class CostFunctionLayer:
     def __init__(self):
-        self._costs_functions: Dict[str, Dict[str, Callable]] = defaultdict(dict)
+        self._costs_functions: dict[str, dict[str, Callable]] = defaultdict(dict)
 
-    def add_cost_function(self, mobility_service: str, cost_name: str, cost_function: Callable[[Dict[str, float]], float]):
+    def add_cost_function(self, mobility_service: str, cost_name: str, cost_function: Callable[[dict[str, float]], float]):
         self._costs_functions[mobility_service][cost_name] = cost_function
 
 
@@ -33,10 +33,10 @@ class AbstractLayer(CostFunctionLayer):
     def __init__(self,
                  roads: RoadDescriptor,
                  id: str,
-                 veh_type: Type[Vehicle],
+                 veh_type: type[Vehicle],
                  default_speed: float,
-                 services: Optional[List[AbstractMobilityService]] = None,
-                 observer: Optional[CSVVehicleObserver] = None):
+                 services: list[AbstractMobilityService] | None = None,
+                 observer: CSVVehicleObserver | None = None):
         """
         The class for implementation of a layer graph
 
@@ -49,7 +49,7 @@ class AbstractLayer(CostFunctionLayer):
             services: The services that used the layer
             observer: An observer to write information about the vehicles in the layer
         """
-        super(AbstractLayer, self).__init__()
+        super().__init__()
         self._id: str = id
 
         self.graph: OrientedGraph = OrientedGraph()
@@ -59,16 +59,16 @@ class AbstractLayer(CostFunctionLayer):
 
         self._default_speed: float = default_speed
 
-        self.map_reference_links: Dict[str, List[str]] = dict()
-        self.map_reference_nodes: Dict[str, str] = dict()
-        self.map_links_classes: Dict[str, str] = dict()
+        self.map_reference_links: dict[str, list[str]] = {}
+        self.map_reference_nodes: dict[str, str] = {}
+        self.map_links_classes: dict[str, str] = {}
 
         self.shortest_paths = None
 
         # self._costs_functions: Dict[Dict[str, Callable]] = defaultdict(dict)
 
-        self.mobility_services: Dict[str, AbstractMobilityService] = dict()
-        self._veh_type: Type[Vehicle] = veh_type
+        self.mobility_services: dict[str, AbstractMobilityService] = {}
+        self._veh_type: type[Vehicle] = veh_type
 
         if services is not None:
             for s in services:
@@ -108,7 +108,7 @@ class AbstractLayer(CostFunctionLayer):
     # def add_cost_function(self, mobility_service: str, cost_name: str, cost_function: Callable[[Dict[str, float]], float]):
     #     self._costs_functions[mobility_service][cost_name] = cost_function
 
-    def connect_origindestination(self, odlayer:OriginDestinationLayer, connection_distance: float, secure_connection_distance: float = None):
+    def connect_origindestination(self, odlayer:OriginDestinationLayer, connection_distance: float, secure_connection_distance: float | None = None):
         """
         Connects the origin destination layer to a layer
 
@@ -208,13 +208,13 @@ class AbstractLayer(CostFunctionLayer):
 
     @classmethod
     @abstractmethod
-    def __load__(cls, data: Dict, roads: RoadDescriptor):
+    def __load__(cls, data: dict, roads: RoadDescriptor):
         pass
 
     def initialize(self):
         pass
 
-class MultiLayerGraph(object):
+class MultiLayerGraph:
     """
     Multi layer graph class
 
@@ -227,9 +227,9 @@ class MultiLayerGraph(object):
     """
 
     def __init__(self,
-                 layers:List[AbstractLayer] = [],
-                 odlayer:Optional[OriginDestinationLayer] = None,
-                 connection_distance:Optional[float] = None):
+                 layers:list[AbstractLayer],
+                 odlayer:OriginDestinationLayer | None = None,
+                 connection_distance:float | None = None):
         """
         Args:
             layers: List of mobility service layer to add to the multilayer graph
@@ -241,20 +241,20 @@ class MultiLayerGraph(object):
         for l in layers:
             l.multi_graph = self
 
-        self.layers = dict()
+        self.layers = {}
 
-        self.mapping_layer_services = dict()
+        self.mapping_layer_services = {}
         self.map_reference_links = ChainMap()
 
-        self.map_linkid_layerid=dict()  # Link and layer mapping
+        self.map_linkid_layerid = {}  # Link and layer mapping
 
-        self.zones = dict()
+        self.zones = {}
 
         self.dynamic_space_sharing = DynamicSpaceSharing(self)
 
         for l in layers:
             self.map_reference_links.maps.append(l.map_reference_links)
-            for lid in l.map_reference_links.keys():
+            for lid in l.map_reference_links:
                 self.map_linkid_layerid[lid]= l.id
 
         self.odlayer = None
@@ -325,7 +325,7 @@ class MultiLayerGraph(object):
         [self.graph.add_node(nid, pos[0], pos[1], odlayer.id) for nid, pos in odlayer.origins.items()]
         [self.graph.add_node(nid, pos[0], pos[1], odlayer.id) for nid, pos  in odlayer.destinations.items()]
 
-    def connect_origindestination_layers(self, connection_distance: float, secure_connection_distance: float = None):
+    def connect_origindestination_layers(self, connection_distance: float, secure_connection_distance: float | None = None):
         """
         Connects the origin destination layer to the other layers
 
@@ -410,9 +410,11 @@ class MultiLayerGraph(object):
                             onpos = graph_onode_pos[idx]
                             dist_nodes = _norm(graph_dnode_pos - onpos, axis=1)
                             mask = dist_nodes < connection_distance
-                            if mask.sum() == 0 and extend_connect:  # connect closest node (if not too far)
-                                if dist_nodes.min() <= max_connect_dist:
-                                    mask[np.argmin(dist_nodes)] = True
+
+                            # connect closest node (if not too far)
+                            if mask.sum() == 0 and extend_connect and dist_nodes.min() <= max_connect_dist:
+                                mask[np.argmin(dist_nodes)] = True
+
                             for layer_nid, dist in zip(graph_dnode_ids[mask], dist_nodes[mask]):
                                 # Check if this transit link already exist
                                 if onid in self.graph.nodes and layer_nid in self.graph.nodes[onid].adj:
@@ -430,7 +432,7 @@ class MultiLayerGraph(object):
             for service in layer.mobility_services:
                 self.mapping_layer_services[service] = layer
 
-    def connect_layers(self, lid: str, upstream: str, downstream: str, length: float, costs: Dict[str, float]):
+    def connect_layers(self, lid: str, upstream: str, downstream: str, length: float, costs: dict[str, float]):
         # Check if this transit link does not already exist
         if upstream in self.graph.nodes and downstream in self.graph.nodes[upstream].adj:
             link = self.graph.nodes[upstream].adj[downstream]
@@ -449,9 +451,9 @@ class MultiLayerGraph(object):
         gnodes = self.graph.nodes
 
         # Initialize costs on links
-        link_layers = list()
+        link_layers = []
 
-        for lid, layer in self.layers.items():
+        for layer in self.layers.values():
             link_layers.append(layer.graph.links)  # only non transit links concerned
 
         for link in self.graph.links.values():
@@ -469,7 +471,7 @@ class MultiLayerGraph(object):
             else:
                 layer = self.layers[link.label]
                 speed = layer.default_speed
-                for mservice in layer.mobility_services.keys():
+                for mservice in layer.mobility_services:
                     costs[mservice] = {"speed": speed,
                                        "travel_time": link.length / speed,
                                        "length": link.length}
@@ -485,7 +487,7 @@ class MultiLayerGraph(object):
                 if layer_link is not None:
                     layer_link.update_costs(costs)
 
-    def add_cost_function(self, layer_id: str, cost_name: str, cost_function: Callable, mobility_service: Optional[str] = None):
+    def add_cost_function(self, layer_id: str, cost_name: str, cost_function: Callable, mobility_service: str | None = None):
         # Retrieve layer
         if layer_id == 'TRANSIT':
             layer = self.transitlayer
@@ -502,7 +504,7 @@ class MultiLayerGraph(object):
                 layer.add_cost_function(mservice, cost_name, cost_function)
 
     def add_zone(self, zone: MLZone):
-        if zone.id in self.zones.keys():
+        if zone.id in self.zones:
             print(f"Already defined zone {zone.id} is overwritten")
         self.zones[zone.id] = zone
 
@@ -513,12 +515,12 @@ class MultiLayerGraph(object):
 
     def get_all_mobility_services_of_type(self, mstype):
         all_ms = self.get_all_mobility_services()
-        return set([ms.id for ms in all_ms if isinstance(ms,mstype)])
+        return {ms.id for ms in all_ms if isinstance(ms,mstype)}
 
 class TransitLayer(CostFunctionLayer):
     def __init__(self):
-        super(TransitLayer, self).__init__()
-        self.links: defaultdict[str, defaultdict[str, List[str]]] = defaultdict(lambda: defaultdict(list))
+        super().__init__()
+        self.links: defaultdict[str, defaultdict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
         self._walk_speed = None
 
     @property
@@ -547,8 +549,7 @@ class TransitLayer(CostFunctionLayer):
         """
         for olayer in self.links:
             for links in self.links[olayer].values():
-                for lid in links:
-                    yield lid
+                yield from links
 
     def iter_inter_links(self):
         """
@@ -561,8 +562,7 @@ class TransitLayer(CostFunctionLayer):
         for olayer in self.links:
             for dlayer, links in self.links[olayer].items():
                 if "ODLAYER" not in (olayer, dlayer):
-                    for lid in links:
-                        yield lid
+                    yield from links
 
     def __dump__(self):
         return dict(self.links)
@@ -577,20 +577,20 @@ class TransitLayer(CostFunctionLayer):
         return new_obj
 
 class SimpleLayer(AbstractLayer):
-    def create_node(self, nid: str, dbnode: str, exclude_movements: Optional[Dict[str, Set[str]]] = None):
+    def create_node(self, nid: str, dbnode: str, exclude_movements: dict[str, set[str]] | None = None):
         assert dbnode in self.roads.nodes
         node_pos = self.roads.nodes[dbnode].position
 
         if exclude_movements is not None:
             exclude_movements = {key: set(val) for key, val in exclude_movements.items()}
         else:
-            exclude_movements = dict()
+            exclude_movements = {}
 
         self.graph.add_node(nid, node_pos[0], node_pos[1], self.id, exclude_movements)
 
         self.map_reference_nodes[nid] = dbnode
 
-    def create_link(self, lid: str, upstream: str, downstream: str, costs: Dict[str, Dict[str, float]], road_links: List[str]):
+    def create_link(self, lid: str, upstream: str, downstream: str, costs: dict[str, dict[str, float]], road_links: list[str]):
         # for mservice in costs:
         #     assert mservice == "WALK" or mservice in self.mobility_services.keys(), f"Mobility service {mservice} defined in costs is not in {self.id} mobility services"
 
@@ -599,12 +599,11 @@ class SimpleLayer(AbstractLayer):
 
         self.map_reference_links[lid] = road_links
 
-    def add_links_classes(self, links_classes: Dict[str, List[str]]):
+    def add_links_classes(self, links_classes: dict[str, list[str]]):
         # Check that the links belong to this layer graph and build the map
-        map_links_classes = {}
-        for clas in links_classes.keys():
-            for class_link in links_classes[clas]:
-                self.add_class_to_link(class_link, clas, check=True)
+        for k, v in links_classes.items():
+            for class_link in v:
+                self.add_class_to_link(class_link, k, check=True)
 
     def add_class_to_link(self, lid, class_id, check=False):
         if check:
@@ -613,7 +612,7 @@ class SimpleLayer(AbstractLayer):
         self.map_links_classes[lid] = class_id
 
     @classmethod
-    def __load__(cls, data: Dict, roads: RoadDescriptor):
+    def __load__(cls, data: dict, roads: RoadDescriptor):
         new_obj = cls(roads,
                       data['ID'],
                       load_class_by_module_name(data['VEH_TYPE']),
@@ -638,12 +637,15 @@ class SimpleLayer(AbstractLayer):
 
     def __dump__(self):
         return {'ID': self.id,
-                'TYPE': ".".join([self.__class__.__module__, self.__class__.__name__]),
-                'VEH_TYPE': ".".join([self._veh_type.__module__, self._veh_type.__name__]),
+                'TYPE': f"{self.__class__.__module__}.{self.__class__.__name__}",
+                'VEH_TYPE': f"{self._veh_type.__module__}.{self._veh_type.__name__}",
                 'DEFAULT_SPEED': self.default_speed,
                 'SERVICES': [s.__dump__() for s in self.mobility_services.values()],
                 'NODES': [node_to_dict(n) for n in self.graph.nodes.values()],
-                'LINKS': [link_to_dict(l) | {'CLASS': self.map_links_classes[lid] if lid in self.map_links_classes else ''} for lid,l in self.graph.links.items()],
+                'LINKS': [
+                    link_to_dict(l) | {'CLASS': self.map_links_classes.get(lid, '')}
+                    for lid, l in self.graph.links.items()
+                ],
                 'MAP_ROADDB': {"NODES": self.map_reference_nodes,
                                "LINKS": self.map_reference_links}}
 
@@ -652,15 +654,15 @@ class CarLayer(SimpleLayer):
     def __init__(self,
                  roads: RoadDescriptor,
                  _id: str = "CAR",
-                 veh_type: Type[Vehicle] = Car,
+                 veh_type: type[Vehicle] = Car,
                  default_speed: float = 13.8,
-                 services: Optional[List[AbstractMobilityService]] = None,
+                 services: list[AbstractMobilityService] | None = None,
                  observer: Optional = None,
                  ):
-        super(CarLayer, self).__init__(roads, _id, veh_type, default_speed, services, observer)
+        super().__init__(roads, _id, veh_type, default_speed, services, observer)
 
     @classmethod
-    def __load__(cls, data: Dict, roads: RoadDescriptor):
+    def __load__(cls, data: dict, roads: RoadDescriptor):
 
         new_obj = cls(roads,
                       data['ID'],
@@ -691,13 +693,13 @@ class PublicTransportLayer(AbstractLayer):
     def __init__(self,
                  roads: RoadDescriptor,
                  _id: str,
-                 veh_type: Type[Vehicle],
+                 veh_type: type[Vehicle],
                  default_speed: float,
-                 services: Optional[List[PublicTransportMobilityService]] = None,
+                 services: list[PublicTransportMobilityService] | None = None,
                  observer: Optional = None):
-        super(PublicTransportLayer, self).__init__(roads, _id, veh_type, default_speed, services, observer)
+        super().__init__(roads, _id, veh_type, default_speed, services, observer)
 
-        self.lines = dict()
+        self.lines = {}
 
     def _create_stop(self, sid, dbnode):
         assert dbnode in self.roads.stops, f'Node {dbnode} not in roads stops...'
@@ -713,14 +715,14 @@ class PublicTransportLayer(AbstractLayer):
         else:
             line_length = self.roads.sections[reference_sections[0]].length * (self.roads.stops[downstream].relative_position - self.roads.stops[upstream].relative_position)
 
-        costs = {mservice: {'length': line_length} for mservice in self.mobility_services.keys()}
+        costs = {mservice: {'length': line_length} for mservice in self.mobility_services}
         self.graph.add_link(lid, line_id+'_'+upstream, line_id+'_'+downstream, line_length, costs, self.id)
         self.map_reference_links[lid] = reference_sections
 
     def create_line(self,
                     lid: str,
-                    stops: List[str],
-                    sections: List[List[str]],
+                    stops: list[str],
+                    sections: list[list[str]],
                     timetable: TimeTable,
                     bidirectional: bool = False):
 
@@ -734,14 +736,14 @@ class PublicTransportLayer(AbstractLayer):
                            'links': []}
 
         for s in stops:
-            nid = lid+'_'+s
+            nid = f"{lid}_{s}"
             self.lines[lid]['nodes'].append(nid)
             self._create_stop(nid, s)
 
         for i in range(len(stops)-1):
             up = stops[i]
             down = stops[i+1]
-            link_id = '_'.join([lid, up, down])
+            link_id = f"{lid}_{up}_{down}"
             self.lines[lid]['links'].append(link_id)
 
             self._connect_stops(link_id,
@@ -751,7 +753,7 @@ class PublicTransportLayer(AbstractLayer):
                                 sections[i])
 
             if bidirectional:
-                link_id = '_'.join([lid, down, up])
+                link_id = f"{lid}_{down}_{up}"
                 self.lines[lid]['links'].append(link_id)
                 self._connect_stops(link_id,
                                     lid,
@@ -773,8 +775,8 @@ class PublicTransportLayer(AbstractLayer):
 
     def __dump__(self):
         return {'ID': self.id,
-                'TYPE': ".".join([self.__class__.__module__, self.__class__.__name__]),
-                'VEH_TYPE': ".".join([self._veh_type.__module__, self._veh_type.__name__]),
+                'TYPE': f"{self.__class__.__module__}.{self.__class__.__name__}",
+                'VEH_TYPE': f"{self._veh_type.__module__}.{self._veh_type.__name__}",
                 'DEFAULT_SPEED': self.default_speed,
                 'SERVICES': [s.__dump__() for s in self.mobility_services.values()],
                 'LINES': [{'ID': lid,
@@ -784,7 +786,7 @@ class PublicTransportLayer(AbstractLayer):
                            'BIDIRECTIONAL': ldata['bidirectional']} for lid, ldata in self.lines.items()]}
 
     @classmethod
-    def __load__(cls, data: Dict, roads: RoadDescriptor):
+    def __load__(cls, data: dict, roads: RoadDescriptor):
         new_obj = cls(roads,
                       data['ID'],
                       load_class_by_module_name(data['VEH_TYPE']),
@@ -803,35 +805,35 @@ class SharedVehicleLayer(AbstractLayer):
     def __init__(self,
                  roads: RoadDescriptor,
                  _id: str,
-                 veh_type: Type[Vehicle],
+                 veh_type: type[Vehicle],
                  default_speed,
-                 services: Optional[List[AbstractMobilityService]] = None,  # TODO
+                 services: list[AbstractMobilityService] | None = None,  # TODO
                  observer: Optional = None):
-        super(SharedVehicleLayer, self).__init__(roads, _id, veh_type, default_speed, services, observer)
+        super().__init__(roads, _id, veh_type, default_speed, services, observer)
 
         self.stations = []
 
-    def create_node(self, nid: str, dbnode: str, exclude_movements: Optional[Dict[str, Set[str]]] = None):
+    def create_node(self, nid: str, dbnode: str, exclude_movements: dict[str, set[str]] | None = None):
         assert dbnode in self.roads.nodes
         node_pos = self.roads.nodes[dbnode].position
 
         if exclude_movements is not None:
             exclude_movements = {key: set(val) for key, val in exclude_movements.items()}
         else:
-            exclude_movements = dict()
+            exclude_movements = {}
 
         self.graph.add_node(nid, node_pos[0], node_pos[1], self.id, exclude_movements)
 
         self.map_reference_nodes[nid] = dbnode
 
-    def create_link(self, lid: str, upstream: str, downstream: str, costs: Dict[str, Dict[str, float]], road_links: List[str]):
+    def create_link(self, lid: str, upstream: str, downstream: str, costs: dict[str, dict[str, float]], road_links: list[str]):
 
         length = sum(self.roads.sections[l].length for l in road_links)
         self.graph.add_link(lid, upstream, downstream, length, costs, self.id)
 
         self.map_reference_links[lid] = road_links
 
-    def connect_origindestination(self, odlayer: OriginDestinationLayer, connection_distance: float, secure_connection_distance: float = None):
+    def connect_origindestination(self, odlayer: OriginDestinationLayer, connection_distance: float, secure_connection_distance: float | None = None):
         """
         Connects the origin destination layer to a shared vehicle layer (only the stations are linked to the origin
         destination nodes
@@ -882,7 +884,7 @@ class SharedVehicleLayer(AbstractLayer):
                             {'id': lid, 'upstream_node': nid, 'downstream_node': layer_nid, 'dist': dist})
 
         # Destinations to link to the stations or to all the nodes
-        if list(self.mobility_services.values())[0].free_floating_possible:   # each node must be considered
+        if next(iter(self.mobility_services.values())).free_floating_possible:   # each node must be considered
             graph_nodes = self.graph.nodes
             graph_node_ids = np.array([nid for nid in graph_nodes])
             graph_node_pos = np.array([n.position for n in graph_nodes.values()])
@@ -954,15 +956,11 @@ class SharedVehicleLayer(AbstractLayer):
         for nid in odlayer.origins:
             npos = np.array(odlayer.origins[nid])
             dist_node = _norm(pos - npos)
-            if dist_node < connection_distance:
-                if node_id not in odlayer_nodes:
-                    lid = f"{nid}_{node_id}"
-                    transit_links.append(
-                        {'id': lid, 'upstream_node': nid, 'downstream_node': node_id, 'dist': dist_node})
+            if dist_node < connection_distance and node_id not in odlayer_nodes:
+                lid = f"{nid}_{node_id}"
+                transit_links.append({'id': lid, 'upstream_node': nid, 'downstream_node': node_id, 'dist': dist_node})
 
         self._multi_graph.add_transit_links(transit_links)
-
-        return
 
     def disconnect_station(self, station_id: str):
         """
@@ -983,7 +981,7 @@ class SharedVehicleLayer(AbstractLayer):
                 #     vehicle sharing services on the same layer because this
                 #     disconnection would impact the station-based service
                 to_delete = []
-                for layer_id in self.multi_graph.transitlayer.links.keys():
+                for layer_id in self.multi_graph.transitlayer.links:
                     for link_id in self.multi_graph.transitlayer.links[layer_id][self._id]:
                         link_obj = self.multi_graph.graph.links[link_id]
                         if link_obj.downstream == s['node']:
@@ -1000,12 +998,11 @@ class SharedVehicleLayer(AbstractLayer):
                 return [(onid,dnid) for _,_,onid,dnid in to_delete]
         return []
 
-    def add_links_classes(self, links_classes: Dict[str, List[str]]):
+    def add_links_classes(self, links_classes: dict[str, list[str]]):
         # Check that the links belong to this layer graph and build the map
-        map_links_classes = {}
-        for clas in links_classes.keys():
-            for class_link in links_classes[clas]:
-                self.add_class_to_link(class_link, clas)
+        for k, v in links_classes.items():
+            for class_link in v:
+                self.add_class_to_link(class_link, k)
 
     def add_class_to_link(self, lid, class_id):
         assert lid in self.graph.links, f'Link {lid} not in layer {self._id} graph...'
@@ -1014,17 +1011,20 @@ class SharedVehicleLayer(AbstractLayer):
 
     def __dump__(self):
         return {'ID': self.id,
-                'TYPE': ".".join([self.__class__.__module__, self.__class__.__name__]),
-                'VEH_TYPE': ".".join([self._veh_type.__module__, self._veh_type.__name__]),
+                'TYPE': f"{self.__class__.__module__}.{self.__class__.__name__}",
+                'VEH_TYPE': f"{self._veh_type.__module__}.{self._veh_type.__name__}",
                 'DEFAULT_SPEED': self.default_speed,
                 'SERVICES': [s.__dump__() for s in self.mobility_services.values()],
                 'NODES': [node_to_dict(n) for n in self.graph.nodes.values()],
-                'LINKS': [link_to_dict(l) | {'CLASS': self.map_links_classes[lid] if lid in self.map_links_classes else ''} for lid,l in self.graph.links.items()],
+                'LINKS': [
+                    link_to_dict(l) | {'CLASS': self.map_links_classes.get(lid, '')}
+                    for lid, l in self.graph.links.items()
+                ],
                 'MAP_ROADDB': {"NODES": self.map_reference_nodes,
                                "LINKS": self.map_reference_links}}
 
     @classmethod
-    def __load__(cls, data: Dict, roads: RoadDescriptor):
+    def __load__(cls, data: dict, roads: RoadDescriptor):
         """
         Load exogeneous layer data into a new layer
         Args:
@@ -1060,11 +1060,11 @@ class BusLayer(PublicTransportLayer):
     def __init__(self,
                  roads: RoadDescriptor,
                  _id: str = "BUS",
-                 veh_type: Type[Vehicle] = Bus,
+                 veh_type: type[Vehicle] = Bus,
                  default_speed: float = 6.5,
-                 services: Optional[List[AbstractMobilityService]] = None,
+                 services: list[AbstractMobilityService] | None = None,
                  observer: Optional = None):
-        super(BusLayer, self).__init__(roads, _id, veh_type, default_speed, services, observer)
+        super().__init__(roads, _id, veh_type, default_speed, services, observer)
 
 
 if __name__ == "__main__":

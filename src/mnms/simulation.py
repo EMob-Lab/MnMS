@@ -1,43 +1,38 @@
+import csv
+import json
+import traceback
 from math import ceil
 from time import time
-import csv
-import traceback
-import random
-import jsonpickle
-import dill as pickle
-import json
-import dill.detect
-from typing import List, Optional
 
-import numpy as np
+import dill as pickle
+import dill.detect
+from hipop.graph import OrientedGraph, dict_to_graph, dict_to_link, dict_to_node, graph_to_dict
 
 from mnms.demand import User
-from mnms.graph.dynamic_space_sharing import DynamicSpaceSharing
-from mnms.graph.layers import MultiLayerGraph
+from mnms.demand.manager import AbstractDemandManager
 from mnms.flow.abstract import AbstractMFDFlowMotor
 from mnms.flow.user_flow import UserFlow
-from mnms.demand.manager import AbstractDemandManager
-from mnms.travel_decision.abstract import AbstractDecisionModel, Event
+from mnms.graph.layers import MultiLayerGraph
+from mnms.log import LOGLEVEL, attach_log_file, create_logger
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import Time, Dt
-from mnms.log import create_logger, attach_log_file, LOGLEVEL
+from mnms.time import Dt, Time
 from mnms.tools.progress import ProgressBar
+from mnms.travel_decision.abstract import AbstractDecisionModel, Event
 from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Vehicle
-from hipop.graph import OrientedGraph, graph_to_dict, dict_to_graph, dict_to_node, dict_to_link
 
 log = create_logger(__name__)
 
 
-class Supervisor(object):
+class Supervisor:
     def __init__(self,
                  graph: MultiLayerGraph,
                  demand: AbstractDemandManager,
                  flow_motor: AbstractMFDFlowMotor,
                  decision_model: AbstractDecisionModel,
                  user_flow: UserFlow = None,
-                 outfile: Optional[str] = None,
-                 logfile: Optional[str] = None,
+                 outfile: str | None = None,
+                 logfile: str | None = None,
                  loglevel: LOGLEVEL = LOGLEVEL.WARNING):
         """
         Main class to launch a simulation.
@@ -70,7 +65,7 @@ class Supervisor(object):
 
         self._outfilename = outfile
 
-        self.tcurrent: Optional[Time] = None
+        self.tcurrent: Time | None = None
 
         self.from_snapshot = False
 
@@ -106,7 +101,7 @@ class Supervisor(object):
             self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
             self._csvhandler.writerow(['AFFECTATION_STEP', 'TIME', 'ID', 'MOBILITY_SERVICE', 'COSTS'])
 
-    def set_random_seed(self, seed: int):
+    def set_random_seed(self, seed: int | None):
         """Method that sets the seed for all modules that can be stochastic.
 
         Args:
@@ -237,7 +232,7 @@ class Supervisor(object):
                 end = time()
                 log.info(f' Update mobility service {mservice.id} done in [{end-start:.5} s]')
 
-    def call_user_flow_step(self, flow_dt: Dt, users_step: List[User]):
+    def call_user_flow_step(self, flow_dt: Dt, users_step: list[User]):
         """Calls the user flow step and measures execution time.
 
         Args:
@@ -310,7 +305,7 @@ class Supervisor(object):
 
         return new_users
 
-    def get_users_step(self, new_users: List[User], flow_dt: Dt):
+    def get_users_step(self, new_users: list[User], flow_dt: Dt):
         """Gathers the users who depart during the coming simulation flow step.
 
         Args:
@@ -327,7 +322,7 @@ class Supervisor(object):
         next_time = self.tcurrent.add_time(flow_dt)
         iter_new_users = iter(new_users)
         u = next(iter_new_users)
-        users_step = list()
+        users_step = []
         remaining_new_users = new_users.copy()
         try:
             while self.tcurrent <= u.departure_time < next_time:
@@ -338,8 +333,8 @@ class Supervisor(object):
             pass
         return users_step, remaining_new_users
 
-    def run(self, tstart: Time, tend: Time, flow_dt: Dt, affectation_factor: int, update_graph_threshold: float = 0., seed: int=None,
-            snapshot: bool=False, snapshot_folder: str = ''):
+    def run(self, tstart: Time, tend: Time, flow_dt: Dt, affectation_factor: int, update_graph_threshold: float = 0.,
+            seed: int | None = None, snapshot: bool = False, snapshot_folder: str = ''):
         """Launch a full simulation.
 
         Args:
@@ -453,10 +448,12 @@ class Supervisor(object):
         progress.end()
 
     def create_crash_report(self, affectation_step, flow_step) -> dict:
-        data = dict(time=str(self.tcurrent),
-                    affectation_step=affectation_step,
-                    flow_step=flow_step,
-                    error=traceback.format_exc())
+        data = {
+            "time": str(self.tcurrent),
+            "affectation_step": affectation_step,
+            "flow_step": flow_step,
+            "error": traceback.format_exc(),
+        }
 
         return data
 
@@ -470,7 +467,7 @@ class Supervisor(object):
 
         graph_dic = graph_to_dict(self._mlgraph.graph)
 
-        frozen=dict()
+        frozen = {}
         frozen['hipop_graph'] = json.dumps(graph_dic, cls=SetEncoder)
         #frozen['supervisor'] = jsonpickle.encode(self)
 
@@ -492,10 +489,9 @@ def load_snaphshot(snapshot_prefix: str ):
             json.JSONDecoder.__init__(self, object_hook=JSONDCoder.from_dict)
         @staticmethod
         def from_dict(d):
-            if "EXCLUDE_MOVEMENTS" in d:
-                if bool(d["EXCLUDE_MOVEMENTS"]):
-                    for v in d["EXCLUDE_MOVEMENTS"]:
-                        d["EXCLUDE_MOVEMENTS"][v] = set(d["EXCLUDE_MOVEMENTS"][v])
+            if d.get("EXCLUDE_MOVEMENTS", False):
+                for v in d["EXCLUDE_MOVEMENTS"]:
+                    d["EXCLUDE_MOVEMENTS"][v] = set(d["EXCLUDE_MOVEMENTS"][v])
             return d
 
     supervisor_file = open(snapshot_prefix + '.mnms', 'rb')

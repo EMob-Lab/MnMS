@@ -1,9 +1,10 @@
 import unittest
 from pathlib import Path
-from mnms.demand.manager import CSVDemandManager, CSVDemandParseError
-from mnms.time import Time
 
 import numpy as np
+
+from mnms.demand.manager import CSVDemandManager, CSVDemandParseError
+from mnms.time import Time
 
 
 class TestCSVDemand(unittest.TestCase):

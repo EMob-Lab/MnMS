@@ -1,14 +1,14 @@
 import unittest
 from tempfile import TemporaryDirectory
 
-from mnms.demand.user import User, Path
+from mnms.demand.user import Path, User
 from mnms.flow.user_flow import UserFlow
-from mnms.graph.layers import MultiLayerGraph, CarLayer, BusLayer
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import Time, Dt, TimeTable
+from mnms.time import Dt, Time, TimeTable
 from mnms.vehicles.manager import VehicleManager
 
 

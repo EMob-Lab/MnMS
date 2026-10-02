@@ -1,7 +1,4 @@
-import logging
-import sys
 from decimal import Decimal
-from typing import List
 
 import numpy as np
 
@@ -10,7 +7,7 @@ from mnms.log import create_logger
 log = create_logger(__name__)
 
 
-class Dt(object):
+class Dt:
     def __init__(self,
                  hours: int = 0,
                  minutes: int = 0,
@@ -92,7 +89,7 @@ class Dt(object):
         return copy
 
 
-class Time(object):
+class Time:
     def __init__(self, strdate: str = "00:00:00"):
         """
         Class representing time in mnms
@@ -141,7 +138,7 @@ class Time(object):
         time._minutes = int(m)
         time._hours = int(h)
         if time._hours > 24 or time._hours == 24 and (time._minutes > 0 or time._seconds > 0):
-            log.warning(f'Return a time with more than 24 hours')
+            log.warning('Return a time with more than 24 hours')
 
         return time
 
@@ -266,9 +263,9 @@ class Time(object):
         return copy
 
 
-class TimeTable(object):
-    def __init__(self, times: List[Time]=None):
-        self.table: List[Time] = times if times is not None else []
+class TimeTable:
+    def __init__(self, times: list[Time] | None = None):
+        self.table: list[Time] = times if times is not None else []
 
     @classmethod
     def create_table_freq(cls, start: str, end: str, dt:Dt):
@@ -285,7 +282,7 @@ class TimeTable(object):
         return cls(table)
 
     @classmethod
-    def convert_table_freq(cls, departures: List[str]):
+    def convert_table_freq(cls, departures: list[str]):
         table = []
         for departure in departures:
             ntime = Time(departure)

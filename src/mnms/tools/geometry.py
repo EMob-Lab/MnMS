@@ -1,12 +1,13 @@
-from dataclasses import dataclass
 from collections import defaultdict
-from shapely.geometry import Polygon, mapping
-from scipy.spatial import Voronoi
-import numpy as np
-from typing import List, Annotated
+from dataclasses import dataclass
+from typing import Annotated
 
-Point = Annotated[List[float], 2]
-PointList = List[Point]
+import numpy as np
+from scipy.spatial import Voronoi
+from shapely.geometry import Polygon, mapping
+
+Point = Annotated[list[float], 2]
+PointList = list[Point]
 
 
 @dataclass

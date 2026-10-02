@@ -1,15 +1,16 @@
+import csv
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import List, Dict, Optional, Callable
-import csv
+from collections.abc import Callable
 
-from mnms.graph.zone import Zone
-from mnms.time import Time, Dt
 from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.zone import Zone
+from mnms.time import Dt, Time
+
 
 class AbstractReservoir(ABC):
 
-    def __init__(self, zone: Zone, modes: List[str]):
+    def __init__(self, zone: Zone, modes: list[str]):
         """
         Abstract Reservoir class defining the interface for a MFD reservoir
 
@@ -23,12 +24,12 @@ class AbstractReservoir(ABC):
         self.dict_accumulations = defaultdict(lambda: 0)
         self.dict_speeds = defaultdict(lambda: 0.)
 
-        self.ghost_accumulation: Callable[[Time], Dict[str, float]] = lambda x: {}
+        self.ghost_accumulation: Callable[[Time], dict[str, float]] = lambda x: {}
 
         self.trip_lengths = {}
 
     @abstractmethod
-    def update_accumulations(self, dict_accumulations: Dict[str, int]):
+    def update_accumulations(self, dict_accumulations: dict[str, int]):
         """
         Method updating the accumulation inside the Reservoir
 
@@ -39,7 +40,6 @@ class AbstractReservoir(ABC):
         -------
 
         """
-        pass
 
     @abstractmethod
     def update_speeds(self):
@@ -50,9 +50,8 @@ class AbstractReservoir(ABC):
         -------
 
         """
-        pass
 
-    def set_ghost_accumulation(self, f_acc: Callable[[Time], Dict[str, float]]):
+    def set_ghost_accumulation(self, f_acc: Callable[[Time], dict[str, float]]):
 
         self.ghost_accumulation = f_acc
 
@@ -74,7 +73,7 @@ class AbstractReservoir(ABC):
         self.trip_lengths = {}
 
 class AbstractMFDFlowMotor(ABC):
-    def __init__(self, outfile:str=None):
+    def __init__(self, outfile: str | None = None):
         """Abstraction of a flow motor, two methods must be overridden `step` and `update_graph`.
         `step` define the core of the motor, i.e. the way `Vehicle` move. `update_graph` must update the cost of the graph.
 
@@ -95,9 +94,8 @@ class AbstractMFDFlowMotor(ABC):
     def __getstate__(self):
         state = self.__dict__.copy()
 
-        if self._write == True:
-            if '_csvhandler' in state:
-                del state['_csvhandler']
+        if self._write == True and '_csvhandler' in state:
+            del state['_csvhandler']
         return state
 
     def __setstate__(self, state):

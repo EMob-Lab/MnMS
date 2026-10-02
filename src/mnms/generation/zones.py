@@ -1,6 +1,6 @@
 from mnms.graph.road import RoadDescriptor
-from mnms.tools.geometry import get_bounding_box
 from mnms.graph.zone import construct_zone_from_contour
+from mnms.tools.geometry import get_bounding_box
 
 
 def generate_one_zone(zid: str, roads: RoadDescriptor):

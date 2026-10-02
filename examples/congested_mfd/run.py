@@ -10,12 +10,12 @@ from mnms.demand import BaseDemandManager, User
 from mnms.flow.congested_MFD import CongestedMFDFlowMotor, CongestedReservoir
 from mnms.generation.layers import generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
-from mnms.graph.layers import MultiLayerGraph, CarLayer
+from mnms.graph.layers import CarLayer, MultiLayerGraph
 from mnms.graph.zone import construct_zone_from_sections
 from mnms.log import set_mnms_logger_level
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Time, Dt
+from mnms.time import Dt, Time
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 

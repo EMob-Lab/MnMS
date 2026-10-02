@@ -1,26 +1,24 @@
 import tempfile
 import unittest
 from pathlib import Path
+
 import pandas as pd
 
-from mnms.generation.roads import generate_line_road, RoadDescriptor
-from mnms.graph.zone import Zone
-from mnms.graph.zone import construct_zone_from_sections
-from mnms.graph.layers import MultiLayerGraph, SharedVehicleLayer
-from mnms.generation.layers import generate_matching_origin_destination_layer, generate_layer_from_roads
-from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
-from mnms.vehicles.veh_type import Bike, Bus
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
 from mnms.demand import BaseDemandManager, User
-from mnms.time import TimeTable, Time, Dt
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import RoadDescriptor
+from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer, SharedVehicleLayer
+from mnms.graph.zone import construct_zone_from_sections
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time, TimeTable
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
+from mnms.vehicles.veh_type import Bike, Bus
 
 
 class TestFreeFloatingVehicleSharingInterruptionWithPT(unittest.TestCase):
@@ -123,15 +121,7 @@ class TestFreeFloatingVehicleSharingInterruptionWithPT(unittest.TestCase):
         elif sc == '3' or sc == '5':
             mlgraph.connect_layers("TRANSIT_L0_S1_L2_S1+", "L0_S1", "L2_S1+", 0, {})
 
-        if sc == '1':
-            demand = BaseDemandManager([User("U0", [0, 2000], [1000, 1000], Time("07:00:00")),
-                User("U1", [0, 0], [1000, 1000], Time("07:00:00")),
-                User("U2", [0, 1500], [0, 2000], Time("07:02:00"))])
-        elif sc == '2':
-            demand = BaseDemandManager([User("U0", [0, 2000], [1000, 1000], Time("07:00:00")),
-                User("U1", [0, 0], [1000, 1000], Time("07:00:00")),
-                User("U2", [0, 1500], [0, 2000], Time("07:02:00"))])
-        elif sc == '3':
+        if sc == '1' or sc == '2' or sc == '3':
             demand = BaseDemandManager([User("U0", [0, 2000], [1000, 1000], Time("07:00:00")),
                 User("U1", [0, 0], [1000, 1000], Time("07:00:00")),
                 User("U2", [0, 1500], [0, 2000], Time("07:02:00"))])

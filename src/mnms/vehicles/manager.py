@@ -1,18 +1,18 @@
-from typing import Dict, Set, List
 from collections import defaultdict
+from typing import ClassVar
 
-from mnms.vehicles.veh_type import Vehicle
 from mnms.log import create_logger
+from mnms.vehicles.veh_type import Vehicle
 
 log = create_logger(__name__)
 
 
-class VehicleManager(object):
+class VehicleManager:
 
     # Class attribute (shared by all instances)
-    _vehicles: Dict[str, Vehicle] = dict()                      # id_veh, Vehicle
-    _type_vehicles: Dict[str, Set[str]] = defaultdict(set)
-    _new_vehicles: List[Vehicle] = list()
+    _vehicles: ClassVar[dict[str, Vehicle]] = {}  # id_veh, Vehicle
+    _type_vehicles: ClassVar[dict[str, set[str]]] = defaultdict(set)
+    _new_vehicles: ClassVar[list[Vehicle]] = []
 
     def __reduce__(self):
         """
@@ -57,6 +57,6 @@ class VehicleManager(object):
 
     @classmethod
     def empty(cls):
-        VehicleManager._vehicles = dict()
+        VehicleManager._vehicles = {}
         VehicleManager._type_vehicles = defaultdict(set)
-        VehicleManager._new_vehicles = list()
+        VehicleManager._new_vehicles = []

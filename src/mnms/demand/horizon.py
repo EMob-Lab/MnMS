@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import List
 
 from mnms.demand import User
 from mnms.demand.manager import AbstractDemandManager
@@ -20,7 +19,7 @@ class AbstractDemandHorizon(ABC):
         self.manager: AbstractDemandManager = manager.copy()
 
     @abstractmethod
-    def get(self, tstart: Time) -> List[User]:
+    def get(self, tstart: Time) -> list[User]:
         """
         Return a list of User from tsart to start + dt
 
@@ -31,7 +30,6 @@ class AbstractDemandHorizon(ABC):
             A list of Users
 
         """
-        pass
 
 
 class DemandHorizon(AbstractDemandHorizon):

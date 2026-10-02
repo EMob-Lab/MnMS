@@ -1,21 +1,21 @@
 from abc import ABC, abstractmethod
 from collections import deque
+from collections.abc import Generator
 from copy import deepcopy
-from typing import List, Tuple, Deque, Optional, Generator, Callable
-from enum import Enum
 from dataclasses import dataclass, field
+from enum import Enum
 
 import numpy as np
 
-from mnms.tools.observer import TimeDependentSubject
 from mnms.log import create_logger
-from mnms.time import Time, Dt
+from mnms.time import Dt, Time
+from mnms.tools.observer import TimeDependentSubject
 
 log = create_logger(__name__)
 _norm = np.linalg.norm
 
-_TYPE_ITEM_PATH = Tuple[Tuple[str, str], float]
-_TYPE_PATH = List[_TYPE_ITEM_PATH]
+_TYPE_ITEM_PATH = tuple[tuple[str, str], float]
+_TYPE_PATH = list[_TYPE_ITEM_PATH]
 
 
 class ActivityType(Enum):
@@ -242,7 +242,7 @@ class Vehicle(TimeDependentSubject):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool,
-                 activities: Optional[List[VehicleActivity]] = None,
+                 activities: list[VehicleActivity] | None = None,
                  global_id: str = '-1'):
         """
         Class representing a vehicle in the simulation
@@ -254,7 +254,7 @@ class Vehicle(TimeDependentSubject):
             activities: The initial activities of the Vehicle
             is_personal: Boolean specifying if the vehicle is personal or not
         """
-        super(Vehicle, self).__init__()
+        super().__init__()
 
         if int(global_id) < 0:
             self._global_id = str(Vehicle._counter)
@@ -266,7 +266,7 @@ class Vehicle(TimeDependentSubject):
         self.mobility_service = mobility_service
         self._is_personal = is_personal
 
-        self.passengers = dict()  # id_user, user
+        self.passengers = {}  # id_user, user
 
         self._current_link = None
         self._current_node = node
@@ -280,7 +280,7 @@ class Vehicle(TimeDependentSubject):
         self._achieved_path = []
         self._achieved_path_since_last_notify = []
 
-        self.activities: Deque[VehicleActivity] = deque([])
+        self.activities: deque[VehicleActivity] = deque([])
         self.activity = None  # current activity
 
         if activities is not None:
@@ -382,7 +382,7 @@ class Vehicle(TimeDependentSubject):
     def flush_achieved_path_since_last_notify(self):
         self._achieved_path_since_last_notify = []
 
-    def add_activities(self, activities: List[VehicleActivity]):
+    def add_activities(self, activities: list[VehicleActivity]):
         for a in activities:
             self.activities.append(a)
 
@@ -420,10 +420,9 @@ class Vehicle(TimeDependentSubject):
 
     def iter_activities(self):
         yield self.activity
-        for act in self.activities:
-            yield act
+        yield from self.activities
 
-    def set_path(self, path: List[Tuple[Tuple[str, str], float]]):
+    def set_path(self, path: list[tuple[tuple[str, str], float]]):
         self._iter_path = iter(path)
         self._current_link, self._remaining_link_length = next(self._iter_path)
 
@@ -457,7 +456,7 @@ class Vehicle(TimeDependentSubject):
             user.notify(tcurrent)
             user.vehicle = None
 
-        self.passengers = dict()
+        self.passengers = {}
 
     def start_user_trip(self, userid, take_node):
         log.info(f'Passenger {userid} has been taken by {self} at {take_node}')
@@ -500,9 +499,9 @@ class Car(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Car, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)
         self._last_dropped_off_user = None
 
     @property
@@ -520,9 +519,9 @@ class Bus(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool = False,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Bus, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)
 
 
 
@@ -532,9 +531,9 @@ class Tram(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool = False,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Tram, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)
 
 
 class Metro(Vehicle):
@@ -543,9 +542,9 @@ class Metro(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool = False,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Metro, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)
 
 
 class Bike(Vehicle):
@@ -554,9 +553,9 @@ class Bike(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Bike, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)
 
 
 class Train(Vehicle):
@@ -565,6 +564,6 @@ class Train(Vehicle):
                  capacity: int,
                  mobility_service: str,
                  is_personal: bool = False,
-                 activities: Optional[VehicleActivity] = None,
+                 activities: VehicleActivity | None = None,
                  global_id: int = -1):
-        super(Train, self).__init__(node, capacity, mobility_service, is_personal, activities, global_id)
+        super().__init__(node, capacity, mobility_service, is_personal, activities, global_id)

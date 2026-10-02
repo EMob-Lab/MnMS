@@ -1,21 +1,21 @@
 import unittest
 from tempfile import TemporaryDirectory
+
 import pandas as pd
 
-from mnms.demand import User, BaseDemandManager
+from mnms.demand import BaseDemandManager, User
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.graph.layers import MultiLayerGraph, CarLayer, BusLayer, OriginDestinationLayer
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph, OriginDestinationLayer
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
-from mnms.time import Dt, TimeTable, Time
+from mnms.time import Dt, Time, TimeTable
 from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.veh_type import Vehicle
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
-
 
 
 class TestCostsFunctions(unittest.TestCase):
@@ -63,8 +63,8 @@ class TestCostsFunctions(unittest.TestCase):
                         TimeTable.create_table_freq('07:00:00', '23:00:00', Dt(minutes=1)))
 
         odlayer = OriginDestinationLayer()
-        odlayer.create_origin_node(f"ORIGIN", [-50,0])
-        odlayer.create_destination_node(f"DESTINATION", [5000,0])
+        odlayer.create_origin_node("ORIGIN", [-50,0])
+        odlayer.create_destination_node("DESTINATION", [5000,0])
 
         mlgraph = MultiLayerGraph([car_layer, bus_layer], odlayer, 51)
 
@@ -92,9 +92,7 @@ class TestCostsFunctions(unittest.TestCase):
                 speed_cost = costs["WALK"]['speed']
                 if olabel == 'CAR' and dlabel == 'BUS':
                     gc = vot * link.length / speed_cost + transfer_penalty + parking_cost + bus_cost
-                elif olabel == 'ODLAYER' and dlabel == 'CAR':
-                    gc = vot * link.length / speed_cost
-                elif olabel == 'BUS' and dlabel == 'ODLAYER':
+                elif (olabel == 'ODLAYER' and dlabel == 'CAR') or (olabel == 'BUS' and dlabel == 'ODLAYER'):
                     gc = vot * link.length / speed_cost
                 else:
                     raise ValueError(f'Cost not defined for transit link between layer {olabel} and layer {dlabel}')
@@ -154,7 +152,7 @@ class TestCostsFunctions(unittest.TestCase):
                 self.assertAlmostEqual(link.costs["PersonalVehicle"]['generalized_cost'], 0.003 * 2000 / 8.33 + 0.0005 * 2000)
             elif lid in ['L1_B2_B3', 'L1_B1_B2']:
                 self.assertAlmostEqual(link.costs["Bus"]['generalized_cost'], 0.003 * 1450 / 7)
-        for layer_id, layer in self.mlgraph.layers.items():
+        for layer in self.mlgraph.layers.values():
             for layer_link_id, layer_link in layer.graph.links.items():
                 if layer_link_id == 'C0_C1':
                     self.assertAlmostEqual(layer_link.costs["PersonalVehicle"]['generalized_cost'], 0.003 * 2000 / 8.33 + 0.0005 * 2000)
@@ -180,7 +178,7 @@ class TestCostsFunctions(unittest.TestCase):
                 self.assertAlmostEqual(link.costs["PersonalVehicle"]['generalized_cost'], 0.003 * 2000 / 10 + 0.0005 * 2000)
             elif lid in ['L1_B2_B3', 'L1_B1_B2']:
                 self.assertAlmostEqual(link.costs["Bus"]['generalized_cost'], 0.003 * 1450 / 9)
-            for layer_id, layer in self.mlgraph.layers.items():
+            for layer in self.mlgraph.layers.values():
                 for layer_link_id, layer_link in layer.graph.links.items():
                     if layer_link_id == 'C0_C1':
                         self.assertAlmostEqual(layer_link.costs["PersonalVehicle"]['generalized_cost'], 0.003 * 2000 / 10 + 0.0005 * 2000)

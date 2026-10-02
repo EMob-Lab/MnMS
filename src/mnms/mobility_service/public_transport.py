@@ -1,16 +1,21 @@
 import sys
 from collections import defaultdict, deque
+from collections.abc import Generator
 from functools import cached_property
-from typing import List, Dict, Tuple, Optional, Deque, Generator, Type, Union
 
 from mnms.demand import User
 from mnms.log import create_logger
 from mnms.mobility_service.abstract import AbstractMobilityService, Request
 from mnms.time import Dt, Time
 from mnms.tools.cost import create_service_costs
-from mnms.tools.exceptions import VehicleNotFoundError
-from mnms.vehicles.veh_type import VehicleActivityServing, Vehicle, VehicleActivityStop, VehicleActivityRepositioning, \
-    ActivityType, VehicleActivityPickup, VehicleActivity
+from mnms.vehicles.veh_type import (
+    ActivityType,
+    Vehicle,
+    VehicleActivityPickup,
+    VehicleActivityRepositioning,
+    VehicleActivityServing,
+    VehicleActivityStop,
+)
 
 log = create_logger(__name__)
 
@@ -147,13 +152,13 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -id: The id of the service
             -veh_capacity: The capacity of the vehicle this service is using
         """
-        super(PublicTransportMobilityService, self).__init__(id, veh_capacity=veh_capacity, dt_matching=0,
+        super().__init__(id, veh_capacity=veh_capacity, dt_matching=0,
                                                              dt_periodic_maintenance=0)
-        self.vehicles: Dict[str, Deque[Vehicle]] = defaultdict(deque)
-        self._timetable_iter: Dict[str, Generator[Time, None, None]] = dict()
-        self._current_time_table: Dict[str, Time] = dict()
-        self._next_time_table: Dict[str, Time] = dict()
-        self._next_veh_departure: Dict[str, Optional[Tuple[Time, Vehicle]]] = defaultdict(lambda: None)
+        self.vehicles: dict[str, deque[Vehicle]] = defaultdict(deque)
+        self._timetable_iter: dict[str, Generator[Time, None, None]] = {}
+        self._current_time_table: dict[str, Time] = {}
+        self._next_time_table: dict[str, Time] = {}
+        self._next_veh_departure: dict[str, tuple[Time, Vehicle] | None] = defaultdict(lambda: None)
 
         self.gnodes = None
 
@@ -200,7 +205,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         Returns:
             -veh_path: path of a vehicle serving the line
         """
-        veh_path = list()
+        veh_path = []
         path = self.lines[lid]['nodes']
         for i in range(len(path) - 1):
             unode = path[i]
@@ -229,11 +234,13 @@ class PublicTransportMobilityService(AbstractMobilityService):
             except StopIteration:
                 self._next_time_table[lid] = None
 
+        veh_path: list | None = None
+        end_node = self.lines[lid]['nodes'][-1]
+        start_node = self.lines[lid]['nodes'][0]
+
         ## Create vehicle that will depart next if not already exist
         if self._next_veh_departure[lid] is None and self._current_time_table[lid] is not None:
             veh_path = self.construct_public_transport_path(lid)
-            end_node = self.lines[lid]['nodes'][-1]
-            start_node = self.lines[lid]['nodes'][0]
             new_veh = self.fleet.create_vehicle(start_node,
                                                 capacity=self._veh_capacity,
                                                 activities=[VehicleActivityStop(node=end_node,
@@ -244,7 +251,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid}")
 
         ## Launch the departures and create vehicle that will depart next
-        all_departures = list()
+        all_departures = []
         next_time = time.add_time(dt)
         while (self._current_time_table[lid] is not None) and (time <= self._current_time_table[lid] < next_time):
             # Proceed to the departure
@@ -263,12 +270,8 @@ class PublicTransportMobilityService(AbstractMobilityService):
             # Manage next departure
             self._current_time_table[lid] = self._next_time_table[lid]
             if self._current_time_table[lid] is not None:
-                try:
-                    veh_path
-                except NameError:
+                if veh_path is None:
                     veh_path = self.construct_public_transport_path(lid)
-                    end_node = self.lines[lid]['nodes'][-1]
-                    start_node = self.lines[lid]['nodes'][0]
                 new_veh = self.fleet.create_vehicle(start_node,
                                                     capacity=self._veh_capacity,
                                                     activities=[VehicleActivityStop(node=end_node,
@@ -315,7 +318,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
                 new_veh._remaining_link_length = veh_path[0][1]
                 self._next_veh_departure[lid] = (self._current_time_table[lid], new_veh)
                 log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid} (1)")
-            all_departures = list()
+            all_departures = []
 
         # Go to the proper departure time
         if self._current_time_table[lid] is not None and time > self._current_time_table[lid]:
@@ -361,7 +364,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         return all_departures
 
-    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_nodes: List[str]):
+    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_nodes: list[str]):
         """Method that updates a public transport vehicle plan by inserting user's pick-up and
         drop-off.
 
@@ -570,10 +573,10 @@ class PublicTransportMobilityService(AbstractMobilityService):
     def replanning(self):
         pass
 
-    def rebalancing(self, next_demand: List[User], horizon: List[Vehicle]):
+    def rebalancing(self, next_demand: list[User], horizon: list[Vehicle]):
         pass
 
-    def service_level_costs(self, nodes: List[str]) -> dict:
+    def service_level_costs(self, nodes: list[str]) -> dict:
         """Returns the dict of costs representing the cost of the service computed from a path
 
         Args:
@@ -590,7 +593,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -index: index of the activity to remove in the list of vehicle's all activities
         """
         all_activities = [veh.activity] + list(veh.activities)
-        assert len(all_activities) > index + 1, f'There should be an activity in '\
+        assert len(all_activities) > index + 1, 'There should be an activity in '\
             'public transportation vehicle plan after a pickup/serving activity...'
         if index == 0:
             # Interrupt current activity and modify next activity consequently
@@ -619,12 +622,12 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         ## Remove user pickup activity
         all_activities = [veh.activity] + list(veh.activities)
-        user_pu_act_ind = [i for i in range(len(all_activities)) if all_activities[i].user == user][0] # pickup is necessarily before serving
+        user_pu_act_ind = next(i for i in range(len(all_activities)) if all_activities[i].user == user) # pickup is necessarily before serving
         self.remove_activity_by_index(veh, user_pu_act_ind)
 
         ## Remove user serving activity
         all_activities = [veh.activity] + list(veh.activities)
-        user_serving_act_ind = [i for i in range(len(all_activities)) if all_activities[i].user == user][0]
+        user_serving_act_ind = next(i for i in range(len(all_activities)) if all_activities[i].user == user)
         self.remove_activity_by_index(veh, user_serving_act_ind)
 
     def modify_user_drop_node(self, user, veh, new_drop_node, former_drop_node):
@@ -709,7 +712,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         self.modify_user_drop_node(passenger, veh, new_drop_node, former_drop_node)
 
     def __dump__(self):
-        return {"TYPE": ".".join([PublicTransportMobilityService.__module__, PublicTransportMobilityService.__name__]),
+        return {"TYPE": f"{PublicTransportMobilityService.__module__}.{PublicTransportMobilityService.__name__}",
                 "ID": self.id}
 
     @classmethod

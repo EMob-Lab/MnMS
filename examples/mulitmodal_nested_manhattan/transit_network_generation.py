@@ -1,4 +1,5 @@
-from mnms.time import TimeTable, Time, Dt
+from mnms.time import Dt, TimeTable
+
 
 def generate_daganzo_hybrid_transit_network_stops(roads):
     ### Add nodes and sections not connected to the rest of the roads for the train line

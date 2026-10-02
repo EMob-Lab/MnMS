@@ -1,21 +1,21 @@
-from typing import Set, List, Annotated
 from dataclasses import dataclass
+from typing import Annotated
 
 import numpy as np
 
 from mnms.tools.geometry import points_in_polygon
 
-Point = Annotated[List[float], 2]
-PointList = List[Point]
+Point = Annotated[list[float], 2]
+PointList = list[Point]
 
 
 @dataclass(slots=True)
-class Zone(object):
+class Zone:
     id: str
-    sections: Set[str]
+    sections: set[str]
     contour: PointList
 
-    def is_inside(self, points: List[Point]):
+    def is_inside(self, points: list[Point]):
         return points_in_polygon(self.contour, points)
 
     def centroid(self):
@@ -26,22 +26,22 @@ class Zone(object):
         return np.array([sum_x/length, sum_y/length])
 
 @dataclass
-class MLZone(object):
+class MLZone:
     id: str
-    links: Set[str]
+    links: set[str]
     contour: PointList
 
 @dataclass
-class LayerZone(object):
+class LayerZone:
     """Zone for the AbstractLayer objects : it gathers links belonging to the same
     layer.
     """
     id: str
-    links: Set[str]
+    links: set[str]
     contour : PointList
     detour_ratio : float = 1.343
 
-    def is_inside(self, points: List[Point]):
+    def is_inside(self, points: list[Point]):
         return points_in_polygon(self.contour, points)
 
 def construct_zone_from_contour(roads: "RoadDescriptor", id: str, contour: PointList, graph=None, zone_type='Zone'):
@@ -71,7 +71,7 @@ def construct_zone_from_contour(roads: "RoadDescriptor", id: str, contour: Point
             return LayerZone(id, zone_links, contour)
 
 
-def construct_zone_from_sections(roads: "RoadDescriptor", _id: str, sections: List[str]):
+def construct_zone_from_sections(roads: "RoadDescriptor", _id: str, sections: list[str]):
     nodes = []
     for sec in sections:
         section = roads.sections[sec]

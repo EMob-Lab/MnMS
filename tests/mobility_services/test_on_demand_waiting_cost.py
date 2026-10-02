@@ -1,30 +1,22 @@
+import math
 import tempfile
 import unittest
 from pathlib import Path
-import pandas as pd
-import numpy as np
-import math
 
-from mnms.generation.roads import generate_line_road, RoadDescriptor
-from mnms.graph.zone import Zone
-from mnms.graph.zone import construct_zone_from_sections, construct_zone_from_contour
-from mnms.graph.layers import MultiLayerGraph, SharedVehicleLayer, CarLayer
-from mnms.generation.roads import generate_manhattan_road
-from mnms.generation.layers import generate_matching_origin_destination_layer, generate_layer_from_roads
-from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
-from mnms.vehicles.veh_type import Bike, Bus
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
+import pandas as pd
+
 from mnms.demand import BaseDemandManager, User
-from mnms.time import TimeTable, Time, Dt
-from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_manhattan_road
+from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.zone import construct_zone_from_contour
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
+from mnms.mobility_service.on_demand import OnDemandMobilityService
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 
 
 class TestOnDemandMobilityServiceWaitingCost(unittest.TestCase):

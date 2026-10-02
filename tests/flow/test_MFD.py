@@ -1,28 +1,28 @@
 import unittest
 from tempfile import TemporaryDirectory
-import numpy as np
-import pytest
-import pandas as pd
 
-from mnms.demand import User
+import numpy as np
+import pandas as pd
+import pytest
+
+from mnms.demand import BaseDemandManager, User
 from mnms.demand.user import Path
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.generation.roads import generate_line_road
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
-from mnms.graph.layers import MultiLayerGraph, CarLayer, BusLayer
+from mnms.generation.roads import generate_line_road
+from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
 from mnms.mobility_service.abstract import Request
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.on_demand import OnDemandMobilityService
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
-from mnms.time import Dt, TimeTable, Time
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time, TimeTable
+from mnms.tools.observer import CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Vehicle
-from mnms.tools.observer import CSVVehicleObserver
-from mnms.demand import BaseDemandManager, User
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.simulation import Supervisor
 
 
 class TestMFDFlow(unittest.TestCase):
@@ -178,7 +178,7 @@ class TestMFDFlow(unittest.TestCase):
 
         ## Get and check result
         with open(self.pathdir + "vehs.csv") as f:
-            df = pd.read_csv(f, sep=';')
+            df = pd.read_csv(f, sep=';') # ruff: ignore[F841] FIXME The content of the CSV file should be checked.
 
         with open(self.pathdir + "flow_motor.csv") as f:
             dfres = pd.read_csv(f, sep=';')
@@ -279,7 +279,7 @@ def test_move_veh_res_change():
     personal_car.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
 
-    veh = list(personal_car.fleet.vehicles.values())[0]
+    veh = next(iter(personal_car.fleet.vehicles.values()))
     approx_dist = 11
     assert approx_dist == pytest.approx(user.distance)
     assert approx_dist == pytest.approx(veh.distance)

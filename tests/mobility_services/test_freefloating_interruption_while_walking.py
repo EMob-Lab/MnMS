@@ -1,27 +1,24 @@
 import tempfile
 import unittest
 from pathlib import Path
+
 import pandas as pd
 
-from mnms.generation.roads import generate_line_road, RoadDescriptor
-from mnms.graph.zone import Zone
-from mnms.graph.zone import construct_zone_from_sections
-from mnms.graph.layers import MultiLayerGraph, SharedVehicleLayer, CarLayer
-from mnms.generation.layers import generate_matching_origin_destination_layer, generate_layer_from_roads
-from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.mobility_service.on_demand import OnDemandMobilityService
-from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
-from mnms.vehicles.veh_type import Bike, Bus
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
-from mnms.simulation import Supervisor
 from mnms.demand import BaseDemandManager, User
-from mnms.time import TimeTable, Time, Dt
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import RoadDescriptor
+from mnms.graph.layers import CarLayer, MultiLayerGraph, PublicTransportLayer, SharedVehicleLayer
+from mnms.graph.zone import construct_zone_from_sections
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
+from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.mobility_service.vehicle_sharing import VehicleSharingMobilityService
-from mnms.mobility_service.personal_vehicle import PersonalMobilityService
-from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
+from mnms.simulation import Supervisor
+from mnms.time import Dt, Time, TimeTable
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
+from mnms.vehicles.veh_type import Bike, Bus
 
 
 class TestFreeFloatingVehicleSharingInterruptionWhileWalking(unittest.TestCase):

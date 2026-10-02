@@ -2,13 +2,14 @@ import csv
 import re
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path as Pathl
-from typing import List, Literal, Union, Dict, Callable
-from datetime import datetime
+from typing import Literal
 
 import numpy as np
 
-from mnms.demand.user import User, Path
+from mnms.demand.user import Path, User
 from mnms.log import create_logger
 from mnms.time import Time
 from mnms.tools.exceptions import CSVDemandParseError
@@ -21,13 +22,13 @@ class AbstractDemandManager(ABC):
     """Abstract class for loading a User demand
     """
 
-    def __init__(self, user_parameters: Callable[[User], Dict] = lambda x: {}):
+    def __init__(self, user_parameters: Callable[[User], dict] = lambda x: {}):
         self._observers = []
         self._user_to_attach = []
         self._user_parameter = user_parameters
 
     @abstractmethod
-    def get_next_departures(self, tstart: Time, tend: Time) -> List[User]:
+    def get_next_departures(self, tstart: Time, tend: Time) -> list[User]:
         """Return the Users with a departure time between tstart and tend
 
         Parameters
@@ -42,9 +43,8 @@ class AbstractDemandManager(ABC):
         List[User]
 
         """
-        pass
 
-    def construct_user_parameters(self, users: List[User]) -> None:
+    def construct_user_parameters(self, users: list[User]) -> None:
         for u in users:
             u.parameters = self._user_parameter(u)
 
@@ -52,7 +52,7 @@ class AbstractDemandManager(ABC):
     def copy(self):
         pass
 
-    def add_user_observer(self, obs: Observer, user_ids: Union[Literal['all'], List[str]] = "all"):
+    def add_user_observer(self, obs: Observer, user_ids: Literal['all'] | list[str] = "all"):
         self._observers.append(obs)
         self._user_to_attach.append(user_ids)
 
@@ -66,16 +66,16 @@ class BaseDemandManager(AbstractDemandManager):
         list of User to manage
     """
 
-    def __init__(self, users, user_parameters: Callable[[User], Dict] = lambda x: {}):
-        super(BaseDemandManager, self).__init__(user_parameters)
+    def __init__(self, users, user_parameters: Callable[[User], dict] = lambda x: {}):
+        super().__init__(user_parameters)
         self._users = users
         self._iter_demand = iter(self._users)
         self._current_user = next(self._iter_demand)
 
         self.nb_users = len(self._users)
 
-    def get_next_departures(self, tstart: Time, tend: Time) -> List[User]:
-        departure = list()
+    def get_next_departures(self, tstart: Time, tend: Time) -> list[User]:
+        departure = []
         while tstart <= self._current_user.departure_time < tend:
             # Attaching observers to Users
             for iobs, obs in enumerate(self._observers):
@@ -98,7 +98,7 @@ class BaseDemandManager(AbstractDemandManager):
         for u in self._users:
             print(u)
 
-    def to_csv(self, file: Union[Pathl, str], delimiter=";"):
+    def to_csv(self, file: Pathl | str, delimiter=";"):
         with open(file, 'w') as f:
             writer = csv.writer(f, delimiter=delimiter)
             writer.writerow(["ID", "DEPARTURE", "ORIGIN", "DESTINATION"])
@@ -120,7 +120,7 @@ class CSVDemandManager(AbstractDemandManager):
         Delimiter for the CSV file
     """
 
-    def init_demand_reader(self, csvfile: Union[Pathl, str]):
+    def init_demand_reader(self, csvfile: Pathl | str):
 
         mandatory_columns = ['ID', 'DEPARTURE', 'ORIGIN', 'DESTINATION']
         time_format_1 = "%H:%M:%S"
@@ -133,14 +133,14 @@ class CSVDemandManager(AbstractDemandManager):
             optional_columns = [h for h in headers if h not in mandatory_columns]
             self._optional_columns = {c: headers.index(c) for c in optional_columns}
             # Small checks on consistency of optional columns
-            noms = 'MOBILITY SERVICES' not in self._optional_columns.keys()
-            nomsg = 'MOBILITY SERVICES GRAPH' not in self._optional_columns.keys()
+            noms = 'MOBILITY SERVICES' not in self._optional_columns
+            nomsg = 'MOBILITY SERVICES GRAPH' not in self._optional_columns
             if (noms and nomsg) or (noms and not nomsg) or (not noms and nomsg):
                 pass
             else:
                 raise CSVDemandParseError(csvfile)
-            nop = 'PATH' not in self._optional_columns.keys()
-            nocms = 'CHOSEN SERVICES' not in self._optional_columns.keys()
+            nop = 'PATH' not in self._optional_columns
+            nocms = 'CHOSEN SERVICES' not in self._optional_columns
             if (nop and nocms) or (not nop and not nocms):
                 pass
             else:
@@ -152,10 +152,10 @@ class CSVDemandManager(AbstractDemandManager):
         first_line = next(self._reader)
         departure_time = first_line[1]
         try:
-            datetime.strptime(departure_time, time_format_1)
+            datetime.strptime(departure_time, time_format_1).replace(tzinfo=timezone.utc)
         except ValueError:
             try:
-                datetime.strptime(departure_time, time_format_2)
+                datetime.strptime(departure_time, time_format_2).replace(tzinfo=timezone.utc)
             except ValueError:
                 raise CSVDemandParseError(csvfile)
         match_x = re.match(r'^[-+]?[0-9]*\.*[0-9]*\d\s[-+]?[0-9]*\.*[0-9]*\d$', first_line[2])
@@ -172,8 +172,8 @@ class CSVDemandManager(AbstractDemandManager):
 
         self._current_user = self.construct_user(first_line)
 
-    def __init__(self, csvfile: Union[Pathl, str], delimiter=';', user_parameters: Callable[[User], Dict] = lambda x: {}):
-        super(CSVDemandManager, self).__init__(user_parameters)
+    def __init__(self, csvfile: Pathl | str, delimiter=';', user_parameters: Callable[[User], dict] = lambda x: {}):
+        super().__init__(user_parameters)
         self._filename = csvfile
         self._delimiter = delimiter
         self._file = open(self._filename, 'r')
@@ -200,8 +200,8 @@ class CSVDemandManager(AbstractDemandManager):
         self._reader = csv.reader(self._file, delimiter=self._delimiter, quotechar='|')
         self.init_demand_reader(self._filename)
 
-    def get_next_departures(self, tstart: Time, tend: Time) -> List[User]:
-        departure = list()
+    def get_next_departures(self, tstart: Time, tend: Time) -> list[User]:
+        departure = []
 
         # If the lower bound of next departures is after the fist departure in the demand, we skip the first users until
         # reaching the  lower bound of next departures
@@ -238,17 +238,23 @@ class CSVDemandManager(AbstractDemandManager):
             origin = np.fromstring(row[2], sep=' ')
             destination = np.fromstring(row[3], sep=' ')
         else:
-            raise TypeError(f"demand_type must be either 'node' or 'coordinate'")
+            raise TypeError("demand_type must be either 'node' or 'coordinate'")
         forced_path = None
         chosen_ms = None
-        if 'PATH' in self._optional_columns.keys() and row[self._optional_columns['PATH']] != '':
+        if 'PATH' in self._optional_columns and row[self._optional_columns['PATH']] != '':
             forced_path = Path(None, row[self._optional_columns['PATH']].split(' '))
             chosen_ms = row[self._optional_columns['CHOSEN SERVICES']].split(' ')
             chosen_ms = {cms.split(':')[0]:cms.split(':')[1] for cms in chosen_ms}
-        return User(row[0], origin, destination, Time(row[1]),
-                    available_mobility_services=None if 'MOBILITY SERVICES' not in self._optional_columns.keys() else row[self._optional_columns['MOBILITY SERVICES']].split(' '),
-                    mobility_services_graph=None if 'MOBILITY SERVICES GRAPH' not in self._optional_columns.keys() else row[self._optional_columns['MOBILITY SERVICES GRAPH']],
-                    path=forced_path, forced_path_chosen_mobility_services=chosen_ms)
+        return User(
+            row[0],
+            origin,
+            destination,
+            Time(row[1]),
+            available_mobility_services=None if 'MOBILITY SERVICES' not in self._optional_columns else row[self._optional_columns['MOBILITY SERVICES']].split(' '),
+            mobility_services_graph=None if 'MOBILITY SERVICES GRAPH' not in self._optional_columns else row[self._optional_columns['MOBILITY SERVICES GRAPH']],
+            path=forced_path,
+            forced_path_chosen_mobility_services=chosen_ms
+        )
 
     def __del__(self):
         self._file.close()

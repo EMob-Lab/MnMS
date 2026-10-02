@@ -1,5 +1,5 @@
-from json import JSONEncoder
 from importlib import import_module
+from json import JSONEncoder
 
 import numpy as np
 

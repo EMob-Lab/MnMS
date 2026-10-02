@@ -4,26 +4,26 @@
 ## Casuals
 import os
 import random
-import pandas as pd
-import numpy as np
 import time
-from stepfunction import stepfunction as sf # install with pip install -i https://test.pypi.org/simple/ stepfunction-kit4a
+
+import pandas as pd
+from stepfunction import (
+    stepfunction as sf,  # install with pip install -i https://test.pypi.org/simple/ stepfunction-kit4a
+)
+
+from mnms.demand.manager import CSVDemandManager
+from mnms.flow.MFD import MFDFlowMotor, Reservoir
+from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
+from mnms.generation.roads import generate_manhattan_road
+from mnms.graph.layers import MultiLayerGraph
 
 ## MnMS & HiPOP
-from mnms.log import set_all_mnms_logger_level, LOGLEVEL
-from mnms.generation.roads import generate_manhattan_road
-from mnms.tools.observer import CSVVehicleObserver, CSVUserObserver
+from mnms.log import LOGLEVEL, set_all_mnms_logger_level
 from mnms.mobility_service.on_demand_shared import OnDemandSharedMobilityService
-from mnms.graph.layers import MultiLayerGraph
-from mnms.vehicles.veh_type import Car
-from mnms.time import TimeTable, Time, Dt
-from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
-from mnms.demand.manager import CSVDemandManager
-from mnms.travel_decision.dummy import DummyDecisionModel
-from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.simulation import Supervisor
-from mnms.log import LOGLEVEL
-
+from mnms.time import Dt, Time
+from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
+from mnms.travel_decision.dummy import DummyDecisionModel
 
 ##################
 ### Parameters ###
@@ -89,7 +89,7 @@ def generate_ridesharing_vehicles_init_pos_f(rs, nb_vehs, file):
     if not os.path.isfile(file):
         rs_supply.to_csv(file, sep=';', index=False)
     else:
-        print(f"A ridesharing initial positions file already exist. Nothing is generated to prevent overwriting.")
+        print("A ridesharing initial positions file already exist. Nothing is generated to prevent overwriting.")
 
 def generate_demand_scenario(mlgraph, dep_rates, tstart, tend, demand_file):
     """Generates a randomized demand scenario and write it down in a file.
@@ -128,7 +128,7 @@ def generate_demand_scenario(mlgraph, dep_rates, tstart, tend, demand_file):
     if not os.path.isfile(demand_file):
         df.to_csv(demand_file, sep=';', index=False)
     else:
-        print(f"A demand file already exist. Nothing is generated to prevent overwriting.")
+        print("A demand file already exist. Nothing is generated to prevent overwriting.")
 
 def create_on_demand_vehicles(on_demand_mob_service, vehicles_positions_file):
     """Create the on-demand vehicles at the initial positions specified by the file.
