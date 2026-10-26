@@ -1,6 +1,6 @@
 [project]
 name = "MnMS"
-version = "1.0.1"
+version = "1.1.0"
 description = "Agent-based Multimodal Urban Moblity Simulator resulting from the ERC MAGnUM project"
 readme = "README.md"
 requires-python = ">= 3.10"
