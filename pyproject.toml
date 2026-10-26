@@ -71,3 +71,22 @@ requires = [
     "hatchling >= 1.32",
 ]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+# By default, the whole repository is embedded in the source distribution,
+# which results in a quite large .tar.gz file (> 10 MB) in case of MnMS.
+# To avoid that, the files to embed are explicitly defined here:
+include = [
+
+    # Source files (obviously...)
+    "src",
+
+    # Root documentation
+    "/*.md",
+    "LICENSE",
+
+    # Whatever is required for the tests
+    "tests",
+    ".coveragerc",
+    "pytest.toml",
+]
