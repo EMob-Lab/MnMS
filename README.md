@@ -20,7 +20,12 @@ of today's urban transportation system, and beyond!
 
 ### From package manager
 
-This installation method is not available yet. Coming soon...
+This is the recommended (and most simple!) method to install MnMS:
+just download it from [PyPI](https://pypi.org/project/MnMS/).
+
+```shell
+pip install mnms
+```
 
 
 ### From sources
