@@ -483,7 +483,7 @@ class MultiLayerGraph:
             link.update_costs(costs)
 
             for links in link_layers: # only non transit links concerned
-                layer_link = links.get(link.id, None)
+                layer_link = links.get(link.id)
                 if layer_link is not None:
                     layer_link.update_costs(costs)
 
