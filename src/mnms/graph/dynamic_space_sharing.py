@@ -3,6 +3,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from hipop.graph import NodeMap
 from hipop.shortest_path import parallel_dijkstra_heterogeneous_costs
 
 from mnms.log import create_logger
@@ -118,7 +119,7 @@ class DynamicSpaceSharing:
 
         return vehicles_to_reroute
 
-    def unban_link(self, lid: str, gnodes: list["Nodes"]):
+    def unban_link(self, lid: str, gnodes: NodeMap):
         """Method to unban a banned link for a specific mobility service.
         It recomputes the travel time and cost on that link.
 
