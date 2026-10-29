@@ -72,7 +72,6 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         self.dict_speeds: dict | None = None
 
         self.veh_manager: VehicleManager | None = None
-        self.graph_nodes: dict | None = None
 
         self._layer_link_length_mapping: dict[str, LinkInfo] = {}
         self._section_to_reservoir: dict[str, str | None] = {}
@@ -85,8 +84,6 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             del state['_csvhandler']
         if '_layer_link_length_mapping' in state:
             del state['_layer_link_length_mapping']
-        if 'graph_nodes' in state:
-            del state['graph_nodes']
 
         return state
 
@@ -152,7 +149,6 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         self.dict_speeds[None] = {m: 0 for r in self.reservoirs.values() for m in r.modes} | {None: 0}
 
         self.veh_manager = VehicleManager()
-        self.graph_nodes = self._graph.graph.nodes
         self.roads_sections = self._graph.roads.sections
 
         self._reset_mapping()
@@ -174,8 +170,8 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         unode, dnode = veh.current_link
         remaining_length = veh.remaining_link_length
 
-        unode_pos = np.array(self.graph_nodes[unode].position)
-        dnode_pos = np.array(self.graph_nodes[dnode].position)
+        unode_pos = np.array(self._graph.graph.nodes[unode].position)
+        dnode_pos = np.array(self._graph.graph.nodes[dnode].position)
 
         direction = dnode_pos - unode_pos
         norm_direction = np.linalg.norm(direction)
@@ -229,7 +225,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         try:
             # Find the section where vehicle is currently
             unode, dnode = veh.current_link
-            curr_link = self.graph_nodes[unode].adj[dnode]
+            curr_link = self._graph.graph.nodes[unode].adj[dnode]
             sids = self._graph.map_reference_links[curr_link.id]
             if len(sids) == 1:
                 sid = sids[0]
@@ -365,7 +361,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                 costs_functions = layer._costs_functions
                 for mservice, cost_funcs in costs_functions.items():
                     for cost_name, cost_f in cost_funcs.items():
-                        costs[mservice][cost_name] = cost_f(self.graph_nodes, layer, link, costs)
+                        costs[mservice][cost_name] = cost_f(self._graph.graph.nodes, layer, link, costs)
 
                 # Test if link is banned, if yes do not update the travel time and dynamic
                 # space sharing cost for the banned mobility service, but only the speed
@@ -378,8 +374,9 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
                 # Update of the cost in the corresponding graph layer
                 for links in link_layers:
-                    if lid in links:
-                        links[lid].update_costs(costs)
+                    link = links.get(lid)
+                    if link is not None:
+                        link.update_costs(costs)
                         break
         if len(linkcosts) > 0:
             graph.update_costs(linkcosts)

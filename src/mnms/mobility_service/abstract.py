@@ -412,7 +412,7 @@ class AbstractMobilityService(ABC):
         )
         self.remove_activity_by_index(veh, user_serving_act_ind, mlgraph, cost)
 
-    def modify_user_drop_node(self, user, veh, new_drop_node, former_drop_node, gnodes, mlgraph, cost):
+    def modify_user_drop_node(self, user, veh, new_drop_node, former_drop_node, mlgraph, cost):
         """Method that modifies the drop node of a user who appears in the plan of a
         vehicle of this mobility service (i.e. user should have been matched with the vehicle,
         it may already be in the vehicle). It is done by updating the user serving activity
@@ -432,7 +432,6 @@ class AbstractMobilityService(ABC):
             -passenger: user in a vehicle of this mobility service who wants to change her drop node
             -new_drop_node: the new drop node of the passenger
             -former_drop_node: the former drop node of the passenger
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph where vehicle evolves
             -cost: name of the cost user considers to make her mode-route decision
         """
@@ -451,7 +450,7 @@ class AbstractMobilityService(ABC):
                 ' once user path has been updated with the new drop node'
             u_serving_act_new_nodes = user.path.nodes[current_node_ind:new_drop_node_ind+1]
             u_serving_act_new_path = [((u_serving_act_new_nodes[i],u_serving_act_new_nodes[i+1]),
-                gnodes[u_serving_act_new_nodes[i]].adj[u_serving_act_new_nodes[i+1]].length) \
+                mlgraph.graph.nodes[u_serving_act_new_nodes[i]].adj[u_serving_act_new_nodes[i+1]].length) \
                 for i in range(len(u_serving_act_new_nodes)-1)]
             if user_serving_act_ind == 0:
                 # Vehicle is currently serving the user: update current activity path by
@@ -521,7 +520,7 @@ class AbstractMobilityService(ABC):
             # Former and new drop nodes correspond, there is nothing to do
             pass
 
-    def modify_passenger_drop_node(self, passenger, new_drop_node, former_drop_node, gnodes, mlgraph, cost):
+    def modify_passenger_drop_node(self, passenger, new_drop_node, former_drop_node, mlgraph, cost):
         """Method that modifies the drop node of a user which is currently inside a
         vehicle of this mobility service.
 
@@ -529,12 +528,11 @@ class AbstractMobilityService(ABC):
             -passenger: user in a vehicle of this mobility service who wants to change her drop node
             -new_drop_node: the new drop node of the passenger
             -former_drop_node: the former drop node of the passenger
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph where vehicle evolves
             -cost: name of the cost user considers to make her mode-route decision
         """
         veh = passenger.vehicle
-        self.modify_user_drop_node(passenger, veh, new_drop_node, former_drop_node, gnodes, mlgraph, cost)
+        self.modify_user_drop_node(passenger, veh, new_drop_node, former_drop_node, mlgraph, cost)
 
     def periodic_maintenance(self, dt: Dt):
         """
@@ -705,7 +703,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
             'mobility service but another zone with the same id already exists...'
         # Check consistency of the zone
         if self.layer is not None:
-            assert len(set(zone.links).intersection(set(self.graph.links.keys()))) == len(zone.links), \
+            assert all(lid in self.graph.links for lid in zone.links), \
                 f'Some links of LayerZone {zone.id} do not belong to {self.id} layer...'
         # Add the zone and initialize the estimated pickup time in it to the default value
         self._zones[zone.id] = zone

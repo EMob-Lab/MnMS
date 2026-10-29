@@ -154,7 +154,6 @@ class DynamicSpaceSharing:
             -vehicles: list of all vehicles involved in the simulation
         """
         self._flow_step_counter += 1
-        gnodes = self.graph.graph.nodes
 
         # Unban links for which the banning period elapsed
         to_del = []
@@ -163,7 +162,7 @@ class DynamicSpaceSharing:
             if banned_link.period <= 0:
                 to_del.append(lid)
         for lid in to_del:
-            self.unban_link(lid, gnodes)
+            self.unban_link(lid, self.graph.graph.nodes)
             log.info(f'Unban {lid} at {tcurrent}')
             del self.banned_links[lid]
 
@@ -190,14 +189,13 @@ class DynamicSpaceSharing:
             if new_banned_links:
                 log.info(f'Ban links {new_banned_links} at {tcurrent} and reroute {vehicles_to_reroute}')
 
-        self.reroute_vehicles(vehicles_to_reroute, gnodes)
+        self.reroute_vehicles(vehicles_to_reroute)
 
-    def reroute_vehicles(self, vehs, gnodes):
+    def reroute_vehicles(self, vehs):
         """Method that reroutes the vehicles impacted by links banning.
 
         Args:
             -vehs: the list of vehs and activity impacted by the links banning
-            -gnodes: nodes of the multi layer graph
         """
         # NB: unbanning does not lead to rerouting, only banning
 
@@ -275,7 +273,7 @@ class DynamicSpaceSharing:
                             log.error(f'Cannot find new path first node {new_path[0]} into old path {old_veh_path_nodes}...')
                             sys.exit(-1)
                         old_veh_path_nodes = old_veh_path_nodes[idx:]
-                    passenger.modify_part_of_path(old_veh_path_nodes, new_path, gnodes, self.graph, self.cost)
+                    passenger.modify_part_of_path(old_veh_path_nodes, new_path, self.graph, self.cost)
                     log.info(f'User {passenger.id} updated her path consequently: {passenger.path}')
             else:
                 log.warning(f'Cannot find an alternative route '\
