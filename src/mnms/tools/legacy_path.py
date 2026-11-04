@@ -9,7 +9,7 @@ Specific cases are encountered in the following situations:
   in the path search functions):
   - until HiPOP v2, these paths used to be represented as `[]` (empty list), with a associated path cost zero,
   - as of HiPOP v3, a OrientedGraphPath instance containing a single node is returned
-    (thus, invoking `path.node_ids()` returns a list of length 1).
+    (thus, invoking `path.nodes.ids()` returns a list of length 1).
 
 - Invalid paths (typically encountered when destination is not reachable from origin in the path search functions):
   - until HiPOP v2, these paths used to be represented as `[]` (empty list), with a associated path cost +infinity,
