@@ -9,12 +9,8 @@ from collections.abc import Callable
 from enum import Enum
 
 import numpy as np
-from hipop.shortest_path import (
-    compute_path_length,
-    dijkstra,
-    parallel_k_intermodal_shortest_path,
-    parallel_k_shortest_path,
-)
+from hipop.graph import OrientedGraphPath
+from hipop.shortest_path import parallel_k_intermodal_shortest_path, parallel_k_shortest_path
 from numpy.linalg import norm as _norm
 
 from mnms.demand.user import Path, User, UserState
@@ -23,6 +19,7 @@ from mnms.log import create_logger
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.time import Time
 from mnms.tools.dict_tools import sum_dict
+from mnms.tools.legacy_path import compute_path_cost_from_links, compute_path_length_from_links
 
 log = create_logger(__name__)
 
@@ -99,7 +96,7 @@ class AbstractDecisionModel(ABC):
         self.mobility_services_graphs = mobility_services_graphs
         self.save_routes_dynamically_and_reapply = save_routes_dynamically_and_reapply
         if self.save_routes_dynamically_and_reapply:
-            self.saved_routes = {}
+            self._saved_routes = {}
 
         self._mlgraph = mlgraph
         self._cost = cost
@@ -222,7 +219,7 @@ class AbstractDecisionModel(ABC):
             -user: the user who has a forced initial path
         """
         if user.path.layers == []:
-            user.path.construct_layers_from_links(self._mlgraph.graph.nodes)
+            user.path.construct_layers_from_links(self._mlgraph.graph.links)
         if user.path.mobility_services == []:
             if 'TRANSIT' not in user.forced_path_chosen_mobility_services:
                 user.forced_path_chosen_mobility_services['TRANSIT'] = 'WALK'
@@ -296,7 +293,6 @@ class AbstractDecisionModel(ABC):
         """
         all_mob_services = set(self._mlgraph.get_all_mobility_services())
         all_mob_services_ids = [ms.id for ms in all_mob_services]
-        gnodes = self._mlgraph.graph.nodes
         deadend_users = []
         personal_ms_planning_origins = {}
 
@@ -347,7 +343,7 @@ class AbstractDecisionModel(ABC):
 
             if e != Event.DEPARTURE:
                 ## Review availability of personal mobility services
-                personal_ms_planning_origins[u.id] = self.review_availability_of_personal_mob_services(u, e, gnodes)
+                personal_ms_planning_origins[u.id] = self.review_availability_of_personal_mob_services(u, e, self._mlgraph.graph.nodes)
 
             ## If user has no more available mob service, set state to deadend
             if len(u.available_mobility_services) == 0:
@@ -545,7 +541,7 @@ class AbstractDecisionModel(ABC):
                         self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                   str(chosen_path.path_cost),
                                                   ' '.join(chosen_path.nodes),
-                                                  compute_path_length(self._mlgraph.graph, chosen_path.nodes),
+                                                  compute_path_length_from_links(self._mlgraph.graph, chosen_path.links),
                                                   ' '.join(chosen_path.mobility_services),
                                                   '1'])
                     else:
@@ -557,7 +553,7 @@ class AbstractDecisionModel(ABC):
                             self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                        str(p.path_cost),
                                                        ' '.join(p.nodes),
-                                                       compute_path_length(self._mlgraph.graph, p.nodes),
+                                                       compute_path_length_from_links(self._mlgraph.graph, p.links),
                                                        ' '.join(p.mobility_services),
                                                        chosen])
 
@@ -566,7 +562,7 @@ class AbstractDecisionModel(ABC):
                     teleport_origin = None if user.current_node is None else gnodes[user.current_node].position
                     user.set_path(chosen_path, gnodes=gnodes, max_teleport_dist=self.personal_mob_service_park_radius,
                         teleport_origin=teleport_origin)
-                    user.start_path(gnodes)
+                    user.start_path(self._mlgraph.graph.links)
                 elif user.state == UserState.WALKING:
                     dist = _norm(user.position - gnodes[chosen_path.nodes[0]].position)
                     current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj
@@ -574,28 +570,28 @@ class AbstractDecisionModel(ABC):
                         # User starts the chosen path right now, eventually teleport
                         user.set_path(chosen_path, gnodes=gnodes, max_teleport_dist=self.personal_mob_service_park_radius,
                             teleport_origin=user.position)
-                        user.start_path(gnodes)
+                        user.start_path(self._mlgraph.graph.links)
                     elif not current_transit_link_exists:
                         # User teleports whatever the distance and starts the chosen path right now
                         user.set_path(chosen_path, gnodes=gnodes, max_teleport_dist=10e8,
                             teleport_origin=user.position)
-                        user.start_path(gnodes)
+                        user.start_path(self._mlgraph.graph.links)
                     else:
                         # User finishes to walk on current link and then starts the chosen path without teleporting
                         assert chosen_path.nodes[0] == user.current_link[1], f'User {user.id} replanned while WALKING on {user.current_link} '\
                             f'and chose a path with an erroneous first node (path={chosen_path})'
-                        _ = user.update_path(chosen_path, gnodes, self._mlgraph, self._cost)
+                        _ = user.update_path(chosen_path, self._mlgraph, self._cost)
                 elif user.state == UserState.WAITING_ANSWER:
                     # User starts the chosen path right now, eventually teleport, clean/update user's ongoing request
-                    user.update_path_and_requested_service_buffer(chosen_path, gnodes, self._mlgraph, self._cost, self.personal_mob_service_park_radius)
+                    user.update_path_and_requested_service_buffer(chosen_path, self._mlgraph, self._cost, self.personal_mob_service_park_radius)
                 elif user.state == UserState.WAITING_VEHICLE:
                     # User starts the chosen path right now, eventually teleport, update vehicle plan consequently
-                    user.update_path_and_waited_vehicle_plan(chosen_path, gnodes, self._mlgraph, self._cost, self.personal_mob_service_park_radius)
+                    user.update_path_and_waited_vehicle_plan(chosen_path, self._mlgraph, self._cost, self.personal_mob_service_park_radius)
                 elif user.state == UserState.INSIDE_VEHICLE:
                     # User finishes on the current link and then starts the chosen path without teleporting, update vehicle plan consequently
                     assert chosen_path.nodes[0] == user.current_link[1], f'User {user.id} replanned while INSIDE_VEHICLE on {user.current_link} '\
                         f'and chose a path with an erroneous first node (path={chosen_path})'
-                    user.update_path_and_current_vehicle_plan(chosen_path, gnodes, self._mlgraph, self._cost)
+                    user.update_path_and_current_vehicle_plan(chosen_path, self._mlgraph, self._cost)
                 else:
                     log.error(f'User {user.id} undefined replanning behavior in {user.state} state...')
                     sys.exit(-1)
@@ -616,7 +612,6 @@ class AbstractDecisionModel(ABC):
             -event: event that led user the (re)plan
             -tcurrent: current time
         """
-        gnodes = self._mlgraph.graph.nodes
         uid = user.id
 
         if self._write:
@@ -641,7 +636,7 @@ class AbstractDecisionModel(ABC):
                     f'turns to DEADEND.')
                 user.set_state_deadend(tcurrent)
             elif user.state == UserState.WALKING:
-                current_transit_link_exists = user.current_link[1] in gnodes[user.current_link[0]].adj
+                current_transit_link_exists = user.current_link[1] in self._mlgraph.graph.nodes[user.current_link[0]].adj
                 if not current_transit_link_exists:
                     # User turns immediatly DEADEND
                     log.warning(f'User {uid} has found no path during the (re)planning, '\
@@ -667,7 +662,7 @@ class AbstractDecisionModel(ABC):
             elif user.state == UserState.INSIDE_VEHICLE:
                 # User finishes to ride vehicle on current link, and then turns DEADEND,
                 # vehicle's plan is updated consequently
-                user.modify_current_ride_drop_node(user.current_link[1], gnodes, self._mlgraph, self._cost)
+                user.modify_current_ride_drop_node(user.current_link[1], self._mlgraph, self._cost)
                 log.warning(f'User {uid} has found no path during the (re)planning, '\
                     f'will alight vehicle {user.vehicle} at next node and turn DEADEND.')
                 user.deadend_at_next_node = True
@@ -677,7 +672,13 @@ class AbstractDecisionModel(ABC):
             log.error('Case not yet developped')
             sys.exit(-1)
 
-    def parse_paths(self, paths, uids, chosen_mservices, nb_paths, users_paths, intermodality=None):
+    def parse_paths(self,
+            paths: list[list[tuple[OrientedGraphPath, float]]],
+            uids,
+            chosen_mservices,
+            nb_paths,
+            users_paths,
+            intermodality=None):
         """Method that parsed HiPOP outputs.
 
         Args:
@@ -691,7 +692,6 @@ class AbstractDecisionModel(ABC):
         Return:
             -users_paths: updated list of saved shortest paths
         """
-        gnodes = self._mlgraph.graph.nodes
 
         for i, kpath in enumerate(paths):
             user_id = uids[i]
@@ -703,14 +703,14 @@ class AbstractDecisionModel(ABC):
 
             # For each of the k shortest paths
             for p in kpath:
-                # Path can be valid only if it contains at least 2 nodes
-                if len(p[0]) >= 2:
+                # Path can be valid only if it contains at least 1 link (i.e. at least 2 nodes)
+                if len(p[0].links) > 0:
                     # Path can be valid only if it does not pass several times per the same nodes
-                    if (len(p[0]) == len(set(p[0]))):
+                    if not p[0].has_loop():
                         if self.save_routes_dynamically_and_reapply:
                             self.save_computed_route(p[0], chosen_mservices[i], intermodality)
-                        p = Path(p[1], p[0]) # at this stage, p.path_cost contains the first stage cost
-                        self.treat_path(p, chosen_mservices[i], user, gnodes)
+                        p = Path(p[0].nodes.ids(), p[0].links.ids(), p[1]) # at this stage, p.path_cost contains the first stage cost
+                        self.treat_path(p, chosen_mservices[i], user, self._mlgraph.graph.links)
                         # NB: we save this path even if equal to an already saved path, it is useful for testing purposes
                         user_paths.append(p)
                     else:
@@ -722,16 +722,16 @@ class AbstractDecisionModel(ABC):
                 log.warning(f'Zero path computed for user {user_id} for mode combination {chosen_mservices[i]}, {kpath}')
         return users_paths
 
-    def treat_path(self, p, chosen_mservice, user, gnodes):
+    def treat_path(self, p, chosen_mservice, user, glinks):
         """Method that achieves the building of a path.
 
         Args:
             -p: path with first stage path cost and path nodes
             -chosen_mservice: the dict specifying which mobility service is used on which layer
             -user: the user who is considering this path
-            -gnodes: the graph nodes
+            -glinks: the graph links
         """
-        p.construct_layers_from_links(gnodes)
+        p.construct_layers_from_links(glinks)
         path_mobservices = [chosen_mservice[layer_id] for layer_id,_ in p.layers]
         p.set_mobility_services(path_mobservices)
         # Second stage path cost computation = take into account waiting time
@@ -848,18 +848,6 @@ class AbstractDecisionModel(ABC):
         ### Path selection
         self.path_selection(users_paths, tcurrent)
 
-    def compute_path(self, origin: str, destination: str, accessible_layers: set[str], chosen_services: dict[str, str]):
-        try:
-            return dijkstra(self._mlgraph.graph,
-                            origin,
-                            destination,
-                            self._cost,
-                            chosen_services,
-                            accessible_layers)
-        except ValueError as ex:
-            log.error(f'HiPOP.Error: {ex}')
-            sys.exit(-1)
-
     def reapply_saved_routes(self, uids, origins, destinations, available_layers, chosen_mservices, nb_paths, users_paths, intermodality=None):
         """Method that reapplies the saved routes and modifies the inputs of HiPOP functions consequently.
 
@@ -880,7 +868,6 @@ class AbstractDecisionModel(ABC):
             -new_nb_paths: the list of number of paths to find for which the path should effectively be computed
             -users_paths: the updated users_paths
         """
-        gnodes = self._mlgraph.graph.nodes
         new_uids = []
         new_origins = []
         new_destinations = []
@@ -895,16 +882,24 @@ class AbstractDecisionModel(ABC):
             mss = chosen_mservices[i]
             mss_str = self.cast_chosen_mservice_intermodality_to_str(mss, intermodality)
             k = nb_paths[i]
-            if o in self.saved_routes and d in self.saved_routes[o] and mss_str in self.saved_routes[o][d] and len(self.saved_routes[o][d][mss_str]) >= k:
-                    # Recompute path cost with current costs
-                    candidates_paths = [Path(self.compute_path_cost(pnodes, mss, gnodes), pnodes) for pnodes in self.saved_routes[o][d][mss_str]]
-                    # Select the k bests
-                    candidates_paths = sorted(candidates_paths, key=lambda p: p.path_cost)
-                    candidates_paths = candidates_paths[:k]
-                    # Assign them to the user
-                    for p in candidates_paths:
-                        self.treat_path(p, mss, user, gnodes)
-                        users_paths[uid]['paths'].append(p)
+            if (o in self._saved_routes and d in self._saved_routes[o] and mss_str in self._saved_routes[o][d] and
+                len(self._saved_routes[o][d][mss_str]) >= k):
+
+                # Rebuild the paths from the saved link IDs, and recompute their cost with current costs
+                glinks = self._mlgraph.graph.links
+                candidates_paths = []
+                for route in self._saved_routes[o][d][mss_str]:
+                    path_cost = compute_path_cost_from_links(self._mlgraph.graph, route, self._cost, mss)
+                    path_nodes = [o] + [glinks[lid].downstream for lid in route]
+                    path_links = route.copy() # Defensive copy: path modifications must not affect the saved route
+                    candidates_paths.append(Path(path_nodes, path_links, path_cost))
+                # Select the k bests
+                candidates_paths = sorted(candidates_paths, key=lambda p: p.path_cost)
+                candidates_paths = candidates_paths[:k]
+                # Assign them to the user
+                for p in candidates_paths:
+                    self.treat_path(p, mss, user, self._mlgraph.graph.links)
+                    users_paths[uid]['paths'].append(p)
             else:
                 # The k shortest paths will be recomputed
                 new_uids.append(uid)
@@ -916,29 +911,32 @@ class AbstractDecisionModel(ABC):
         log.info(f'{len(uids)-len(new_uids)} / {len(uids)} are reapplied from saved routes')
         return new_uids, new_origins, new_destinations, new_available_layers, new_chosen_mservices, new_nb_paths, users_paths
 
-    def save_computed_route(self, path_nodes, chosen_mservices, intermodality):
+    def save_computed_route(self, path: OrientedGraphPath, chosen_mservices, intermodality):
         """Method that saves a path computed for a certain set of mobility services.
 
         Args:
-            -path_nodes: the list of nodes constituting the path to save
+            -path: the path object returned by HiPOP
             -chosen_mservices: the dictionnary indicating the available layers and
              the mobility service chosen for each of them
             -intemrodality: specifies if specific layers must be passed through
         """
-        o = path_nodes[0]
-        d = path_nodes[-1]
-        if o in self.saved_routes:
-            if d in self.saved_routes[o]:
-                chosen_mservices_str = self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality)
-                if chosen_mservices_str in self.saved_routes[o][d]:
-                    if path_nodes not in self.saved_routes[o][d][chosen_mservices_str]:
-                        self.saved_routes[o][d][chosen_mservices_str].append(path_nodes)
+        # The route is saved as a list of link IDs. The corresponding node IDs
+        # are rebuilt on the fly when the route is reapplied.
+        route = path.links.ids()
+        o = path.origin.id
+        d = path.destination.id
+        chosen_mservices_str = self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality)
+        if o in self._saved_routes:
+            if d in self._saved_routes[o]:
+                if chosen_mservices_str in self._saved_routes[o][d]:
+                    if route not in self._saved_routes[o][d][chosen_mservices_str]:
+                        self._saved_routes[o][d][chosen_mservices_str].append(route)
                 else:
-                    self.saved_routes[o][d][chosen_mservices_str] = [path_nodes]
+                    self._saved_routes[o][d][chosen_mservices_str] = [route]
             else:
-                self.saved_routes[o][d] = {self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality): [path_nodes]}
+                self._saved_routes[o][d] = {chosen_mservices_str: [route]}
         else:
-            self.saved_routes[o] = {d: {self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality): [path_nodes]}}
+            self._saved_routes[o] = {d: {chosen_mservices_str: [route]}}
 
     def cast_chosen_mservice_intermodality_to_str(self, mss, intermodality):
         """Method that casts a dict of chosen mobility service per layer and an intermodality
@@ -953,19 +951,3 @@ class AbstractDecisionModel(ABC):
             casted = casted + '__' + '-INTERMODAL-'.join(intermod_list)
 
         return casted
-
-    def compute_path_cost(self, path_nodes, chosen_mservices, gnodes):
-        """Method that computes the cost of a path.
-
-        Args:
-            -path_nodes: the list of nodes constituting the path
-            -chosen_mservices: the dict specifying which mobility service is used on each layer
-            -gnodes: the dict of nodes of the multi layer graph
-        """
-        path_cost = 0
-        for i in range(len(path_nodes)-1):
-            un = path_nodes[i]
-            dn = path_nodes[i+1]
-            l = gnodes[un].adj[dn]
-            path_cost += l.costs[chosen_mservices[l.label]][self._cost]
-        return path_cost

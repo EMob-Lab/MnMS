@@ -26,6 +26,7 @@ from mnms.mobility_service.filters import (
 from mnms.time import Dt, Time
 from mnms.tools.exceptions import PathNotFound
 from mnms.tools.geometry import get_bounding_box, polygon_area
+from mnms.tools.legacy_path import convert_to_legacy_path
 from mnms.tools.preprocessing import decode_shortest_path_tree
 from mnms.vehicles.veh_type import (
     ActivityType,
@@ -64,7 +65,6 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         """
         super().__init__(id, veh_capacity=1, dt_matching=dt_matching,
             dt_periodic_maintenance=dt_periodic_maintenance, default_waiting_time=default_waiting_time)
-        self.gnodes = {}
         self.detour_ratio = detour_ratio
 
         self._matching_strategy = matching_strategy
@@ -97,17 +97,12 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         self._requests_history.append(Request(user, drop_node, request_time))
 
     def step_maintenance(self, dt: Dt):
-        """Method that proceeds to the maintenance phase. It updates the dictionnary
-        of nodes of the graph on which this mobility service runs (TODO: check if this
-        is really needed). Also, it computes the estimated waiting time(s) for a request
-        in each zone of this service.
+        """Method that proceeds to the maintenance phase. It computes the estimated
+        waiting time(s) for a request in each zone of this service.
 
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        # Update dict of graph nodes
-        self.gnodes = self.graph.nodes
-
         # (Re)compute estimated pickup times
         self.update_estimated_pickup_times(dt)
 
@@ -119,7 +114,6 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             -dt: time elapsed since the previous maintenance phase
         """
         # Treat zone per zone when they are defined
-        glinks = self.graph.links
         count_links_treated = 0
         for zid, z in self._zones.items():
             count_links_treated += len(z.links)
@@ -136,7 +130,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             open_reqs_in_z = np.array(open_reqs)[mask]
 
             area = polygon_area(z.contour)
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in z.links])
+            mean_speed = np.mean([self.graph.links[lid].costs[self.id]['speed'] for lid in z.links])
             tau = (self.dt_matching+1) * dt.to_seconds()
 
             # Oversupply mode
@@ -147,7 +141,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             elif (len(idle_vehs_in_z) < len(open_reqs_in_z)) or (len(idle_vehs_in_z) == len(open_reqs_in_z) and len(open_reqs_in_z) > 0):
                 open_reqs_density_in_z = len(open_reqs_in_z) / area
                 # Compute mean requests arrival rate in this zone
-                reqs_hist_pos = [self.gnodes[req.pickup_node].position for req in self.requests_history]
+                reqs_hist_pos = [self.graph.nodes[req.pickup_node].position for req in self.requests_history]
                 mask = z.is_inside(reqs_hist_pos)
                 reqs_hist_in_z = np.array(self.requests_history)[mask]
                 if len(reqs_hist_in_z) == 0:
@@ -164,12 +158,12 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 w = self.default_waiting_time
             self._estimated_pickup_times[zid] = w
         # Check that all links of this service's layer have been treated
-        if len(self.zones) > 0 and count_links_treated < len(glinks):
+        if len(self.zones) > 0 and count_links_treated < len(self.graph.links):
             log.warning(f'Incomplete zoning defined for {self.id} service, we compute '\
                 'the estimated waiting time on remaining links considering the whole network...')
 
         # Treat links all together when no zone is defined
-        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(glinks)):
+        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(self.graph.links)):
             # Count the nb of idle vehicles on the whole network
             idle_vehs = self.get_idle_vehicles()
 
@@ -179,7 +173,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             tau = (self.dt_matching+1) * dt.to_seconds()
             bbox = get_bounding_box(None, graph=self.graph)
             area = max(1, (bbox.xmax - bbox.xmin)) * max(1,(bbox.ymax - bbox.ymin)) # max(1,-) for flat networks
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in glinks])
+            mean_speed = np.mean([link.costs[self.id]['speed'] for link in self.graph.links.values()])
             delta_t = (max(open_reqs).request_time - min(open_reqs).request_time).to_seconds() if open_reqs else np.nan
             if delta_t == 0:
                 delta_t = dt.to_seconds() # dt is the smallest time step
@@ -316,28 +310,27 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             sys.exit(-1)
 
         ## Parse outputs and complete the pickup times and veh paths matrices
-        for i in range(len(paths)):
+        for i, path_with_cost in enumerate(paths):
+            if path_with_cost is None: # If vehicle cannot reach user, skip and consider next vehicle
+                continue
             ridx = ridxs[i]
             req = reqs[ridx]
             vidx = vidxs[i]
             veh = vehs[vidx]
-            veh_path, tt = paths[i]
-            # If vehicle cannot reach user, skip and consider next vehicle
-            if tt == float('inf'):
-                continue
+            veh_path, tt = path_with_cost
             service_dt = Dt(seconds=tt)
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
                 veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
                 veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.gnodes, self.id))
-                current_link = self.gnodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
+                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.gnodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
             # Apply user's waiting tolerance
             if service_dt < req.user.pickup_dt[self.id]:
                 pickup_times_matrix[ridx][vidx] = service_dt.to_seconds()
-                veh_paths_matrix[ridx][vidx] = veh_path
+                veh_paths_matrix[ridx][vidx] = convert_to_legacy_path(veh_path) # TODO OrientedGraphPath keep further?
 
         ### Solve the minimum total pickup time matching problem
         row_ind, col_ind = linear_sum_assignment(pickup_times_matrix)
@@ -386,7 +379,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 veh_path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
                 if o != d and len(veh_path) > 1:
                     # Compute the travel time
-                    tt = compute_path_nodes_travel_time(veh_path, self.gnodes, self.id)
+                    tt = compute_path_nodes_travel_time(veh_path, self.graph.nodes, self.id)
                 elif o == d:
                     veh_path = []
                     tt = 0
@@ -409,10 +402,10 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
 
         # Gather valid candidates
         candidates = []
-        for i, (veh_path, tt) in enumerate(paths):
-            if tt == float('inf'):
-                # This vehicle cannot reach user, skip and consider next vehicle
+        for i, path_with_cost in enumerate(paths):
+            if path_with_cost is None: # This vehicle cannot reach user, skip and consider next vehicle
                 continue
+            veh_path, tt = path_with_cost
             veh = idle_vehs_in_radius[i]
             service_dt = Dt(seconds=tt)
             candidates.append((veh, service_dt, veh_path))
@@ -420,7 +413,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         # Select the veh with the smallest service time
         if candidates:
             candidates.sort(key=lambda x:x[1])
-            self._cache_request_vehicles[user.id] = candidates[0][0], candidates[0][2]
+            self._cache_request_vehicles[user.id] = candidates[0][0], convert_to_legacy_path(candidates[0][2]) # TODO OrientedGraphPath keep further?
         else:
             return Dt(hours=24)
 
@@ -454,30 +447,31 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             veh_last_node = veh.activity.node if not veh.activities else \
                     veh.activities[-1].node
             try:
-                veh_path, tt = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
+                path_with_cost = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
             except ValueError as ex:
                 log.error(f'HiPOP.Error: {ex}')
                 sys.exit(-1)
             # If vehicle cannot reach user, skip and consider next vehicle
-            if tt == float('inf'):
+            if path_with_cost is None:
                 continue
+            veh_path, tt = path_with_cost
 
             # Compute the estimated pickup time including end of current vehicle's plan plus the pickup activity for user
             service_dt = Dt(seconds=tt)
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
                 veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
                 veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.gnodes, self.id))
-                current_link = self.gnodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
+                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.gnodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
             candidates.append((veh, service_dt, veh_path))
 
         # Select the veh with the smallest service time
         if candidates:
             candidates.sort(key=lambda x:x[1])
-            self._cache_request_vehicles[user.id] = candidates[0][0], candidates[0][2]
+            self._cache_request_vehicles[user.id] = candidates[0][0], convert_to_legacy_path(candidates[0][2]) # TODO OrientedGraphPath keep further?
         else:
             return Dt(hours=24)
 
@@ -520,14 +514,15 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
     #                 veh_last_node = choosen_veh.activity.node if not choosen_veh.activities else \
     #                 choosen_veh.activities[-1].node
     #                 try:
-    #                     veh_path, cost = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
+    #                     path_with_cost = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
     #                 except ValueError as ex:
     #                     log.error(f'HiPOP.Error: {ex}')
     #                     sys.exit(-1)
     #                 # If vehicle cannot reach user, skip and consider next vehicle
-    #                 if cost == float('inf'):
+    #                 if path_with_cost is None:
     #                     continue
     #                     # raise PathNotFound(choosen_veh._current_node, user.current_node)
+    #                 veh_path = convert_to_legacy_path(path_with_cost[0])
     #
     #                 service_dt = Dt(seconds=cost)
     #                 self._cache_request_vehicles[uid] = choosen_veh, veh_path
@@ -603,22 +598,16 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
             matching_strategy=matching_strategy, radius=radius, detour_ratio=detour_ratio, default_waiting_time=default_waiting_time)
         #NB: super is the first mother class, do not init the second mother class because
         #    it contains the same attributes except depots
-        self.gnodes = None
         self.depots = {}
 
     def step_maintenance(self, dt: Dt):
         """Method that proceeds to the maintenance phase.
-        It updates the dictionnary of nodes of the graph on which this mobility
-        service runs.
-        Moreover, it makes the stopped vehciles reposition themselves toward the nearest
+        It makes the stopped vehciles reposition themselves toward the nearest
         depot.
 
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        ## Update graph nodes
-        self.gnodes = self.graph.nodes
-
         # (Re)compute estimated pickup times
         self.update_estimated_pickup_times(dt)
 
@@ -636,7 +625,7 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                         # Get the shortest path till the nearest depot
                         nearest_depot = nearest_depot[0]
                         try:
-                            veh_path, cost = dijkstra(self.graph,
+                            path_with_cost = dijkstra(self.graph,
                                                     veh._current_node,
                                                     nearest_depot.node,
                                                     'travel_time',
@@ -646,10 +635,10 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                         except ValueError as ex:
                             log.error(f'HiPOP.Error: {ex}')
                             sys.exit(-1)
-                        if cost == float('inf'):
+                        if path_with_cost is None:
                             raise PathNotFound(veh._current_node, depots)
                         # Make the vehicle reposition till the nearest depot
-                        veh_path = self.construct_veh_path(veh_path)
+                        veh_path = self.construct_veh_path(convert_to_legacy_path(path_with_cost[0])) # TODO OrientedGraphPath keep further?
                         repositioning = VehicleActivityRepositioning(node=nearest_depot.node,
                                                                  path=veh_path)
                         veh.activity.is_done = True

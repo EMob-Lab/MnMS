@@ -79,8 +79,11 @@ class TestUserFlow(unittest.TestCase):
     def test_request_veh(self):
         user = User('U0', '0', '4', Time('00:01:00'))
         user._current_node = 'C0'
-        user.set_path(Path(cost=3400,
-                           nodes=['C0', 'C1', 'C2', 'B2', 'B3', 'B4']))
+        user.set_path(Path(
+            nodes=['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
+            links=['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            cost=3400,
+        ))
         self.user_flow.step(Dt(minutes=1), [user])
 
         self.assertIn('U0', self.user_flow.users)

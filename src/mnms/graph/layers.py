@@ -283,12 +283,12 @@ class MultiLayerGraph:
         self.graph = OrientedGraph()
 
     def add_transit_links(self, transit_links):
-        gnodes = self.graph.nodes
 
         for tl in transit_links:
             # Check that this transit link does not already exist
-            if tl['upstream_node'] in self.graph.nodes and tl['downstream_node'] in self.graph.nodes[tl['upstream_node']].adj:
-                link = self.graph.nodes[tl['upstream_node']].adj[tl['downstream_node']]
+            up_node = self.graph.nodes.get(tl['upstream_node'])
+            if up_node is not None and tl['downstream_node'] in up_node.adj:
+                link = up_node.adj[tl['downstream_node']]
                 log.warning(f"A transit link from {tl['upstream_node']} to {tl['downstream_node']} already exists (link id = {link.id})")
                 continue
 
@@ -310,7 +310,7 @@ class MultiLayerGraph:
                 link = self.graph.nodes[tl['upstream_node']].adj[tl['downstream_node']]
                 for mservice, cost_functions in self.transitlayer._costs_functions.items():
                     for cost_name, cost_func in cost_functions.items():
-                        costs[mservice][cost_name] = cost_func(gnodes, self.transitlayer, link, costs)
+                        costs[mservice][cost_name] = cost_func(self.graph.nodes, self.transitlayer, link, costs)
                 link.update_costs(costs)
 
             # Add the transit link into the map_linkid_layerid and the transit layer
@@ -353,14 +353,12 @@ class MultiLayerGraph:
         """
         assert self.odlayer is not None #TODO: why this condition?
         _norm = np.linalg.norm
-        gnodes = self.graph.nodes
 
         graph_node_ids = np.array([nid for nid in self.layers[layer_id].graph.nodes])
         graph_node_pos = np.array([n.position for n in self.layers[layer_id].graph.nodes.values()])
 
         graph_nodes = self.layers[layer_id].graph.nodes
-        for nid in graph_nodes:
-            node = graph_nodes[nid]
+        for nid, node in graph_nodes.items():
             npos = np.array(node.position)
             dist_nodes = _norm(graph_node_pos - npos, axis=1)
             mask = dist_nodes < connection_distance
@@ -368,8 +366,9 @@ class MultiLayerGraph:
                 bool_connect = (layer_nid != nid)
                 if bool_connect:
                     # Check if a link does not already exist between these two nodes
-                    if nid in gnodes and layer_nid in self.graph.nodes[nid].adj:
-                        link = gnodes[nid].adj[layer_nid]
+                    unode = self.graph.nodes.get(nid)
+                    if unode is not None and layer_nid in unode.adj:
+                        link = unode.adj[layer_nid]
                         if link.label == 'TRANSIT':
                             log.warning(f'A transit link already exist from {nid} to {layer_nid} (link id = {link.id})')
                             continue
@@ -417,8 +416,9 @@ class MultiLayerGraph:
 
                             for layer_nid, dist in zip(graph_dnode_ids[mask], dist_nodes[mask]):
                                 # Check if this transit link already exist
-                                if onid in self.graph.nodes and layer_nid in self.graph.nodes[onid].adj:
-                                    link = self.graph.nodes[onid].adj[layer_nid]
+                                onode = self.graph.nodes.get(onid)
+                                if onode is not None and layer_nid in onode.adj:
+                                    link = onode.adj[layer_nid]
                                     log.warning(f'A transit link from {onid} to {layer_nid} already exists (link id = {link.id})')
                                     continue
                                 lid = f"{onid}_{layer_nid}"
@@ -434,8 +434,9 @@ class MultiLayerGraph:
 
     def connect_layers(self, lid: str, upstream: str, downstream: str, length: float, costs: dict[str, float]):
         # Check if this transit link does not already exist
-        if upstream in self.graph.nodes and downstream in self.graph.nodes[upstream].adj:
-            link = self.graph.nodes[upstream].adj[downstream]
+        up_node = self.graph.nodes.get(upstream)
+        if up_node is not None and downstream in up_node.adj:
+            link = up_node.adj[downstream]
             log.warning(f'A transit link from {upstream} to {downstream} already exist (link id = {link.id})')
         else:
             if "WALK" not in costs:
@@ -448,7 +449,6 @@ class MultiLayerGraph:
             self.transitlayer.add_link(lid, link_olayer_id, link_dlayer_id)
 
     def initialize_costs(self,walk_speed):
-        gnodes = self.graph.nodes
 
         # Initialize costs on links
         link_layers = []
@@ -467,7 +467,7 @@ class MultiLayerGraph:
                 # NB: travel_time could be defined as a cost_function
                 for mservice, cost_functions in layer._costs_functions.items():
                     for cost_name, cost_func in cost_functions.items():
-                        costs[mservice][cost_name] = cost_func(gnodes, layer, link, costs)
+                        costs[mservice][cost_name] = cost_func(self.graph.nodes, layer, link, costs)
             else:
                 layer = self.layers[link.label]
                 speed = layer.default_speed
@@ -478,12 +478,12 @@ class MultiLayerGraph:
                 # NB: travel_time could be defined as a cost_function
                 for mservice, cost_functions in layer._costs_functions.items():
                     for cost_name, cost_func in cost_functions.items():
-                        costs[mservice][cost_name] = cost_func(gnodes, layer, link, costs)
+                        costs[mservice][cost_name] = cost_func(self.graph.nodes, layer, link, costs)
 
             link.update_costs(costs)
 
             for links in link_layers: # only non transit links concerned
-                layer_link = links.get(link.id, None)
+                layer_link = links.get(link.id)
                 if layer_link is not None:
                     layer_link.update_costs(costs)
 
@@ -962,7 +962,7 @@ class SharedVehicleLayer(AbstractLayer):
 
         self._multi_graph.add_transit_links(transit_links)
 
-    def disconnect_station(self, station_id: str):
+    def disconnect_station(self, station_id: str) -> set[str]:
         """
         Disconnect a free floating station from the origins of the odlayer
 
@@ -972,7 +972,7 @@ class SharedVehicleLayer(AbstractLayer):
 
         Returns
         -------
-        the list of links that have been deleted
+        the IDs of the links that have been deleted (as a set)
         """
         for s in self.stations:
             if s['id'] == station_id:
@@ -985,18 +985,17 @@ class SharedVehicleLayer(AbstractLayer):
                     for link_id in self.multi_graph.transitlayer.links[layer_id][self._id]:
                         link_obj = self.multi_graph.graph.links[link_id]
                         if link_obj.downstream == s['node']:
-                            link = self.multi_graph.graph.links[link_id]
-                            to_delete.append((layer_id,link_id, link.upstream, link.downstream))
+                            to_delete.append((layer_id, link_id))
                 # Delete the links
-                for layer_id,link_id,_,_ in to_delete:
+                for layer_id, link_id in to_delete:
                     self.multi_graph.graph.delete_link(link_id)
                     self.multi_graph.transitlayer.links[layer_id][self._id].remove(link_id)
                     del self.multi_graph.map_linkid_layerid[link_id]
                 # Remove the station
                 self.stations.remove(s)
-                # Return the list of links that have been deleted
-                return [(onid,dnid) for _,_,onid,dnid in to_delete]
-        return []
+                # Return the set of links that have been deleted
+                return {link_id for _, link_id in to_delete}
+        return set()
 
     def add_links_classes(self, links_classes: dict[str, list[str]]):
         # Check that the links belong to this layer graph and build the map

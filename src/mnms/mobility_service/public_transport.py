@@ -160,23 +160,6 @@ class PublicTransportMobilityService(AbstractMobilityService):
         self._next_time_table: dict[str, Time] = {}
         self._next_veh_departure: dict[str, tuple[Time, Vehicle] | None] = defaultdict(lambda: None)
 
-        self.gnodes = None
-
-    def __getstate__(self):
-
-        state = self.__dict__.copy()
-
-        if 'gnodes' in state:
-            del state['gnodes']
-
-        return state
-
-    def __setstate__(self, state):
-
-        self.__dict__.update(state)
-
-        self.gnodes = None
-
     @cached_property
     def lines(self):
         return self.layer.lines
@@ -437,9 +420,9 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         path = line_stops[ind_veh:ind_user+1]
         if len(path) > 1:
-            pickup_time = veh_remaining_length / self.gnodes[path[0]].adj[path[1]].costs[self.id]['speed']
+            pickup_time = veh_remaining_length / self.graph.nodes[path[0]].adj[path[1]].costs[self.id]['speed']
             for i in range(1, len(path)-1):
-                link = self.gnodes[path[i]].adj[path[i+1]]
+                link = self.graph.nodes[path[i]].adj[path[i+1]]
                 pickup_time += link.length / link.costs[self.id]['speed']
             pickup_time = Dt(seconds=pickup_time)
         else:
@@ -468,7 +451,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         # Select the proper line for user
         user_line_id, chosen_line = self.find_line(start)
 
-        if not self.gnodes[start].radj:
+        if not self.graph.nodes[start].radj:
             if self._next_veh_departure[user_line_id] is None:
                 return Dt(hours=24)
             departure_time, waiting_veh = self._next_veh_departure[user_line_id]
@@ -513,7 +496,6 @@ class PublicTransportMobilityService(AbstractMobilityService):
         Args:
             -dt: time elapsed since the last maintenance phase
         """
-        self.gnodes = self.graph.nodes
         for lid in self.lines:
             for new_veh in self.new_departures(self._tcurrent, dt, lid):
                 # Mark the Stop activity_type to done to start vehicle journey
