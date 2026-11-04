@@ -137,7 +137,6 @@ class TestPublicTransport(unittest.TestCase):
 
         self.assertEqual(df['STATE'].iloc[-1], 'ARRIVED')
 
-    @unittest.skip("Failing test, to be fixed") # Error message: AssertionError: '07:09:00.00' != '07:10:00.00'
     def test_non_covering_timetable(self):
         # Create supervisor
         supervisor = self.create_supervisor('2')
@@ -156,9 +155,12 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(vehs_ids, {1, 2, 3})
 
         dfveh1 = dfveh[dfveh['ID'] == 1]
-        self.assertEqual(dfveh1['TIME'].iloc[0], '07:10:00.00')
+        self.assertEqual(dfveh1['TIME'].iloc[0], '07:09:00.00')
+        self.assertEqual(dfveh1['TIME'].iloc[1], '07:10:00.00')
         self.assertEqual(dfveh1['TIME'].iloc[-1], '07:20:00.00')
-        self.assertEqual(dfveh1['DISTANCE'].iloc[0], 300)
+        self.assertTrue(pd.isna(dfveh1['SPEED'].iloc[0])) # Initial position of the vehicle (thus no speed yet).
+        self.assertEqual(dfveh1['DISTANCE'].iloc[0], 0)
+        self.assertEqual(dfveh1['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh1['DISTANCE'].iloc[-1], 3000)
         self.assertEqual(dfveh1['STATE'].iloc[-1], 'STOP')
         link_list_bus1 = dfveh1['LINK'].tolist()
@@ -166,9 +168,12 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(link_list_bus1, ['L0r_S2r L0r_S1r', 'L0r_S1r L0r_S0r'])
 
         dfveh3 = dfveh[dfveh['ID'] == 3]
-        self.assertEqual(dfveh3['TIME'].iloc[0], '07:16:00.00')
+        self.assertEqual(dfveh3['TIME'].iloc[0], '07:15:00.00')
+        self.assertEqual(dfveh3['TIME'].iloc[1], '07:16:00.00')
         self.assertEqual(dfveh3['TIME'].iloc[-1], '07:20:00.00')
-        self.assertEqual(dfveh3['DISTANCE'].iloc[0], 300)
+        self.assertTrue(pd.isna(dfveh3['SPEED'].iloc[0])) # Initial position of the vehicle (thus no speed yet).
+        self.assertEqual(dfveh3['DISTANCE'].iloc[0], 0)
+        self.assertEqual(dfveh3['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh3['DISTANCE'].iloc[-1], 1500)
         self.assertEqual(dfveh3['STATE'].iloc[-1], 'REPOSITIONING')
         link_list_bus3 = dfveh3['LINK'].tolist()
@@ -176,9 +181,12 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(link_list_bus3, ['L0r_S2r L0r_S1r'])
 
         dfveh2 = dfveh[dfveh['ID'] == 2]
-        self.assertEqual(dfveh2['TIME'].iloc[0], '07:17:00.00')
+        self.assertEqual(dfveh2['TIME'].iloc[0], '07:16:00.00')
+        self.assertEqual(dfveh2['TIME'].iloc[1], '07:17:00.00')
         self.assertEqual(dfveh2['TIME'].iloc[-1], '07:20:00.00')
-        self.assertEqual(dfveh2['DISTANCE'].iloc[0], 300)
+        self.assertTrue(pd.isna(dfveh2['SPEED'].iloc[0])) # Initial position of the vehicle (thus no speed yet).
+        self.assertEqual(dfveh2['DISTANCE'].iloc[0], 0)
+        self.assertEqual(dfveh2['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh2['DISTANCE'].iloc[-1], 1200)
         self.assertEqual(dfveh2['STATE'].iloc[-1], 'REPOSITIONING')
         link_list_bus2 = dfveh2['LINK'].tolist()

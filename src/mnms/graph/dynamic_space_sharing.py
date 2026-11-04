@@ -171,8 +171,7 @@ class DynamicSpaceSharing:
         vehicles_to_reroute = []
         if self._flow_step_counter >= self._dt:
             self._flow_step_counter = 0
-            #new_banned_links = self._dynamic(self.graph, tcurrent)
-            new_banned_links = []
+            new_banned_links = self._dynamic(self.graph, tcurrent)
 
             for lid, mobility_service, period in new_banned_links:
                 if lid not in self.banned_links:
