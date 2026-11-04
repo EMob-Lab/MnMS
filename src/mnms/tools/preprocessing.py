@@ -4,8 +4,6 @@ import time
 
 from hipop.shortest_path import floyd_warshall, parallel_dijkstra, parallel_dijkstra_single_source
 
-from mnms.tools.legacy_path import convert_to_legacy_path_with_cost
-
 
 def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile):
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
@@ -35,8 +33,18 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
     # Build a dict of shortest paths
     sps = {}
     for i,(o,d) in enumerate(all_ods):
-        legacy_path_with_cost = convert_to_legacy_path_with_cost(paths[i])
-        output_item = legacy_path_with_cost[0][0] # TODO OrientedGraphPath The output item is the ID of the first node?? Looks weird, possibly a broken code.
+        current_path_with_cost = paths[i]
+        if current_path_with_cost is None:
+            continue
+        path_nodes = current_path_with_cost[0].nodes
+        if len(path_nodes) < 2: # Skip empty paths (i.e. when the origin and destination are the same)
+            continue
+
+        # If the current destination is reachable from the current origin,
+        # save the ID of the last node encountered before reaching the destination.
+        # WARNING: in presence of a graph with excluded movements on some nodes,
+        # what is saved may not be sufficient to rebuild the whole paths from origin to destination.
+        output_item = path_nodes[-2].id
         if o in sps:
             sps[o][d] = output_item
         else:
@@ -108,7 +116,20 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
     print(f'Done in {time.time()-st}')
     spts_dict = {}
     for i,o in enumerate(origins):
-        spts_dict[o] = spts[i]
+        current_spt = spts[i]
+
+        # For each destination reachable from the current origin,
+        # save the ID of the last node encountered before reaching the destination.
+        # WARNING: in presence of a graph with excluded movements on some nodes,
+        # what is saved may not be sufficient to rebuild the whole paths from origin to destination.
+        output = {}
+        for destination in current_spt.destinations:
+            path_nodes = current_spt.path_to(destination).nodes
+            if len(path_nodes) >= 2:
+                output[destination] = path_nodes[-2].id
+
+        if len(output) > 0:
+            spts_dict[o] = output
 
     # Dump dict into json the shortest path tree, not the paths as it is smaller
     # in memory size
