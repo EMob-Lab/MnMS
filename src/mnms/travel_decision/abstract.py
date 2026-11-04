@@ -704,12 +704,12 @@ class AbstractDecisionModel(ABC):
             # For each of the k shortest paths
             for p in kpath:
                 # Path can be valid only if it contains at least 1 link (i.e. at least 2 nodes)
-                if len(p[0]) > 0:
+                if len(p[0].links) > 0:
                     # Path can be valid only if it does not pass several times per the same nodes
                     if not p[0].has_loop():
                         if self.save_routes_dynamically_and_reapply:
                             self.save_computed_route(p[0], chosen_mservices[i], intermodality)
-                        p = Path(p[1], p[0].node_ids()) # TODO OrientedGraphPath keep further? # at this stage, p.path_cost contains the first stage cost
+                        p = Path(p[1], p[0].nodes.ids()) # TODO OrientedGraphPath keep further? # at this stage, p.path_cost contains the first stage cost
                         self.treat_path(p, chosen_mservices[i], user, self._mlgraph.graph.nodes)
                         # NB: we save this path even if equal to an already saved path, it is useful for testing purposes
                         user_paths.append(p)
@@ -915,9 +915,9 @@ class AbstractDecisionModel(ABC):
              the mobility service chosen for each of them
             -intemrodality: specifies if specific layers must be passed through
         """
-        o = path.origin_id
-        d = path.destination_id
-        path_nodes = path.node_ids() # TODO OrientedGraphPath keep further?
+        path_nodes = path.nodes.ids() # TODO OrientedGraphPath keep further?
+        o = path_nodes[0]
+        d = path_nodes[-1]
         if o in self.saved_routes:
             if d in self.saved_routes[o]:
                 chosen_mservices_str = self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality)

@@ -238,9 +238,9 @@ class DynamicSpaceSharing:
             if new_path_with_cost is None:
                 continue
             new_path, _ = new_path_with_cost
-            if len(new_path) > 0: # Ignore paths with no link TODO OrientedGraphPath still relevant?
+            if len(new_path.links) > 0: # TODO OrientedGraphPath still relevant?
                 mservice = layers[i].mobility_services[mservices[i]]
-                new_path_node_ids = new_path.node_ids()
+                new_path_node_ids = new_path.nodes.ids()
                 new_veh_path = mservice.construct_veh_path(new_path_node_ids) # TODO OrientedGraphPath keep further?
                 veh = vehs[i][0]
                 activity = vehs[i][1]
@@ -270,14 +270,14 @@ class DynamicSpaceSharing:
                     old_veh_path_nodes = path_to_nodes(old_veh_path)
                     if activity == veh.activity:
                         # Find part to effectively modify (remove the part of old path already achieved)
-                        origin_id = new_path.origin_id
+                        origin_id = new_path.origin.id
                         try:
                             idx = old_veh_path_nodes.index(origin_id)
                         except ValueError:
                             log.error(f'Cannot find new path first node {origin_id} into old path {old_veh_path_nodes}...')
                             sys.exit(-1)
                         old_veh_path_nodes = old_veh_path_nodes[idx:]
-                    passenger.modify_part_of_path(old_veh_path_nodes, new_path, self.graph, self.cost) # TODO OrientedGraphPath keep further?
+                    passenger.modify_part_of_path(old_veh_path_nodes, new_path_node_ids, self.graph, self.cost) # TODO OrientedGraphPath keep further?
                     log.info(f'User {passenger.id} updated her path consequently: {passenger.path}')
             else:
                 log.warning(f'Cannot find an alternative route '\

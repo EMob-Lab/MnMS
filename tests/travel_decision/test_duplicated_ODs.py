@@ -57,7 +57,7 @@ class TestDuplicatedODs(unittest.TestCase):
     def _extractLinkIdsFromKSPResult(
             hipop_paths: list[list[tuple[OrientedGraphPath, float]]]) -> list[list[tuple[list[str], float]]]:
         return [
-            [(hipop_path.link_ids(), cost) for hipop_path, cost in current_hipop_paths]
+            [(hipop_path.links.ids(), cost) for hipop_path, cost in current_hipop_paths]
             for current_hipop_paths in hipop_paths
         ]
 
@@ -65,7 +65,7 @@ class TestDuplicatedODs(unittest.TestCase):
     def _extractLinkIdsFromSingleSPResult(
             hipop_paths: list[tuple[OrientedGraphPath, float] | None]) -> list[tuple[list[str], float] | None]:
         return [
-            None if hipop_path is None else (hipop_path[0].link_ids(), hipop_path[1])
+            None if hipop_path is None else (hipop_path[0].links.ids(), hipop_path[1])
             for hipop_path in hipop_paths
         ]
 
