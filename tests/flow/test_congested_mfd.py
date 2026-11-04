@@ -4,8 +4,6 @@ from tempfile import TemporaryDirectory
 import pandas as pd
 import pytest
 
-pd.options.mode.chained_assignment = None
-
 from mnms.demand import BaseDemandManager, User
 from mnms.demand.user import Path
 from mnms.flow.congested_MFD import CongestedMFDFlowMotor, CongestedReservoir
@@ -110,6 +108,11 @@ class TestCongestedMFD(unittest.TestCase):
         with open(self.pathdir + "reservoirs.csv") as f:
             df = pd.read_csv(f, sep=';')
         df2 = df[df['RESERVOIR'] == 'res2']
+
+        # For pandas < 3.0, explicit copy is mandatory since `df2` gets modified just after
+        # (pandas >= 3.0 does not need it thanks to its copy-on-write behavior).
+        df2 = df2.copy()
+
         df2['TIME_'] = [Time(timestr) for timestr in df2['TIME'].tolist()]
         df2 = df2[(df2['TIME_'] >= Time('07:01:40')) & (df2['TIME_'] <= Time('07:03:40'))]
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
