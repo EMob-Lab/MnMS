@@ -176,8 +176,6 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         self._users: dict[str, UserInfo] = {}
         self._requests_history = []
 
-        self.gnodes = None
-
     @property
     def users(self):
         return self._users
@@ -284,7 +282,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         """
         pickup_time = Dt()
         for a in plan:
-            pickup_time += Dt(seconds=compute_path_travel_time(a.path, self.gnodes, self.id))
+            pickup_time += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
             if isinstance(a, VehicleActivityPickup) and a.user == user:
                 break
         return pickup_time
@@ -515,8 +513,6 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        self.gnodes = self.graph.nodes
-
         ## Manage users info
         users_info_to_del = []
         for uid in self.users:
@@ -639,7 +635,6 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        glinks = self.graph.links
         # Treat zone per zone when they are defined
         count_links_treated = 0
         for zid, z in self._zones.items():
@@ -657,7 +652,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             open_reqs_in_z = np.array(open_reqs)[mask]
 
             area = polygon_area(z.contour)
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in z.links])
+            mean_speed = np.mean([self.graph.links[lid].costs[self.id]['speed'] for lid in z.links])
             tau = (self.dt_matching+1) * dt.to_seconds()
 
             # Oversupply mode
@@ -685,12 +680,12 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 w = self.default_waiting_time
             self._estimated_pickup_times[zid] = w
         # Check that all links of this service's layer have been treated
-        if len(self.zones) > 0 and count_links_treated < len(glinks):
+        if len(self.zones) > 0 and count_links_treated < len(self.graph.links):
             log.warning(f'Incomplete zoning defined for {self.id} service, we compute '\
                 'the estimated waiting time on remaining links considering the whole network...')
 
         # Treat links all together when no zone is defined
-        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(glinks)):
+        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(self.graph.links)):
             # Count the nb of idle vehicles on the whole network
             idle_vehs = self.get_idle_vehicles()
 
@@ -700,7 +695,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             tau = (self.dt_matching+1) * dt.to_seconds()
             bbox = get_bounding_box(None, graph=self.graph)
             area = max(1, (bbox.xmax - bbox.xmin)) * max(1,(bbox.ymax - bbox.ymin)) # max(1,-) for flat networks
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in glinks])
+            mean_speed = np.mean([link.costs[self.id]['speed'] for link in self.graph.links.values()])
             delta_t = (max(open_reqs).request_time - min(open_reqs).request_time).to_seconds() if open_reqs else np.nan
             if delta_t == 0:
                 delta_t = dt.to_seconds() # dt is the smallest time step

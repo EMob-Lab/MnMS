@@ -28,8 +28,6 @@ class UserFlow:
 
         self._waiting_answer: dict[str, tuple[Time, AbstractMobilityService]] = {}
 
-        self._gnodes = None
-
         if outfile is None:
             self._write = False
         else:
@@ -44,8 +42,6 @@ class UserFlow:
 
         if self._write == True and '_csvhandler' in state:
             del state['_csvhandler']
-        if '_gnodes' in state:
-            del state['_gnodes']
         return state
 
     def __setstate__(self, state):
@@ -91,8 +87,8 @@ class UserFlow:
         unode, dnode = user.current_link
         remaining_length = user.remaining_link_length
 
-        unode_pos = np.array(self._gnodes[unode].position)
-        dnode_pos = np.array(self._gnodes[dnode].position)
+        unode_pos = np.array(self._graph.graph.nodes[unode].position)
+        dnode_pos = np.array(self._graph.graph.nodes[dnode].position)
 
         direction = dnode_pos - unode_pos
         norm_direction = np.linalg.norm(direction)
@@ -110,7 +106,6 @@ class UserFlow:
         finish_walk_and_request = []
         finish_walk = []
         finish_trip = []
-        gnodes = self._graph.graph.nodes
         for uid in self._walking:
             user = self.users[uid]
             if user.state == UserState.WALKING:
@@ -144,7 +139,7 @@ class UserFlow:
                             else:
                                 cnode_ind = user.get_current_node_index()
                                 next_next_node = upath[cnode_ind + 1]
-                                next_link = gnodes[user.current_node].adj[next_next_node]
+                                next_link = self._graph.graph.nodes[user.current_node].adj[next_next_node]
                                 if next_link.label == 'TRANSIT':
                                     # User keeps walking
                                     log.info(f"User {uid} enters connection on {next_link.id}")
@@ -197,7 +192,7 @@ class UserFlow:
         if user.path is not None:
             upath = user.path.nodes
 
-            start_node = self._gnodes[user.current_node]
+            start_node = self._graph.graph.nodes[user.current_node]
             start_node_pos = start_node.position
             user.position = start_node_pos
 
@@ -229,8 +224,6 @@ class UserFlow:
                             mobility service they requested
         """
         log.info(f"Step User Flow {self._tcurrent}")
-        self._gnodes = self._graph.graph.nodes
-
         refused_user = self.check_user_waiting_answers(dt)
 
         for u in new_users:
@@ -252,7 +245,7 @@ class UserFlow:
                 upath = u.path.nodes
                 cnode = u.current_node
                 cnode_ind = u.get_current_node_index()
-                u.position = self._gnodes[cnode].position
+                u.position = self._graph.graph.nodes[cnode].position
                 if cnode == upath[-1]:
                     # User finished her planned trip, arrived at destination
                     u.finish_trip(self._tcurrent)
@@ -260,7 +253,7 @@ class UserFlow:
                     self._walking.pop(u.id, None)
                     u.notify(self._tcurrent)
                 else:
-                    next_link = self._gnodes[cnode].adj[upath[cnode_ind + 1]]
+                    next_link = self._graph.graph.nodes[cnode].adj[upath[cnode_ind + 1]]
                     if next_link.label == "TRANSIT":
                         # User is about to walk
                         log.info(f"User {u.id} enters connection on {next_link.id}")
@@ -379,7 +372,7 @@ class UserFlow:
         links = []
         for i in range(len(path_nodes)-1):
             try:
-                link = self._gnodes[path_nodes[i]].adj[path_nodes[i+1]]
+                link = self._graph.graph.nodes[path_nodes[i]].adj[path_nodes[i+1]]
                 links.append(link.id)
             except KeyError:
                 log.error(f'Cannot find link between {path_nodes[i]} and {path_nodes[i+1]}...')

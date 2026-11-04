@@ -20,10 +20,7 @@ def save_graph(mlgraph: MultiLayerGraph, filename: str | Path, indent=2):
 
     """
 
-    # Must be retrieved before looping over the transit links,
-    # as this operation involves fetching from C++ a potentially large data-structure.
     graphLinks = mlgraph.graph.links
-
     d = {'ROADS': mlgraph.roads.__dump__(),
          'LAYERS': [l.__dump__() for l in mlgraph.layers.values()],
          'TRANSIT': [link_to_dict(graphLinks[lid]) for lid in mlgraph.transitlayer.iter_inter_links()]}

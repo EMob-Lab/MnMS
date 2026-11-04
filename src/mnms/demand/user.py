@@ -340,7 +340,7 @@ class User(TimeDependentSubject):
         else:
             veh_ms_obj.remove_user_activities(self, mlgraph, cost)
 
-    def modify_part_of_path(self, old_part, new_part, gnodes, mlgraph, cost):
+    def modify_part_of_path(self, old_part, new_part, mlgraph, cost):
         """Method that modifies a part of user's path.
         NB: used after vehicle reroute due to banning, the mobility services do
             not change
@@ -348,7 +348,6 @@ class User(TimeDependentSubject):
         Args:
             -old_part: the old pat of user's path to override
             -new_part: the new part of user's path replacing the old one
-            -gnodes: the multi layer graph nodes
             -mlgraph: the multi layer graph
         """
         # Find old part in user's path
@@ -360,7 +359,7 @@ class User(TimeDependentSubject):
         start_idx, end_idx = st_end_indices[0]
         new_path_nodes = self.path.nodes[:start_idx] + new_part + self.path.nodes[end_idx+1:]
         new_path = Path(None, new_path_nodes)
-        new_path.construct_layers_from_links(gnodes)
+        new_path.construct_layers_from_links(mlgraph.graph.nodes)
         new_path.set_mobility_services(self.path.mobility_services) # Hyp = mobility services do not change
         new_path.update_path_cost(mlgraph, cost)
         service_costs = sum_dict(*(mlgraph.layers[layer].mobility_services[service].service_level_costs(new_path.nodes[node_inds]) \
@@ -399,14 +398,13 @@ class User(TimeDependentSubject):
             ##TODO: Update path cost if it is used somehow after path leg modification because of ridesharing detour
             pass
 
-    def update_path(self, path: "Path", gnodes, mlgraph, cost: str, max_teleport_dist: float | None = None):
+    def update_path(self, path: "Path", mlgraph, cost: str, max_teleport_dist: float | None = None):
         """Method that updates the path of user.
 
         Args:
             -path: path that should starts with a node belonging to user's current path
                    that has not already been passed by the user. This path will replace
                    all the nodes located after this common node in user's current path.
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph
             -cost: name of the cost user considers
             -max_teleport_dist: maximal distance on which teleportation is authorized, if
@@ -430,8 +428,8 @@ class User(TimeDependentSubject):
                 sys.exit(-1)
             else:
                 # Teleport if required
-                path_first_node = gnodes[path.nodes[0]]
-                teleported = self.teleport(self.position, path_first_node, max_teleport_dist, gnodes)
+                path_first_node = mlgraph.graph.nodes[path.nodes[0]]
+                teleported = self.teleport(self.position, path_first_node, max_teleport_dist, mlgraph.graph.nodes)
 
         if teleported:
             # Replace path and launch user on this new path
@@ -441,7 +439,7 @@ class User(TimeDependentSubject):
             # Build user's new path
             new_path_nodes = self.path.nodes[:path_first_node_ind] + path.nodes
             new_path = Path(None, new_path_nodes)
-            new_path.construct_layers_from_links(gnodes)
+            new_path.construct_layers_from_links(mlgraph.graph.nodes)
             new_mobservices_indices = [i for i,(lid,sl) in enumerate(self.path.layers) if \
                 path_first_node_ind >= sl.stop or (path_first_node_ind > sl.start and path_first_node_ind < sl.stop)]
             new_mobservices = [self.path.mobility_services[i] for i in new_mobservices_indices]
@@ -499,7 +497,7 @@ class User(TimeDependentSubject):
         # Return the new drop node of user for the vehicle she currently is inside
         return new_drop_node
 
-    def update_path_and_requested_service_buffer(self, path: "Path", gnodes, mlgraph, cost: str, max_teleport_dist: float):
+    def update_path_and_requested_service_buffer(self, path: "Path", mlgraph, cost: str, max_teleport_dist: float):
         """Method that updates the path of a user who is currently waiting an answer from
         a mobility service and updates the corresponding request consequently.
 
@@ -507,13 +505,12 @@ class User(TimeDependentSubject):
             -path: new path, it should starts with a node belonging to user's current path
                    that has not already been passed by the user. This path will replace
                    all the nodes located after this common node in user's current path.
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph
             -cost: name of the cost user considers
             -max_teleport_dist: maximal distance on which teleportation is authorized
         """
         ### Update path
-        new_drop_node = self.update_path(path, gnodes, mlgraph, cost, max_teleport_dist=max_teleport_dist)
+        new_drop_node = self.update_path(path, mlgraph, cost, max_teleport_dist=max_teleport_dist)
 
         if new_drop_node == self.current_node or new_drop_node is None:
             # User will not take the service she is waiting answer from, remove user request from service's buffer
@@ -521,7 +518,7 @@ class User(TimeDependentSubject):
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
             self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
-            self.remaining_link_length = gnodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
+            self.remaining_link_length = mlgraph.graph.nodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
         else:
             # Find user former requested drop node
             former_drop_node = self.requested_service.user_buffer[self.id].drop_node
@@ -532,7 +529,7 @@ class User(TimeDependentSubject):
                 # User will maintain her request with the same drop node, there is nothing to do
                 pass
 
-    def update_path_and_waited_vehicle_plan(self, path: "Path", gnodes, mlgraph, cost: str, max_teleport_dist: float):
+    def update_path_and_waited_vehicle_plan(self, path: "Path", mlgraph, cost: str, max_teleport_dist: float):
         """Method that updates the path of a user who is currently waiting a vehicle and
         the waited vehicle plan consequently.
 
@@ -540,13 +537,12 @@ class User(TimeDependentSubject):
             -path: new path, it should starts with a node belonging to user's current path
                    that has not already been passed by the user. This path will replace
                    all the nodes located after this common node in user's current path.
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph
             -cost: name of the cost user considers
             -max_teleport_dist: maximal distance on which teleportation is authorized
         """
         ### Update path
-        new_drop_node = self.update_path(path, gnodes, mlgraph, cost, max_teleport_dist=max_teleport_dist)
+        new_drop_node = self.update_path(path, mlgraph, cost, max_teleport_dist=max_teleport_dist)
 
         ### Update vehicle's plan consequently
         veh = self.waited_vehicle
@@ -560,7 +556,7 @@ class User(TimeDependentSubject):
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
             self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
-            self.remaining_link_length = gnodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
+            self.remaining_link_length = mlgraph.graph.nodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
         else:
             # Find user serving activity in the waited vehicle's plan and former drop node
             all_activities = [self.waited_vehicle.activity] + list(self.waited_vehicle.activities)
@@ -577,35 +573,33 @@ class User(TimeDependentSubject):
                     veh_ms_obj.modify_user_drop_node(self, veh, new_drop_node, former_drop_node)
                 # For other types of vehicles, we keep the order in which activities are ordered
                 else:
-                    veh_ms_obj.modify_user_drop_node(self, veh, new_drop_node, former_drop_node, gnodes, mlgraph, cost)
+                    veh_ms_obj.modify_user_drop_node(self, veh, new_drop_node, former_drop_node, mlgraph, cost)
             else:
                 # User will use the vehicle she is waiting for and do not change drop node,
                 # there is nothing to do
                 pass
 
-    def update_path_and_current_vehicle_plan(self, path: "Path", gnodes, mlgraph, cost: str):
+    def update_path_and_current_vehicle_plan(self, path: "Path", mlgraph, cost: str):
         """Method that updates the path of a user who is currently inside a vehicle.
 
         Args:
             -path: new path, it should starts with a node belonging to user's current path
                    that has not already been passed by the user. This path will replace
                    all the nodes located after this common node in user's current path.
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph
             -cost: name of the cost user considers
         """
         ### Update path
-        new_drop_node = self.update_path(path, gnodes, mlgraph, cost)
+        new_drop_node = self.update_path(path, mlgraph, cost)
 
         ### Update vehicle's plan consequently
-        self.modify_current_ride_drop_node(new_drop_node, gnodes, mlgraph, cost)
+        self.modify_current_ride_drop_node(new_drop_node, mlgraph, cost)
 
-    def modify_current_ride_drop_node(self, new_drop_node, gnodes, mlgraph, cost):
+    def modify_current_ride_drop_node(self, new_drop_node, mlgraph, cost):
         """Method that update the drop node of user in current vehicle's plan.
 
         Args:
             -new_drop_node: new drop node for the current ride
-            -gnodes: multilayergraph nodes
             -mlgraph: multilayergraph
             -cost: name of the cost user considers
         """
@@ -627,7 +621,7 @@ class User(TimeDependentSubject):
                 veh_ms_obj.modify_passenger_drop_node(self, new_drop_node, former_drop_node)
             # 2. For other types of vehicles, we keep the order in which activities are ordered
             else:
-                veh_ms_obj.modify_passenger_drop_node(self, new_drop_node, former_drop_node, gnodes, mlgraph, cost)
+                veh_ms_obj.modify_passenger_drop_node(self, new_drop_node, former_drop_node, mlgraph, cost)
 
     def set_path(self, path: "Path", gnodes = None, max_teleport_dist: float = 0., teleport_origin = None):
         """Method that set user's path and checks the conditions of eventual teleporting.
