@@ -962,7 +962,7 @@ class SharedVehicleLayer(AbstractLayer):
 
         self._multi_graph.add_transit_links(transit_links)
 
-    def disconnect_station(self, station_id: str):
+    def disconnect_station(self, station_id: str) -> set[str]:
         """
         Disconnect a free floating station from the origins of the odlayer
 
@@ -972,7 +972,7 @@ class SharedVehicleLayer(AbstractLayer):
 
         Returns
         -------
-        the list of links that have been deleted
+        the IDs of the links that have been deleted (as a set)
         """
         for s in self.stations:
             if s['id'] == station_id:
@@ -985,18 +985,17 @@ class SharedVehicleLayer(AbstractLayer):
                     for link_id in self.multi_graph.transitlayer.links[layer_id][self._id]:
                         link_obj = self.multi_graph.graph.links[link_id]
                         if link_obj.downstream == s['node']:
-                            link = self.multi_graph.graph.links[link_id]
-                            to_delete.append((layer_id,link_id, link.upstream, link.downstream))
+                            to_delete.append((layer_id, link_id))
                 # Delete the links
-                for layer_id,link_id,_,_ in to_delete:
+                for layer_id, link_id in to_delete:
                     self.multi_graph.graph.delete_link(link_id)
                     self.multi_graph.transitlayer.links[layer_id][self._id].remove(link_id)
                     del self.multi_graph.map_linkid_layerid[link_id]
                 # Remove the station
                 self.stations.remove(s)
-                # Return the list of links that have been deleted
-                return [(onid,dnid) for _,_,onid,dnid in to_delete]
-        return []
+                # Return the set of links that have been deleted
+                return {link_id for _, link_id in to_delete}
+        return set()
 
     def add_links_classes(self, links_classes: dict[str, list[str]]):
         # Check that the links belong to this layer graph and build the map

@@ -452,9 +452,11 @@ class AbstractMobilityService(ABC):
             assert new_drop_node_ind != -1, 'The modify_user_drop_node method should be called'\
                 ' once user path has been updated with the new drop node'
             u_serving_act_new_nodes = user.path.nodes[current_node_ind:new_drop_node_ind+1]
-            u_serving_act_new_path = [((u_serving_act_new_nodes[i],u_serving_act_new_nodes[i+1]),
-                mlgraph.graph.nodes[u_serving_act_new_nodes[i]].adj[u_serving_act_new_nodes[i+1]].length) \
-                for i in range(len(u_serving_act_new_nodes)-1)]
+            u_serving_act_new_links = user.path.links[current_node_ind:new_drop_node_ind]
+            u_serving_act_new_path = [
+                ((u_serving_act_new_nodes[i], u_serving_act_new_nodes[i+1]), mlgraph.graph.links[lid].length)
+                for i, lid in enumerate(u_serving_act_new_links)
+            ]
             if user_serving_act_ind == 0:
                 # Vehicle is currently serving the user: update current activity path by
                 # taking into account traveled distance on current link

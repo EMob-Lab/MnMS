@@ -277,7 +277,7 @@ class DynamicSpaceSharing:
                             log.error(f'Cannot find new path first node {origin_id} into old path {old_veh_path_nodes}...')
                             sys.exit(-1)
                         old_veh_path_nodes = old_veh_path_nodes[idx:]
-                    passenger.modify_part_of_path(old_veh_path_nodes, new_path_node_ids, self.graph, self.cost) # TODO OrientedGraphPath keep further?
+                    passenger.modify_part_of_path(old_veh_path_nodes, new_path_node_ids, new_path.links.ids(), self.graph, self.cost)
                     log.info(f'User {passenger.id} updated her path consequently: {passenger.path}')
             else:
                 log.warning(f'Cannot find an alternative route '\

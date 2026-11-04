@@ -1,3 +1,4 @@
+import math
 import sys
 from collections import defaultdict
 from copy import copy, deepcopy
@@ -340,14 +341,16 @@ class User(TimeDependentSubject):
         else:
             veh_ms_obj.remove_user_activities(self, mlgraph, cost)
 
-    def modify_part_of_path(self, old_part, new_part, mlgraph, cost):
+    def modify_part_of_path(self, old_part, new_part, new_part_links, mlgraph, cost): # TODO OrientedGraphPath args should be simplified
         """Method that modifies a part of user's path.
         NB: used after vehicle reroute due to banning, the mobility services do
             not change
 
         Args:
-            -old_part: the old pat of user's path to override
-            -new_part: the new part of user's path replacing the old one
+            -old_part: the old pat of user's path to override (node IDs)
+            -new_part: the new part of user's path replacing the old one (node IDs),
+             it should start and end with the same nodes as old_part
+            -new_part_links: the IDs of the links of new_part
             -mlgraph: the multi layer graph
         """
         # Find old part in user's path
@@ -358,8 +361,9 @@ class User(TimeDependentSubject):
         # Override this old part
         start_idx, end_idx = st_end_indices[0]
         new_path_nodes = self.path.nodes[:start_idx] + new_part + self.path.nodes[end_idx+1:]
-        new_path = Path(None, new_path_nodes)
-        new_path.construct_layers_from_links(mlgraph.graph.nodes)
+        new_path_links = self.path.links[:start_idx] + new_part_links + self.path.links[end_idx:]
+        new_path = Path(new_path_nodes, new_path_links)
+        new_path.construct_layers_from_links(mlgraph.graph.links)
         new_path.set_mobility_services(self.path.mobility_services) # Hyp = mobility services do not change
         new_path.update_path_cost(mlgraph, cost)
         service_costs = sum_dict(*(mlgraph.layers[layer].mobility_services[service].service_level_costs(new_path.nodes[node_inds]) \
@@ -368,24 +372,23 @@ class User(TimeDependentSubject):
         # Set user's new path
         self.path = new_path
 
-    def modify_path_leg(self, ms_id: str, new_nodes: list[str]):
-        """Method that modifies the nodes of one leg of user's path.
+    def modify_path_leg(self, ms_id: str, new_leg: "Path"):
+        """Method that modifies the nodes and links of one leg of user's path.
 
         Args:
             -ms_id: the id of the mobility service used on the leg to modify
-            -new_nodes: the new list of nodes for the leg
+            -new_leg: the new path of the leg (only its nodes and links are used)
         """
         ## Find the leg concerned
         modif = False
         for i, (ms, (layer, sl)) in enumerate(zip(self.path.mobility_services, self.path.layers)):
-            if ms == ms_id and self.path.nodes[sl][-1] == new_nodes[-1]:
+            if ms == ms_id and self.path.nodes[sl][-1] == new_leg.nodes[-1]:
                 # Update nodes and slice of the leg
                 start_ind = sl.start
-                mid_ind = self.get_node_index_in_path(new_nodes[0], last_achieved=True)
-                stop_ind = sl.start + (mid_ind-start_ind) + len(new_nodes)
-                del self.path.nodes[mid_ind:sl.stop]
-                for n in reversed(new_nodes):
-                    self.path.nodes.insert(mid_ind, n)
+                mid_ind = self.get_node_index_in_path(new_leg.nodes[0], last_achieved=True)
+                stop_ind = sl.start + (mid_ind-start_ind) + len(new_leg.nodes)
+                self.path.nodes[mid_ind:sl.stop] = new_leg.nodes
+                self.path.links[mid_ind:sl.stop-1] = new_leg.links
                 self.path.layers[i] = (layer, slice(start_ind, stop_ind, 1))
                 modif = True
             elif modif:
@@ -438,8 +441,9 @@ class User(TimeDependentSubject):
         else:
             # Build user's new path
             new_path_nodes = self.path.nodes[:path_first_node_ind] + path.nodes
-            new_path = Path(None, new_path_nodes)
-            new_path.construct_layers_from_links(mlgraph.graph.nodes)
+            new_path_links = self.path.links[:path_first_node_ind] + path.links
+            new_path = Path(new_path_nodes, new_path_links)
+            new_path.construct_layers_from_links(mlgraph.graph.links)
             new_mobservices_indices = [i for i,(lid,sl) in enumerate(self.path.layers) if \
                 path_first_node_ind >= sl.stop or (path_first_node_ind > sl.start and path_first_node_ind < sl.stop)]
             new_mobservices = [self.path.mobility_services[i] for i in new_mobservices_indices]
@@ -518,7 +522,7 @@ class User(TimeDependentSubject):
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
             self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
-            self.remaining_link_length = mlgraph.graph.nodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
+            self.remaining_link_length = mlgraph.graph.links[self.path.links[current_node_ind]].length
         else:
             # Find user former requested drop node
             former_drop_node = self.requested_service.user_buffer[self.id].drop_node
@@ -556,7 +560,7 @@ class User(TimeDependentSubject):
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
             self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
-            self.remaining_link_length = mlgraph.graph.nodes[self.path.nodes[current_node_ind]].adj[self.path.nodes[current_node_ind+1]].length
+            self.remaining_link_length = mlgraph.graph.links[self.path.links[current_node_ind]].length
         else:
             # Find user serving activity in the waited vehicle's plan and former drop node
             all_activities = [self.waited_vehicle.activity] + list(self.waited_vehicle.activities)
@@ -640,8 +644,8 @@ class User(TimeDependentSubject):
         self.current_node = path.nodes[0]
         self.current_link = (path.nodes[0], path.nodes[1])
 
-    def start_path(self, gnodes):
-        self.remaining_link_length = gnodes[self.path.nodes[0]].adj[self.path.nodes[1]].length
+    def start_path(self, glinks):
+        self.remaining_link_length = glinks[self.path.links[0]].length
 
     def interrupt_path(self, tcurrent: Time):
         """Method that interrupts user's current path.
@@ -809,16 +813,26 @@ class User(TimeDependentSubject):
 
 
 class Path:
-    def __init__(self, cost: float, nodes: list[str] | tuple[str]):
+    def __init__(self, nodes: list[str], links: list[str], cost: float = math.inf):
         """
         Path object describing a User path in the simulation
+
+        The path is described both by the IDs of the nodes and by the IDs of the links
+        it goes through. These two lists MUST be kept consistent: links[i] goes from
+        nodes[i] to nodes[i+1], hence len(nodes) == len(links) + 1. Any code modifying
+        one of them must update the other one accordingly.
+
         Parameters
         ----------
-        cost: The cost of the path
-        nodes: The nodes describing the path
+        nodes: The IDs of the nodes describing the path
+        links: The IDs of the links describing the path
+        cost: The cost of the path (+infinity if not computed yet)
         """
+        assert len(nodes) == len(links) + 1, \
+            f'Inconsistent path: {len(nodes)} nodes {nodes} and {len(links)} links {links}'
         self.path_cost: float = cost
-        self.nodes: tuple[str] = nodes
+        self.nodes: list[str] = nodes
+        self.links: list[str] = links
 
         self.layers: list[tuple[str, slice]] = []
         self.mobility_services = []
@@ -827,13 +841,13 @@ class Path:
     def set_mobility_services(self, ms):
         self.mobility_services = ms
 
-    def construct_layers_from_links(self, gnodes):
-        previous_layer = gnodes[self.nodes[0]].adj[self.nodes[1]].label
+    def construct_layers_from_links(self, glinks):
+        previous_layer = glinks[self.links[0]].label
         index = 0
         i = 0
         layers = []
-        for i in range(1,len(self.nodes)-1):
-            layer = gnodes[self.nodes[i]].adj[self.nodes[i+1]].label
+        for i in range(1,len(self.links)):
+            layer = glinks[self.links[i]].label
             if layer != previous_layer:
                 layers.append((previous_layer, slice(index,i+1,1)))
                 index = i
@@ -841,13 +855,13 @@ class Path:
         layers.append((previous_layer, slice(index, i+2,1)))
         self.layers = layers
 
-    def construct_layers(self, gnodes):
+    def construct_layers(self, gnodes, glinks):
         layer = gnodes[self.nodes[1]].label
         start = 1
         nodes_number = len(self.nodes)
         for i in range(2, nodes_number-1):
             ilayer = gnodes[self.nodes[i]].label
-            linklayer = gnodes[self.nodes[i-1]].adj[self.nodes[i]].label
+            linklayer = glinks[self.links[i-1]].label
             # If we change layer or we temporary leave the layer to re-enter it
             # with a transit link, this is the case when user transfer from one
             # bus line to another bus line belonging to the same layer for example
@@ -858,12 +872,12 @@ class Path:
         self.layers.append((layer, slice(start, nodes_number-1, 1)))
 
     def __repr__(self):
-        return f"Path(path_cost={self.path_cost}, nodes={self.nodes}, layers={self.layers}, services={self.mobility_services})"
+        return f"Path(path_cost={self.path_cost}, nodes={self.nodes}, links={self.links}, layers={self.layers}, services={self.mobility_services})"
 
     def __eq__(self, other: "Path"):
-        same_nodes = (self.nodes == other.nodes)
+        same_links = (self.links == other.links)
         same_ms = (self.mobility_services == other.mobility_services)
-        return same_nodes and same_ms
+        return same_links and same_ms
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -886,13 +900,12 @@ class Path:
             -mlgraph: graph where path is defined
             -cost: name of the cost to consider
         """
+        glinks = mlgraph.graph.links
         path_cost = 0
         for i,(lid, sl) in enumerate(self.layers):
             ms = self.mobility_services[i]
             for j in range(sl.start, sl.stop-1):
-                un = self.nodes[j]
-                dn = self.nodes[j+1]
-                path_cost += mlgraph.graph.nodes[un].adj[dn].costs[ms][cost]
+                path_cost += glinks[self.links[j]].costs[ms][cost]
         self.path_cost = path_cost
 
     def increment_path_cost(self, additional_cost):
