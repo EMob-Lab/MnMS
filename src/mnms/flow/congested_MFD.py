@@ -182,7 +182,7 @@ class CongestedMFDFlowMotor(MFDFlowMotor):
                     # Add vehicle in the queue for entering this reservoir
                     new_res.car_queue.append(QueuedVehicle(veh, new_res.time_interval.copy(), previous_veh_zone))
                     upnode, downode = veh.current_link
-                    link = self.graph_nodes[upnode].adj[downode]
+                    link = self._graph.graph.nodes[upnode].adj[downode]
 
                     # Put the vehicle at the start of the link
                     veh_remaining_length = veh._remaining_link_length

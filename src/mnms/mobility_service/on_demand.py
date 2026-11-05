@@ -64,7 +64,6 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         """
         super().__init__(id, veh_capacity=1, dt_matching=dt_matching,
             dt_periodic_maintenance=dt_periodic_maintenance, default_waiting_time=default_waiting_time)
-        self.gnodes = {}
         self.detour_ratio = detour_ratio
 
         self._matching_strategy = matching_strategy
@@ -97,17 +96,12 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         self._requests_history.append(Request(user, drop_node, request_time))
 
     def step_maintenance(self, dt: Dt):
-        """Method that proceeds to the maintenance phase. It updates the dictionnary
-        of nodes of the graph on which this mobility service runs (TODO: check if this
-        is really needed). Also, it computes the estimated waiting time(s) for a request
-        in each zone of this service.
+        """Method that proceeds to the maintenance phase. It computes the estimated
+        waiting time(s) for a request in each zone of this service.
 
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        # Update dict of graph nodes
-        self.gnodes = self.graph.nodes
-
         # (Re)compute estimated pickup times
         self.update_estimated_pickup_times(dt)
 
@@ -119,7 +113,6 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             -dt: time elapsed since the previous maintenance phase
         """
         # Treat zone per zone when they are defined
-        glinks = self.graph.links
         count_links_treated = 0
         for zid, z in self._zones.items():
             count_links_treated += len(z.links)
@@ -136,7 +129,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             open_reqs_in_z = np.array(open_reqs)[mask]
 
             area = polygon_area(z.contour)
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in z.links])
+            mean_speed = np.mean([self.graph.links[lid].costs[self.id]['speed'] for lid in z.links])
             tau = (self.dt_matching+1) * dt.to_seconds()
 
             # Oversupply mode
@@ -147,7 +140,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             elif (len(idle_vehs_in_z) < len(open_reqs_in_z)) or (len(idle_vehs_in_z) == len(open_reqs_in_z) and len(open_reqs_in_z) > 0):
                 open_reqs_density_in_z = len(open_reqs_in_z) / area
                 # Compute mean requests arrival rate in this zone
-                reqs_hist_pos = [self.gnodes[req.pickup_node].position for req in self.requests_history]
+                reqs_hist_pos = [self.graph.nodes[req.pickup_node].position for req in self.requests_history]
                 mask = z.is_inside(reqs_hist_pos)
                 reqs_hist_in_z = np.array(self.requests_history)[mask]
                 if len(reqs_hist_in_z) == 0:
@@ -164,12 +157,12 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 w = self.default_waiting_time
             self._estimated_pickup_times[zid] = w
         # Check that all links of this service's layer have been treated
-        if len(self.zones) > 0 and count_links_treated < len(glinks):
+        if len(self.zones) > 0 and count_links_treated < len(self.graph.links):
             log.warning(f'Incomplete zoning defined for {self.id} service, we compute '\
                 'the estimated waiting time on remaining links considering the whole network...')
 
         # Treat links all together when no zone is defined
-        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(glinks)):
+        if len(self.zones) == 0 or (len(self.zones) > 0 and count_links_treated < len(self.graph.links)):
             # Count the nb of idle vehicles on the whole network
             idle_vehs = self.get_idle_vehicles()
 
@@ -179,7 +172,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             tau = (self.dt_matching+1) * dt.to_seconds()
             bbox = get_bounding_box(None, graph=self.graph)
             area = max(1, (bbox.xmax - bbox.xmin)) * max(1,(bbox.ymax - bbox.ymin)) # max(1,-) for flat networks
-            mean_speed = np.mean([glinks[lid].costs[self.id]['speed'] for lid in glinks])
+            mean_speed = np.mean([link.costs[self.id]['speed'] for link in self.graph.links.values()])
             delta_t = (max(open_reqs).request_time - min(open_reqs).request_time).to_seconds() if open_reqs else np.nan
             if delta_t == 0:
                 delta_t = dt.to_seconds() # dt is the smallest time step
@@ -329,11 +322,11 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
                 veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
                 veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.gnodes, self.id))
-                current_link = self.gnodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
+                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.gnodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
             # Apply user's waiting tolerance
             if service_dt < req.user.pickup_dt[self.id]:
                 pickup_times_matrix[ridx][vidx] = service_dt.to_seconds()
@@ -386,7 +379,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 veh_path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
                 if o != d and len(veh_path) > 1:
                     # Compute the travel time
-                    tt = compute_path_nodes_travel_time(veh_path, self.gnodes, self.id)
+                    tt = compute_path_nodes_travel_time(veh_path, self.graph.nodes, self.id)
                 elif o == d:
                     veh_path = []
                     tt = 0
@@ -467,11 +460,11 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
                 veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
                 veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.gnodes, self.id))
-                current_link = self.gnodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
+                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.gnodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
             candidates.append((veh, service_dt, veh_path))
 
         # Select the veh with the smallest service time
@@ -603,22 +596,16 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
             matching_strategy=matching_strategy, radius=radius, detour_ratio=detour_ratio, default_waiting_time=default_waiting_time)
         #NB: super is the first mother class, do not init the second mother class because
         #    it contains the same attributes except depots
-        self.gnodes = None
         self.depots = {}
 
     def step_maintenance(self, dt: Dt):
         """Method that proceeds to the maintenance phase.
-        It updates the dictionnary of nodes of the graph on which this mobility
-        service runs.
-        Moreover, it makes the stopped vehciles reposition themselves toward the nearest
+        It makes the stopped vehciles reposition themselves toward the nearest
         depot.
 
         Args:
             -dt: time elapsed since the previous maintenance phase
         """
-        ## Update graph nodes
-        self.gnodes = self.graph.nodes
-
         # (Re)compute estimated pickup times
         self.update_estimated_pickup_times(dt)
 
