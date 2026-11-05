@@ -1,0 +1,73 @@
+name: Deploy to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger on version tags like v1.2.3
+
+jobs:
+
+  check-version:
+    name: Check git tag
+    runs-on: ubuntu-slim
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensure git tag corresponds to project version
+        run: |
+          project_version="v$(python3 .github/scripts/get_project_version.py)"
+          echo "Git tag = [$GITHUB_REF_NAME]"
+          echo "Project version = [$project_version]"
+          if [[ "$GITHUB_REF_NAME" != "$project_version" ]]; then
+            echo "Mismatch between git tag and project version (in pyproject.toml), aborting deployment..."
+            exit 1
+          fi
+
+  build:
+    name: Build wheel & source distribution
+    runs-on: ubuntu-latest
+    needs:
+      - check-version
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x' # The exact Python version is not important here.
+
+      - name: Build wheel & sdist
+        run: |
+          pip install --group distrib
+          python -m build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: |
+            ./dist/*.tar.gz
+            ./dist/*.whl
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs:
+      - check-version
+      - build
+
+    environment:
+      name: pypi-env
+      url: https://pypi.org/project/MnMS/
+
+    permissions:
+      id-token: write # Required for authentication through OIDC.
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
