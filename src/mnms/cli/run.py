@@ -121,7 +121,7 @@ class MnMSParameters:
         try:
             return getattr(LOGLEVEL, configured_level)
         except AttributeError as error:
-            raise ValueError(f"Unknown log level: {self.supervisor['log_level']}") from error
+            raise ValueError(f"Unknown log level: {self.scenario['logger_level']}") from error
 
 
 def calculate_speed_from_MFD(
@@ -232,7 +232,6 @@ def run_simulation(parameters: MnMSParameters) -> None:
         mmgraph.connect_inter_layers(conn["layers"], conn["connection_distance"])
 
     # Load demand and create the demand manager
-    print
     demand = CSVDemandManager(parameters.demand_file)
     demand.add_user_observer(CSVUserObserver(str(parameters.output_path("user.csv"))), user_ids="all")
 
@@ -326,7 +325,6 @@ def main() -> None:
     )
     parser.add_argument(
         "config_file",
-        nargs="?",
         type=Path,
         help="path to the JSON configuration file",
     )

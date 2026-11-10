@@ -123,7 +123,7 @@
     },
     "DECISION_MODEL": {
         "model": "logit",
-        "nb_shortest_path": 3
+        "n_shortest_path": 3
     },
     "SCENARIO": {
         "start": "07:00:00",
