@@ -281,7 +281,9 @@ def run_simulation(parameters: MnMSParameters) -> None:
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI application entry point."""
+
     parser = argparse.ArgumentParser(description="Run a MnMS simulation.")
     parser.add_argument(
         "config_file",
