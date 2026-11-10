@@ -74,7 +74,17 @@ You then need to build HiPOP locally (a C++ toolchain is required; see the
 or contact the package maintainers.
 
 
-## Tutorials and examples
+## Usage, tutorials and examples
+
+Simulations can be run from the command line with:
+
+```shell
+mnms path/to/config.json
+```
+
+... where `path/to/config.json` is a JSON configuration file defining the simulation parameters.
+See `examples/cli/mnms_settings.json` for an example of such a configuration file,
+and run `mnms -h` for more details.
 
 Tutorials can be found in the `doc/tutorials` directory as jupyter notebooks.
 Some simulation examples can be found in the `examples` directory.

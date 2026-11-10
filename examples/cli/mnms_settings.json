@@ -1,8 +1,8 @@
 {
     "GRAPH": {
-        "network_file": "../../examples/Lyon63V/INPUTS/network-Lyon63V.json",
+        "network_file": "../Lyon63V/INPUTS/network-Lyon63V.json",
         "OD_LAYER": {
-            "file": "../../examples/Lyon63V/INPUTS/odlayer-Lyon63V.json",
+            "file": "../Lyon63V/INPUTS/odlayer-Lyon63V.json",
             "connection_distance": 250
         },
         "MOBILITY_SERVICES": [
@@ -48,7 +48,7 @@
         ]
     },
     "DEMAND": {
-        "file": "../../examples/Lyon63V/INPUTS/demand-Lyon63V-coords.csv"
+        "file": "../Lyon63V/INPUTS/demand-Lyon63V-coords.csv"
     },
     "FLOW_MOTOR": {
         "MFD": [

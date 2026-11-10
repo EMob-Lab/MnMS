@@ -281,10 +281,49 @@ def run_simulation(parameters: MnMSParameters) -> None:
     )
 
 
+_DESCRIPTION = """\
+Run a MnMS simulation.
+
+Read a JSON configuration file, build the multimodal network, the demand,
+the flow model and the travel decision model, then run the MnMS simulation
+over the configured time period. Simulation results and logs are saved
+to the configured output directory."""
+
+
+_EPILOG = """\
+configuration file:
+  The JSON configuration contains the following sections:
+
+  GRAPH             Network file, origin-destination layer and connection distance,
+                    mobility services, and connections between layers.
+  DEMAND            CSV file containing the demand to load.
+  FLOW_MOTOR        MFD parameters for each reservoir and layer.
+                    Each accumulation range specifies min, max (or "inf"),
+                    slope, and intercept.
+                    Speed is computed as `slope × accumulation + intercept`.
+  DECISION_MODEL    Decision model ("logit" or "dummy") and the number of
+                    shortest paths to consider.
+  SCENARIO          Start and end times, flow timestep in seconds, assignment factor,
+                    output directory, and log level ("DEBUG", "INFO", "WARNING",
+                    "ERROR" or "CRITICAL").
+
+  Input paths and the output directory are resolved relative to the directory
+  containing the configuration file. Configured layers and mobility service types
+  must match the network. Each road reservoir must also have MFD parameters
+  for its layers.
+
+  An example configuration file is available at:
+  https://github.com/EMob-Lab/MnMS/tree/main/examples/cli"""
+
+
 def main() -> None:
     """CLI application entry point."""
 
-    parser = argparse.ArgumentParser(description="Run a MnMS simulation.")
+    parser = argparse.ArgumentParser(
+        description=_DESCRIPTION,
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "config_file",
         nargs="?",
