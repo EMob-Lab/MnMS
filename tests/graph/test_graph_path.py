@@ -3,10 +3,10 @@ import pickle
 import unittest
 from itertools import pairwise
 
-from hipop.shortest_path import dijkstra
+from hipop.graph import OrientedGraph
+from hipop.graph import make_empty_path as make_empty_hipop_path
+from hipop.graph import make_path as make_hipop_path
 
-from mnms.generation.layers import generate_layer_from_roads
-from mnms.generation.roads import generate_line_road
 from mnms.graph.graph_path import GraphPath
 
 
@@ -15,24 +15,22 @@ def make_path(*nodes: str) -> GraphPath:
     return GraphPath(nodes, [f'{u}_{d}' for u, d in pairwise(nodes)])
 
 
-class TestGraphPath(unittest.TestCase):
-    def setUp(self):
-        """Initiates the test.
-        """
-        self.path = make_path('A', 'B', 'C', 'D', 'E')
+def make_empty_path(node: str) -> GraphPath:
+    """Build a path made of a single node and no link."""
+    return GraphPath([node], [])
 
-    def tearDown(self):
-        """Concludes and closes the test.
-        """
+
+class TestGraphPath(unittest.TestCase):
 
     def test_construction(self):
-        self.assertEqual(self.path.nodes, ('A', 'B', 'C', 'D', 'E'))
-        self.assertEqual(self.path.links, ('A_B', 'B_C', 'C_D', 'D_E'))
-        self.assertEqual(self.path.origin, 'A')
-        self.assertEqual(self.path.destination, 'E')
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(path.nodes, ('A', 'B', 'C', 'D', 'E'))
+        self.assertEqual(path.links, ('A_B', 'B_C', 'C_D', 'D_E'))
+        self.assertEqual(path.origin, 'A')
+        self.assertEqual(path.destination, 'E')
 
     def test_construction_single_node(self):
-        p = GraphPath(['A'], [])
+        p = make_empty_path('A')
         self.assertEqual(p.nodes, ('A',))
         self.assertEqual(p.links, ())
         self.assertEqual(p.origin, 'A')
@@ -54,156 +52,235 @@ class TestGraphPath(unittest.TestCase):
         links.append('B_C')
         self.assertEqual(p, make_path('A', 'B'))
 
+    def test_immutability(self):
+        path = make_path('A', 'B', 'C', 'D', 'E')
+
+        # Public attributes cannot be reassigned...
+        for attr in ['nodes', 'links', 'origin', 'destination']:
+            with self.assertRaises(AttributeError):
+                setattr(path, attr, None)
+
+        # ... nor modified in place
+        with self.assertRaises(TypeError):
+            path.nodes[0] = 'X'
+        with self.assertRaises(TypeError):
+            path.links[0] = 'X_B'
+
+        # No new attribute can be added
+        with self.assertRaises(AttributeError):
+            path.foo = 1
+
+        # The path is left untouched by all the attempts above
+        self.assertEqual(path, make_path('A', 'B', 'C', 'D', 'E'))
+
     def test_equality_and_hash(self):
-        self.assertEqual(self.path, make_path('A', 'B', 'C', 'D', 'E'))
-        self.assertEqual(hash(self.path), hash(make_path('A', 'B', 'C', 'D', 'E')))
-        self.assertNotEqual(self.path, make_path('A', 'B', 'C', 'D'))
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(path, make_path('A', 'B', 'C', 'D', 'E'))
+        self.assertEqual(hash(path), hash(make_path('A', 'B', 'C', 'D', 'E')))
+        self.assertNotEqual(path, make_path('A', 'B', 'C', 'D'))
         # Same nodes but different links (e.g. parallel links)
         self.assertNotEqual(make_path('A', 'B'), GraphPath(['A', 'B'], ['A_B_bis']))
-        self.assertNotEqual(self.path, ('A', 'B', 'C', 'D', 'E'))
+        self.assertNotEqual(path, ('A', 'B', 'C', 'D', 'E'))
 
     def test_repr(self):
         self.assertEqual(repr(make_path('A', 'B', 'C')), 'GraphPath(from=A links=[A_B B_C] to=C)')
-        self.assertEqual(repr(GraphPath(['A'], [])), 'GraphPath(from=A links=[] to=A)')
+        self.assertEqual(repr(make_empty_path('A')), 'GraphPath(from=A links=[] to=A)')
 
     def test_copy_and_pickle(self):
-        self.assertEqual(copy.copy(self.path), self.path)
-        self.assertEqual(copy.deepcopy(self.path), self.path)
-        self.assertEqual(pickle.loads(pickle.dumps(self.path)), self.path)
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(copy.copy(path), path)
+        self.assertEqual(copy.deepcopy(path), path)
+        self.assertEqual(pickle.loads(pickle.dumps(path)), path)
 
     def test_has_loop(self):
-        self.assertFalse(self.path.has_loop())
-        self.assertFalse(GraphPath(['A'], []).has_loop())
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertFalse(path.has_loop())
+        self.assertFalse(make_empty_path('A').has_loop())
         self.assertTrue(make_path('A', 'B', 'C', 'A').has_loop())
+        self.assertTrue(make_path('A', 'B', 'C', 'D', 'B', 'E', 'F').has_loop())
+        self.assertTrue(make_path('A', 'B', 'B', 'C').has_loop()) # Self-loop
 
     def test_sub_path(self):
-        self.assertEqual(self.path.sub_path(0), self.path)
-        self.assertEqual(self.path.sub_path(1), make_path('B', 'C', 'D', 'E'))
-        self.assertEqual(self.path.sub_path(1, 2), make_path('B', 'C', 'D'))
-        self.assertEqual(self.path.sub_path(1, 0), GraphPath(['B'], []))
-        self.assertEqual(self.path.sub_path(4), GraphPath(['E'], []))
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(path.sub_path(0), path)
+        self.assertEqual(path.sub_path(1), make_path('B', 'C', 'D', 'E'))
+        self.assertEqual(path.sub_path(1, 2), make_path('B', 'C', 'D'))
+        self.assertEqual(path.sub_path(1, 0), make_empty_path('B'))
+        self.assertEqual(path.sub_path(4), make_empty_path('E'))
+        self.assertEqual(path.sub_path(4, 1), make_empty_path('E'))
         # Link count exceeding the remaining number of links
-        self.assertEqual(self.path.sub_path(2, 10), make_path('C', 'D', 'E'))
+        self.assertEqual(path.sub_path(2, 10), make_path('C', 'D', 'E'))
 
     def test_sub_path_invalid(self):
+        path = make_path('A', 'B', 'C', 'D', 'E')
         with self.assertRaises(IndexError):
-            self.path.sub_path(5)
+            path.sub_path(5)
         with self.assertRaises(IndexError):
-            self.path.sub_path(-1)
+            path.sub_path(-1)
         with self.assertRaises(ValueError):
-            self.path.sub_path(1, -1)
+            path.sub_path(1, -1)
 
-    def test_add(self):
-        expected = self.path
-        self.assertEqual(make_path('A', 'B', 'C').add(make_path('C', 'D', 'E')), expected)
-        self.assertEqual(make_path('A', 'B', 'C') + make_path('C', 'D', 'E'), expected)
-        self.assertEqual(self.path + GraphPath(['E'], []), self.path)
-        self.assertEqual(GraphPath(['A'], []) + self.path, self.path)
+    def test_concatenate(self):
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(make_path('A', 'B', 'C') + make_path('C', 'D', 'E'), path)
+        self.assertEqual(path + make_empty_path('E'), path)
+        self.assertEqual(make_empty_path('A') + path, path)
 
-    def test_add_invalid(self):
+    def test_concatenate_invalid(self):
         with self.assertRaises(ValueError):
             make_path('A', 'B') + make_path('C', 'D')
+        with self.assertRaises(ValueError):
+            make_path('A', 'B') + make_empty_path('C')
+        with self.assertRaises(ValueError):
+            make_empty_path('A') + make_path('B', 'C')
+        with self.assertRaises(ValueError):
+            make_empty_path('A') + make_empty_path('B')
         with self.assertRaises(TypeError):
-            self.path + ['E', 'F']
+            make_path('A', 'B', 'C') + ['C', 'D', 'E']
 
     def test_starts_with(self):
-        self.assertTrue(self.path.starts_with(make_path('A', 'B', 'C')))
-        self.assertTrue(self.path.starts_with(GraphPath(['A'], [])))
-        self.assertTrue(self.path.starts_with(self.path))
-        self.assertFalse(self.path.starts_with(make_path('B', 'C')))
-        self.assertFalse(self.path.starts_with(GraphPath(['A', 'B'], ['A_B_bis'])))
-        self.assertFalse(make_path('A', 'B').starts_with(self.path))
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertTrue(path.starts_with(make_path('A', 'B', 'C')))
+        self.assertTrue(path.starts_with(make_empty_path('A')))
+        self.assertTrue(path.starts_with(path))
+        self.assertFalse(path.starts_with(make_path('B', 'C')))
+        self.assertFalse(path.starts_with(GraphPath(['A', 'B'], ['A_B_bis'])))
+        self.assertFalse(make_path('A', 'B').starts_with(path))
 
     def test_ends_with(self):
-        self.assertTrue(self.path.ends_with(make_path('C', 'D', 'E')))
-        self.assertTrue(self.path.ends_with(GraphPath(['E'], [])))
-        self.assertTrue(self.path.ends_with(self.path))
-        self.assertFalse(self.path.ends_with(make_path('C', 'D')))
-        self.assertFalse(make_path('D', 'E').ends_with(self.path))
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertTrue(path.ends_with(make_path('C', 'D', 'E')))
+        self.assertTrue(path.ends_with(make_empty_path('E')))
+        self.assertTrue(path.ends_with(path))
+        self.assertFalse(path.ends_with(make_path('C', 'D')))
+        self.assertFalse(path.ends_with(GraphPath(['D', 'E'], ['D_E_bis'])))
+        self.assertFalse(make_path('D', 'E').ends_with(path))
 
     def test_find(self):
-        self.assertEqual(self.path.find(make_path('B', 'C', 'D')), [1])
-        self.assertEqual(self.path.find(self.path), [0])
-        self.assertEqual(self.path.find(make_path('B', 'D')), [])
-        self.assertEqual(self.path.find(GraphPath(['C'], [])), [2])
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(path.find(make_path('B', 'C', 'D')), [1])
+        self.assertEqual(path.find(path), [0])
+        self.assertEqual(path.find(make_path('B', 'D')), [])
+        self.assertEqual(path.find(make_empty_path('C')), [2])
         self.assertEqual(make_path('A', 'B', 'A', 'B').find(make_path('A', 'B')), [0, 2])
         # Same nodes but different links
-        self.assertEqual(self.path.find(GraphPath(['B', 'C'], ['B_C_bis'])), [])
+        self.assertEqual(path.find(GraphPath(['B', 'C'], ['B_C_bis'])), [])
 
-    def test_replace(self):
-        self.assertEqual(self.path.replace(make_path('B', 'C', 'D'), make_path('B', 'X', 'Y', 'D')),
+    def test_replace_in_between(self):
+
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        self.assertEqual(path.replace_in_between(1, 3, make_path('B', 'X', 'Y', 'D')),
             make_path('A', 'B', 'X', 'Y', 'D', 'E'))
-        self.assertEqual(self.path.replace(make_path('B', 'C', 'D'), make_path('B', 'D')),
-            make_path('A', 'B', 'D', 'E'))
-        self.assertEqual(self.path.replace(self.path, make_path('A', 'X', 'E')), make_path('A', 'X', 'E'))
-        self.assertEqual(self.path.replace(make_path('A', 'B'), make_path('A', 'X', 'B')),
+        self.assertEqual(path.replace_in_between(1, 3, make_path('B', 'D')), make_path('A', 'B', 'D', 'E'))
+        self.assertEqual(path.replace_in_between(0, 4, make_path('A', 'X', 'E')), make_path('A', 'X', 'E'))
+        self.assertEqual(path.replace_in_between(0, 1, make_path('A', 'X', 'B')),
             make_path('A', 'X', 'B', 'C', 'D', 'E'))
-        self.assertEqual(self.path.replace(make_path('D', 'E'), make_path('D', 'X', 'E')),
+        self.assertEqual(path.replace_in_between(3, 4, make_path('D', 'X', 'E')),
             make_path('A', 'B', 'C', 'D', 'X', 'E'))
-        # Replacement of a link by a parallel link
-        self.assertEqual(self.path.replace(make_path('B', 'C'), GraphPath(['B', 'C'], ['B_C_bis'])),
-            GraphPath(['A', 'B', 'C', 'D', 'E'], ['A_B', 'B_C_bis', 'C_D', 'D_E']))
 
-    def test_replace_invalid(self):
-        # Different ends
-        with self.assertRaises(ValueError):
-            self.path.replace(make_path('B', 'C', 'D'), make_path('B', 'X'))
-        with self.assertRaises(ValueError):
-            self.path.replace(make_path('B', 'C', 'D'), make_path('X', 'D'))
-        # Old part not found
-        with self.assertRaises(ValueError):
-            self.path.replace(make_path('B', 'D'), make_path('B', 'X', 'D'))
-        # Old part found several times
-        with self.assertRaises(ValueError):
-            make_path('A', 'B', 'A', 'B').replace(make_path('A', 'B'), make_path('A', 'X', 'B'))
+        # Same start and end nodes: insertion of a loop
+        self.assertEqual(path.replace_in_between(2, 2, make_path('C', 'X', 'C')),
+            make_path('A', 'B', 'C', 'X', 'C', 'D', 'E'))
+        self.assertEqual(path.replace_in_between(2, 2, make_empty_path('C')), path)
 
-    def test_replace_from(self):
-        self.assertEqual(self.path.replace_from(2, make_path('C', 'X', 'Y')), make_path('A', 'B', 'C', 'X', 'Y'))
-        self.assertEqual(self.path.replace_from(0, make_path('A', 'X')), make_path('A', 'X'))
-        self.assertEqual(self.path.replace_from(4, make_path('E', 'X')), make_path('A', 'B', 'C', 'D', 'E', 'X'))
-        self.assertEqual(self.path.replace_from(2, GraphPath(['C'], [])), make_path('A', 'B', 'C'))
+        # Removal of a loop
+        path = make_path('A', 'B', 'C', 'B', 'D')
+        self.assertEqual(path.replace_in_between(1, 3, make_empty_path('B')), make_path('A', 'B', 'D'))
 
-    def test_replace_from_invalid(self):
-        with self.assertRaises(ValueError):
-            self.path.replace_from(2, make_path('B', 'X'))
+    def test_replace_in_between_invalid(self):
+        path = make_path('A', 'B', 'C', 'D', 'E')
         with self.assertRaises(IndexError):
-            self.path.replace_from(5, make_path('E', 'X'))
+            path.replace_in_between(-1, 2, make_path('A', 'B', 'C'))
+        with self.assertRaises(IndexError):
+            path.replace_in_between(3, 2, make_path('D', 'C'))
+        with self.assertRaises(IndexError):
+            path.replace_in_between(3, 5, make_path('D', 'E'))
+        with self.assertRaises(ValueError):
+            path.replace_in_between(1, 3, make_path('B', 'X'))
+        with self.assertRaises(ValueError):
+            path.replace_in_between(1, 3, make_path('X', 'D'))
+
+    def test_replace_first_or_last(self):
+        for replace in [GraphPath.replace_first, GraphPath.replace_last]:
+            with self.subTest(replacement_method=replace.__name__):
+
+                path = make_path('A', 'B', 'C', 'D', 'E')
+                self.assertEqual(replace(path, make_path('B', 'C', 'D'), make_path('B', 'X', 'Y', 'D')),
+                    make_path('A', 'B', 'X', 'Y', 'D', 'E'))
+                self.assertEqual(replace(path, make_path('B', 'C', 'D'), make_path('B', 'D')),
+                    make_path('A', 'B', 'D', 'E'))
+                self.assertEqual(replace(path, path, make_path('A', 'X', 'E')), make_path('A', 'X', 'E'))
+
+                # Replacement of a link by a parallel link
+                self.assertEqual(replace(path, make_path('B', 'C'), GraphPath(['B', 'C'], ['B_C_bis'])),
+                    GraphPath(['A', 'B', 'C', 'D', 'E'], ['A_B', 'B_C_bis', 'C_D', 'D_E']))
+
+                # Part to replace without link: insertion of a loop
+                self.assertEqual(replace(path, make_empty_path('C'), make_path('C', 'X', 'C')),
+                    make_path('A', 'B', 'C', 'X', 'C', 'D', 'E'))
+
+                # Removal of a loop
+                path = make_path('A', 'B', 'C', 'B', 'D')
+                self.assertEqual(replace(path, make_path('B', 'C', 'B'), make_empty_path('B')), make_path('A', 'B', 'D'))
+
+        # Ensure only the first/last occurrence is replaced in case of multiple occurrences
+        path = make_path('A', 'B', 'A', 'B')
+        self.assertEqual(path.replace_first(make_path('A', 'B'), make_path('A', 'X', 'B')),
+            make_path('A', 'X', 'B', 'A', 'B'))
+        self.assertEqual(path.replace_last(make_path('A', 'B'), make_path('A', 'X', 'B')),
+            make_path('A', 'B', 'A', 'X', 'B'))
+
+    def test_replace_first_or_last_invalid(self):
+        path = make_path('A', 'B', 'C', 'D', 'E')
+        for replace in [path.replace_first, path.replace_last]:
+            with self.subTest(replacement_method=replace.__name__):
+                # Different ends
+                with self.assertRaises(ValueError):
+                    replace(make_path('B', 'C', 'D'), make_path('B', 'X'))
+                with self.assertRaises(ValueError):
+                    replace(make_path('B', 'C', 'D'), make_path('X', 'D'))
+                # Part to replace not found
+                with self.assertRaises(ValueError):
+                    replace(make_path('B', 'D'), make_path('B', 'X', 'D'))
+                # Same nodes but different links
+                with self.assertRaises(ValueError):
+                    replace(GraphPath(['B', 'C'], ['B_C_bis']), make_path('B', 'X', 'C'))
 
 
 class TestGraphPathWithGraph(unittest.TestCase):
-    def setUp(self):
-        """Initiates the test.
-        """
-        roads = generate_line_road([0, 0], [0, 30], 4)
-        self.graph = generate_layer_from_roads(roads, 'CAR').graph
 
-    def tearDown(self):
-        """Concludes and closes the test.
-        """
+    def setUp(self):
+        # Create a line graph A -> B -> C -> D.
+        self.graph = OrientedGraph()
+        for i, nid in enumerate(['A', 'B', 'C', 'D']):
+            self.graph.add_node(nid, 10 * i, 0, '')
+        for up, down in pairwise(['A', 'B', 'C', 'D']):
+            self.graph.add_link(f'{up}_{down}', up, down, 10, {}, '')
 
     def test_from_hipop(self):
-        hipop_path, _ = dijkstra(self.graph, 'CAR_0', 'CAR_3', 'length', {'CAR': 'CAR'}, {'CAR'})
-        p = GraphPath.from_hipop(hipop_path)
-        self.assertEqual(p.nodes, ('CAR_0', 'CAR_1', 'CAR_2', 'CAR_3'))
-        self.assertEqual(p.links, ('CAR_0_1', 'CAR_1_2', 'CAR_2_3'))
+        hipop_path = make_hipop_path(self.graph, ['A_B', 'B_C', 'C_D'])
+        self.assertEqual(GraphPath.from_hipop(hipop_path), make_path('A', 'B', 'C', 'D'))
 
     def test_from_hipop_single_node(self):
-        hipop_path, _ = dijkstra(self.graph, 'CAR_1', 'CAR_1', 'length', {'CAR': 'CAR'}, {'CAR'})
-        self.assertEqual(GraphPath.from_hipop(hipop_path), GraphPath(['CAR_1'], []))
+        hipop_path = make_empty_hipop_path(self.graph, 'B')
+        self.assertEqual(GraphPath.from_hipop(hipop_path), make_empty_path('B'))
 
-    def test_check(self):
-        GraphPath(['CAR_0', 'CAR_1', 'CAR_2'], ['CAR_0_1', 'CAR_1_2']).check(self.graph)
-        GraphPath(['CAR_1'], []).check(self.graph)
+    def test_check_consistency(self):
+        make_path('A', 'B', 'C').check_consistency(self.graph)
+        make_empty_path('B').check_consistency(self.graph)
 
-    def test_check_invalid(self):
+    def test_check_consistency_invalid(self):
+
         # Unknown link
         with self.assertRaises(ValueError):
-            GraphPath(['CAR_0', 'CAR_1'], ['CAR_0_9']).check(self.graph)
+            GraphPath(['A', 'B'], ['A_Z']).check_consistency(self.graph)
+
         # Link not connecting the nodes
         with self.assertRaises(ValueError):
-            GraphPath(['CAR_0', 'CAR_2'], ['CAR_0_1']).check(self.graph)
+            GraphPath(['A', 'C'], ['A_B']).check_consistency(self.graph)
         with self.assertRaises(ValueError):
-            GraphPath(['CAR_1', 'CAR_0'], ['CAR_0_1']).check(self.graph)
-        # Unknown node
+            GraphPath(['B', 'A'], ['A_B']).check_consistency(self.graph)
+
+        # Unknown node (can only happen with an empty path)
         with self.assertRaises(ValueError):
-            GraphPath(['CAR_9'], []).check(self.graph)
+            make_empty_path('Z').check_consistency(self.graph)
