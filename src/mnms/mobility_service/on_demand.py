@@ -320,17 +320,16 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             veh_path, tt = path_with_cost
             service_dt = Dt(seconds=tt)
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
-                veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
-                veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
-                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                veh_curr_node_ind_in_path = veh.activity.path.nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
+                service_dt += Dt(seconds=compute_path_travel_time(*veh.activity.sub_path(veh_curr_node_ind_in_path+1), self.graph.links, self.id))
+                current_link = self.graph.links[veh.activity.path.links[veh_curr_node_ind_in_path]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, a.link_lengths, self.graph.links, self.id))
             # Apply user's waiting tolerance
             if service_dt < req.user.pickup_dt[self.id]:
                 pickup_times_matrix[ridx][vidx] = service_dt.to_seconds()
-                veh_paths_matrix[ridx][vidx] = convert_to_legacy_path(veh_path) # TODO OrientedGraphPath keep further?
+                veh_paths_matrix[ridx][vidx] = GraphPath.from_hipop(veh_path)
 
         ### Solve the minimum total pickup time matching problem
         row_ind, col_ind = linear_sum_assignment(pickup_times_matrix)

@@ -27,3 +27,7 @@ class LinkDescriptor:
         if not 0 <= index < len(path.links):
             raise IndexError(f'Invalid link index {index} in path {path}')
         return cls(path.links[index], path.nodes[index], path.nodes[index+1])
+
+    def to_path(self) -> GraphPath:
+        """Return the path made of this single link."""
+        return GraphPath([self.upstream, self.downstream], [self.id])

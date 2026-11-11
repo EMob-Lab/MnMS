@@ -46,3 +46,6 @@ class TestLinkDescriptor(unittest.TestCase):
         # Empty path
         with self.assertRaises(IndexError):
             LinkDescriptor.from_path(GraphPath(['A'], []), 0)
+
+    def test_to_path(self):
+        self.assertEqual(LinkDescriptor('A_B', 'A', 'B').to_path(), GraphPath(['A', 'B'], ['A_B']))
