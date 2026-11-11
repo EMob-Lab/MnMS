@@ -2,10 +2,12 @@ import multiprocessing
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import pairwise
 
 from hipop.graph import NodeMap
 from hipop.shortest_path import parallel_dijkstra_heterogeneous_costs
 
+from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Time
 from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity
@@ -277,7 +279,11 @@ class DynamicSpaceSharing:
                             log.error(f'Cannot find new path first node {origin_id} into old path {old_veh_path_nodes}...')
                             sys.exit(-1)
                         old_veh_path_nodes = old_veh_path_nodes[idx:]
-                    passenger.modify_part_of_path(old_veh_path_nodes, new_path_node_ids, new_path.links.ids(), self.graph, self.cost)
+                    old_part = GraphPath(old_veh_path_nodes, [ # TODO OrientedGraphPath: links resolved from pairs of nodes as long as vehicle paths are described by pairs of nodes
+                        self.graph.graph.nodes[unode].adj[dnode].id for unode, dnode in pairwise(old_veh_path_nodes)
+                    ])
+                    new_part = GraphPath.from_hipop(new_path)
+                    passenger.modify_part_of_path(old_part, new_part, self.graph, self.cost)
                     log.info(f'User {passenger.id} updated her path consequently: {passenger.path}')
             else:
                 log.warning(f'Cannot find an alternative route '\

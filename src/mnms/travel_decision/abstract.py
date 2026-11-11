@@ -14,6 +14,7 @@ from hipop.shortest_path import parallel_k_intermodal_shortest_path, parallel_k_
 from numpy.linalg import norm as _norm
 
 from mnms.demand.user import Path, User, UserState
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import MultiLayerGraph
 from mnms.log import create_logger
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
@@ -709,7 +710,7 @@ class AbstractDecisionModel(ABC):
                     if not p[0].has_loop():
                         if self.save_routes_dynamically_and_reapply:
                             self.save_computed_route(p[0], chosen_mservices[i], intermodality)
-                        p = Path(p[0].nodes.ids(), p[0].links.ids(), p[1]) # at this stage, p.path_cost contains the first stage cost
+                        p = Path(GraphPath.from_hipop(p[0]), p[1]) # at this stage, p.path_cost contains the first stage cost
                         self.treat_path(p, chosen_mservices[i], user, self._mlgraph.graph.links)
                         # NB: we save this path even if equal to an already saved path, it is useful for testing purposes
                         user_paths.append(p)
@@ -885,14 +886,11 @@ class AbstractDecisionModel(ABC):
             if (o in self._saved_routes and d in self._saved_routes[o] and mss_str in self._saved_routes[o][d] and
                 len(self._saved_routes[o][d][mss_str]) >= k):
 
-                # Rebuild the paths from the saved link IDs, and recompute their cost with current costs
-                glinks = self._mlgraph.graph.links
-                candidates_paths = []
-                for route in self._saved_routes[o][d][mss_str]:
-                    path_cost = compute_path_cost_from_links(self._mlgraph.graph, route, self._cost, mss)
-                    path_nodes = [o] + [glinks[lid].downstream for lid in route]
-                    path_links = route.copy() # Defensive copy: path modifications must not affect the saved route
-                    candidates_paths.append(Path(path_nodes, path_links, path_cost))
+                # Recompute the cost of the saved routes with current costs
+                candidates_paths = [
+                    Path(route, compute_path_cost_from_links(self._mlgraph.graph, route.links, self._cost, mss))
+                    for route in self._saved_routes[o][d][mss_str]
+                ]
                 # Select the k bests
                 candidates_paths = sorted(candidates_paths, key=lambda p: p.path_cost)
                 candidates_paths = candidates_paths[:k]
@@ -920,11 +918,9 @@ class AbstractDecisionModel(ABC):
              the mobility service chosen for each of them
             -intemrodality: specifies if specific layers must be passed through
         """
-        # The route is saved as a list of link IDs. The corresponding node IDs
-        # are rebuilt on the fly when the route is reapplied.
-        route = path.links.ids()
-        o = path.origin.id
-        d = path.destination.id
+        route = GraphPath.from_hipop(path)
+        o = route.origin
+        d = route.destination
         chosen_mservices_str = self.cast_chosen_mservice_intermodality_to_str(chosen_mservices, intermodality)
         if o in self._saved_routes:
             if d in self._saved_routes[o]:

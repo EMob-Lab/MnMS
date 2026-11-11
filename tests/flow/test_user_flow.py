@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 
 from mnms.demand.user import Path, User
 from mnms.flow.user_flow import UserFlow
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
@@ -80,8 +81,10 @@ class TestUserFlow(unittest.TestCase):
         user = User('U0', '0', '4', Time('00:01:00'))
         user._current_node = 'C0'
         user.set_path(Path(
-            nodes=['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
-            links=['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            graph_path=GraphPath(
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
+                ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            ),
             cost=3400,
         ))
         self.user_flow.step(Dt(minutes=1), [user])

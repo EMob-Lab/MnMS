@@ -10,7 +10,7 @@ from hipop.shortest_path import dijkstra
 
 from mnms import create_logger
 from mnms.demand import User
-from mnms.demand.user import Path
+from mnms.graph.graph_path import GraphPath
 from mnms.mobility_service.abstract import AbstractOnDemandMobilityService, Request, compute_path_travel_time
 from mnms.mobility_service.filters import InRadiusFilter
 from mnms.time import Dt, Time
@@ -481,12 +481,12 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             service_index = passenger.get_mobility_service_index_in_path(self.id)
             service_slice = passenger.path.layers[service_index][1]
             nodes = passenger.path.nodes[service_slice]
-            if nodes != nodes_at_match:
+            if nodes != tuple(nodes_at_match):
                 links_at_match = [ # TODO OrientedGraphPath: links resolved from pairs of nodes as long as vehicle paths are described by pairs of nodes
                     self.graph.nodes[nodes_at_match[i]].adj[nodes_at_match[i+1]].id
                     for i in range(len(nodes_at_match) - 1)
                 ]
-                passenger.modify_path_leg(self.id, Path(nodes_at_match, links_at_match))
+                passenger.modify_path_leg(self.id, GraphPath(nodes_at_match, links_at_match))
             if passenger.id == user.id:
                 ## Save user's info at matching
                 initial_path_dist = compute_path_length(self.graph, nodes)

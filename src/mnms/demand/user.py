@@ -8,20 +8,13 @@ from typing import Optional
 import numpy as np
 from numpy.linalg import norm as _norm
 
+from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Dt, Time
 from mnms.tools.dict_tools import sum_dict
 from mnms.tools.observer import TimeDependentSubject
 
 log = create_logger(__name__)
-
-def find_sublist_in_list(sl,l):
-    results=[]
-    sll=len(sl)
-    for ind in (i for i,e in enumerate(l) if e==sl[0]):
-        if l[ind:ind+sll]==sl:
-            results.append((ind,ind+sll-1))
-    return results
 
 class UserState(Enum):
     ARRIVED = 0
@@ -341,28 +334,25 @@ class User(TimeDependentSubject):
         else:
             veh_ms_obj.remove_user_activities(self, mlgraph, cost)
 
-    def modify_part_of_path(self, old_part, new_part, new_part_links, mlgraph, cost): # TODO OrientedGraphPath args should be simplified
+    def modify_part_of_path(self, old_part: GraphPath, new_part: GraphPath, mlgraph, cost):
         """Method that modifies a part of user's path.
         NB: used after vehicle reroute due to banning, the mobility services do
             not change
 
         Args:
-            -old_part: the old pat of user's path to override (node IDs)
-            -new_part: the new part of user's path replacing the old one (node IDs),
+            -old_part: the old part of user's path to override
+            -new_part: the new part of user's path replacing the old one,
              it should start and end with the same nodes as old_part
-            -new_part_links: the IDs of the links of new_part
             -mlgraph: the multi layer graph
         """
         # Find old part in user's path
-        st_end_indices = find_sublist_in_list(old_part, self.path.nodes)
-        if len(st_end_indices) != 1:
-            log.error(f'Cannot find or found several times old part {old_part} of user {self.id} path {self.path.nodes}...')
+        positions = self.path.graph_path.find(old_part)
+        if len(positions) != 1:
+            log.error(f'Cannot find or found several times old part {old_part} of user {self.id} path {self.path.graph_path}...')
             sys.exit(-1)
         # Override this old part
-        start_idx, end_idx = st_end_indices[0]
-        new_path_nodes = self.path.nodes[:start_idx] + new_part + self.path.nodes[end_idx+1:]
-        new_path_links = self.path.links[:start_idx] + new_part_links + self.path.links[end_idx:]
-        new_path = Path(new_path_nodes, new_path_links)
+        start = positions[0]
+        new_path = Path(self.path.graph_path.replace_in_between(start, start + len(old_part.links), new_part))
         new_path.construct_layers_from_links(mlgraph.graph.links)
         new_path.set_mobility_services(self.path.mobility_services) # Hyp = mobility services do not change
         new_path.update_path_cost(mlgraph, cost)
@@ -372,23 +362,22 @@ class User(TimeDependentSubject):
         # Set user's new path
         self.path = new_path
 
-    def modify_path_leg(self, ms_id: str, new_leg: "Path"):
+    def modify_path_leg(self, ms_id: str, new_leg: GraphPath):
         """Method that modifies the nodes and links of one leg of user's path.
 
         Args:
             -ms_id: the id of the mobility service used on the leg to modify
-            -new_leg: the new path of the leg (only its nodes and links are used)
+            -new_leg: the new path of the leg
         """
         ## Find the leg concerned
         modif = False
         for i, (ms, (layer, sl)) in enumerate(zip(self.path.mobility_services, self.path.layers)):
-            if ms == ms_id and self.path.nodes[sl][-1] == new_leg.nodes[-1]:
+            if ms == ms_id and self.path.nodes[sl][-1] == new_leg.destination:
                 # Update nodes and slice of the leg
                 start_ind = sl.start
-                mid_ind = self.get_node_index_in_path(new_leg.nodes[0], last_achieved=True)
+                mid_ind = self.get_node_index_in_path(new_leg.origin, last_achieved=True)
                 stop_ind = sl.start + (mid_ind-start_ind) + len(new_leg.nodes)
-                self.path.nodes[mid_ind:sl.stop] = new_leg.nodes
-                self.path.links[mid_ind:sl.stop-1] = new_leg.links
+                self.path.graph_path = self.path.graph_path.replace_in_between(mid_ind, sl.stop-1, new_leg)
                 self.path.layers[i] = (layer, slice(start_ind, stop_ind, 1))
                 modif = True
             elif modif:
@@ -440,9 +429,7 @@ class User(TimeDependentSubject):
             new_drop_node = None
         else:
             # Build user's new path
-            new_path_nodes = self.path.nodes[:path_first_node_ind] + path.nodes
-            new_path_links = self.path.links[:path_first_node_ind] + path.links
-            new_path = Path(new_path_nodes, new_path_links)
+            new_path = Path(self.path.graph_path.sub_path(0, path_first_node_ind) + path.graph_path)
             new_path.construct_layers_from_links(mlgraph.graph.links)
             new_mobservices_indices = [i for i,(lid,sl) in enumerate(self.path.layers) if \
                 path_first_node_ind >= sl.stop or (path_first_node_ind > sl.start and path_first_node_ind < sl.stop)]
@@ -454,7 +441,7 @@ class User(TimeDependentSubject):
                         (lid,sl) for lid,sl in new_path.layers
                         if current_node_ind >= sl.start and path_first_node_ind < sl.stop
                     )
-                    new_drop_node = new_path_nodes[current_layer[1].stop-1]
+                    new_drop_node = new_path.nodes[current_layer[1].stop-1]
                 else:
                     new_mobservices.extend(path.mobility_services)
                     new_drop_node = path.nodes[0]
@@ -813,30 +800,31 @@ class User(TimeDependentSubject):
 
 
 class Path:
-    def __init__(self, nodes: list[str], links: list[str], cost: float = math.inf):
+    def __init__(self, graph_path: GraphPath, cost: float = math.inf):
         """
         Path object describing a User path in the simulation
 
-        The path is described both by the IDs of the nodes and by the IDs of the links
-        it goes through. These two lists MUST be kept consistent: links[i] goes from
-        nodes[i] to nodes[i+1], hence len(nodes) == len(links) + 1. Any code modifying
-        one of them must update the other one accordingly.
-
         Parameters
         ----------
-        nodes: The IDs of the nodes describing the path
-        links: The IDs of the links describing the path
+        graph_path: The nodes and links the path goes through
         cost: The cost of the path (+infinity if not computed yet)
         """
-        assert len(nodes) == len(links) + 1, \
-            f'Inconsistent path: {len(nodes)} nodes {nodes} and {len(links)} links {links}'
+        self.graph_path: GraphPath = graph_path
         self.path_cost: float = cost
-        self.nodes: list[str] = nodes
-        self.links: list[str] = links
 
         self.layers: list[tuple[str, slice]] = []
         self.mobility_services = []
         self.service_costs = {}
+
+    @property
+    def nodes(self) -> tuple[str, ...]:
+        """The IDs of the nodes of the path (shortcut for graph_path.nodes)."""
+        return self.graph_path.nodes
+
+    @property
+    def links(self) -> tuple[str, ...]:
+        """The IDs of the links of the path (shortcut for graph_path.links)."""
+        return self.graph_path.links
 
     def set_mobility_services(self, ms):
         self.mobility_services = ms
@@ -872,12 +860,13 @@ class Path:
         self.layers.append((layer, slice(start, nodes_number-1, 1)))
 
     def __repr__(self):
-        return f"Path(path_cost={self.path_cost}, nodes={self.nodes}, links={self.links}, layers={self.layers}, services={self.mobility_services})"
+        return f"Path(path_cost={self.path_cost}, graph_path={self.graph_path}, " \
+            f"layers={self.layers}, services={self.mobility_services})"
 
     def __eq__(self, other: "Path"):
-        same_links = (self.links == other.links)
+        same_graph_path = (self.graph_path == other.graph_path)
         same_ms = (self.mobility_services == other.mobility_services)
-        return same_links and same_ms
+        return same_graph_path and same_ms
 
     def __deepcopy__(self, memo):
         cls = self.__class__
