@@ -4,6 +4,7 @@ import numpy as np
 
 from mnms.demand.user import User, UserState
 from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.log import create_logger
 from mnms.mobility_service.abstract import AbstractMobilityService
 from mnms.time import Dt, Time
@@ -84,7 +85,8 @@ class UserFlow:
         Args:
             -user: user to move
         """
-        unode, dnode = user.current_link
+        unode = user.current_link.upstream
+        dnode = user.current_link.downstream
         remaining_length = user.remaining_link_length
 
         unode_pos = np.array(self._graph.graph.nodes[unode].position)
@@ -138,14 +140,13 @@ class UserFlow:
                                 dist_travelled = 0
                             else:
                                 cnode_ind = user.get_current_node_index()
-                                next_next_node = upath[cnode_ind + 1]
                                 next_link = self._graph.graph.links[user.path.links[cnode_ind]]
                                 if next_link.label == 'TRANSIT':
                                     # User keeps walking
                                     log.info(f"User {uid} enters connection on {next_link.id}")
                                     dist_travelled = dist_travelled - remaining_length
                                     self._walking[uid] = next_link.length
-                                    user.current_link = (user.current_node, next_next_node)
+                                    user.current_link = LinkDescriptor.from_path(user.path.graph_path, cnode_ind)
                                 else:
                                     # User stops walking
                                     user.set_state_stop()

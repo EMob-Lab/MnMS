@@ -9,6 +9,7 @@ import numpy as np
 from numpy.linalg import norm as _norm
 
 from mnms.graph.graph_path import GraphPath
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.log import create_logger
 from mnms.time import Dt, Time
 from mnms.tools.dict_tools import sum_dict
@@ -107,11 +108,11 @@ class User(TimeDependentSubject):
         self._current_node = n
 
     @property
-    def current_link(self):
+    def current_link(self) -> LinkDescriptor | None:
         return self._current_link
 
     @current_link.setter
-    def current_link(self, l : tuple[str,str]):
+    def current_link(self, l: LinkDescriptor | None):
         self._current_link = l
 
     @property
@@ -508,7 +509,7 @@ class User(TimeDependentSubject):
             self.requested_service.cancel_request(self.id)
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
-            self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
+            self.current_link = LinkDescriptor.from_path(self.path.graph_path, current_node_ind)
             self.remaining_link_length = mlgraph.graph.links[self.path.links[current_node_ind]].length
         else:
             # Find user former requested drop node
@@ -546,7 +547,7 @@ class User(TimeDependentSubject):
             self.cancel_match(mlgraph, cost)
             self.set_state_stop()
             current_node_ind = self.get_current_node_index()
-            self.current_link = (self.path.nodes[current_node_ind],self.path.nodes[current_node_ind+1])
+            self.current_link = LinkDescriptor.from_path(self.path.graph_path, current_node_ind)
             self.remaining_link_length = mlgraph.graph.links[self.path.links[current_node_ind]].length
         else:
             # Find user serving activity in the waited vehicle's plan and former drop node
@@ -629,7 +630,7 @@ class User(TimeDependentSubject):
                 self.set_state_stop()
         self.path: Path = path
         self.current_node = path.nodes[0]
-        self.current_link = (path.nodes[0], path.nodes[1])
+        self.current_link = LinkDescriptor.from_path(path.graph_path, 0)
 
     def start_path(self, glinks):
         self.remaining_link_length = glinks[self.path.links[0]].length
@@ -676,7 +677,7 @@ class User(TimeDependentSubject):
             self.achieved_path_ms = []
         return teleported
 
-    def set_position(self, current_link:tuple[str, str], current_node:str, remaining_length:float, position:np.ndarray, tcurrent: Time):
+    def set_position(self, current_link: LinkDescriptor | None, current_node:str, remaining_length:float, position:np.ndarray, tcurrent: Time):
         """Method that updates user's position (including current node, link,
         remaining link length, position and achieved path).
 
