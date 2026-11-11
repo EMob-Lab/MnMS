@@ -55,20 +55,31 @@ class TestGraphPath(unittest.TestCase):
     def test_immutability(self):
         path = make_path('A', 'B', 'C', 'D', 'E')
 
+        # ruff: disable[B017] Which exception type is raised when trying
+        # to modify an immutable field depends on how immutability is implemented.
+        # Client code must not rely on these exception types.
+
         # Public attributes cannot be reassigned...
-        for attr in ['nodes', 'links', 'origin', 'destination']:
-            with self.assertRaises(AttributeError):
-                setattr(path, attr, None)
+        with self.assertRaises(Exception):
+            path.nodes = ('X', 'Y')
+        with self.assertRaises(Exception):
+            path.links = ('X_Y',)
+        with self.assertRaises(Exception):
+            path.origin = 'X'
+        with self.assertRaises(Exception):
+            path.destination = 'Y'
 
         # ... nor modified in place
-        with self.assertRaises(TypeError):
+        with self.assertRaises(Exception):
             path.nodes[0] = 'X'
-        with self.assertRaises(TypeError):
+        with self.assertRaises(Exception):
             path.links[0] = 'X_B'
 
         # No new attribute can be added
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(Exception):
             path.foo = 1
+
+        # ruff: enable[B017]
 
         # The path is left untouched by all the attempts above
         self.assertEqual(path, make_path('A', 'B', 'C', 'D', 'E'))
