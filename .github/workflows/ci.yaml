@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+  schedule: # Periodic trigger on main branch (warning: disabled if no repository activity for 60 days)
+    - cron: '0 4 * * 1' # Weekly on Monday at 4:00 AM UTC
   workflow_dispatch: # Manual trigger
     inputs:
       os:
