@@ -20,6 +20,13 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
 
+def check_path_nodes(path: Path, graph):
+    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
+    for node in path.nodes:
+        if node not in graph.nodes:
+            raise ValueError(f'Node {node} does not exist in the graph')
+
+
 class TestForcedPath(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -61,6 +68,7 @@ class TestForcedPath(unittest.TestCase):
 
         if manager_type == 'base':
             forced_path = Path(None, ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            check_path_nodes(forced_path, mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -71,6 +79,7 @@ class TestForcedPath(unittest.TestCase):
             demand = CSVDemandManager(self.wrong_file)
         elif manager_type == 'wrong_base':
             forced_path = Path(None, ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            check_path_nodes(forced_path, mlgraph.graph) # The nodes exist but there is no link ORIGIN_1 -> BUSL_S0.
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,

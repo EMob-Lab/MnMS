@@ -8,6 +8,13 @@ from mnms.generation.roads import generate_line_road
 from mnms.tools.render import draw_path, draw_roads
 
 
+def check_path_nodes(path: Path, graph):
+    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
+    for node in path.nodes:
+        if node not in graph.nodes:
+            raise ValueError(f'Node {node} does not exist in the graph')
+
+
 class TestRenderRoads(unittest.TestCase):
     def setUp(self) -> None:
         roads = generate_line_road([0, 0], [0, 3000], 4)
@@ -35,5 +42,6 @@ class TestRenderPath(unittest.TestCase):
 
     def test_draw_path(self):
         path = Path(cost=0, nodes=["CAR_NORTH_0", "CAR_3", "CAR_2", "CAR_1", "CAR_0"])
+        check_path_nodes(path, self.mlgraph.graph)
         _, ax = plt.subplots()
         draw_path(ax, self.mlgraph, path)
