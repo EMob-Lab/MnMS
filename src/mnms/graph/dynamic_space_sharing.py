@@ -220,12 +220,9 @@ class DynamicSpaceSharing:
 
         # Parse new paths computed
         for i, new_path_with_cost in enumerate(new_paths):
-            if new_path_with_cost is None:
-                continue
-            new_path, _ = new_path_with_cost
-            if len(new_path.links) > 0: # TODO OrientedGraphPath still relevant?
+            if new_path_with_cost is not None and len(new_path_with_cost[0].links) > 0:
                 mservice = layers[i].mobility_services[mservices[i]]
-                new_part = GraphPath.from_hipop(new_path)
+                new_part = GraphPath.from_hipop(new_path_with_cost[0])
                 new_part_lengths = mservice.compute_link_lengths(new_part)
                 veh = vehs[i][0]
                 activity = vehs[i][1]
