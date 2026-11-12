@@ -189,11 +189,8 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -veh_path: path of a vehicle serving the line
             -veh_path_lengths: the length of each link of the path
         """
-        nodes = self.lines[lid]['nodes']
-        links = [ # TODO OrientedGraphPath: links resolved from pairs of nodes as long as lines are described by nodes
-            self.graph.nodes[nodes[i]].adj[nodes[i+1]] for i in range(len(nodes) - 1)
-        ]
-        return GraphPath(nodes, [link.id for link in links]), [link.length for link in links]
+        path: GraphPath = self.lines[lid]['path']
+        return path, [self.graph.links[link_id].length for link_id in path.links]
 
     def new_departures(self, time, dt, lid: str):
         """Returns all the departures of a public transport line during the current time step.
@@ -216,7 +213,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         veh_path: GraphPath | None = None
         veh_path_lengths: list[float] | None = None
-        start_node = self.lines[lid]['nodes'][0]
+        start_node = self.lines[lid]['path'].origin
 
         ## Create vehicle that will depart next if not already exist
         if self._next_veh_departure[lid] is None and self._current_time_table[lid] is not None:
@@ -286,7 +283,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -all_departures: lists of vehicles that are about to start service on the line
         """
         veh_path, veh_path_lengths = self.construct_public_transport_path(lid)
-        start_node = self.lines[lid]['nodes'][0]
+        start_node = self.lines[lid]['path'].origin
 
         # At first call in the recursive process, create the next veh to depart
         if all_departures is None:
@@ -347,7 +344,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         return all_departures
 
-    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_nodes: list[str]):
+    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_path: GraphPath):
         """Method that updates a public transport vehicle plan by inserting user's pick-up and
         drop-off.
 
@@ -355,14 +352,14 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -user: user to pick-up and drop-off
             -drop_node: node where user would like to be dropped-off
             -veh: vehicle that will pick-up and drop-off the user
-            -line_nodes: list of nodes the vehicle should follow
+            -line_path: path of the line followed by the vehicle
         """
 
         log.info(f"User {user.id} matched with vehicle {veh.id} of mobility service {self.id}")
         user.set_state_waiting_vehicle(veh)
 
-        pu_node_ind = line_nodes.index(user.current_node)
-        do_node_ind = line_nodes.index(drop_node)
+        pu_node_ind = line_path.nodes.index(user.current_node)
+        do_node_ind = line_path.nodes.index(drop_node)
 
         assert pu_node_ind <= do_node_ind, f'Pickup index {pu_node_ind} should necessarily take place '\
             f'before dropoff index {do_node_ind} on the public transport line for User {user.id}.'
@@ -379,7 +376,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         ind_do = -1
         for ind, activity in enumerate(activities_including_curr):
             activity_node = activity.node
-            activity_node_ind = line_nodes.index(activity_node)
+            activity_node_ind = line_path.nodes.index(activity_node)
             if pu_node_ind <= activity_node_ind and ind_pu == -1:
                 ind_pu = ind
             if do_node_ind <= activity_node_ind:
@@ -412,16 +409,14 @@ class PublicTransportMobilityService(AbstractMobilityService):
         user_node = user.current_node
         veh_remaining_length = veh.remaining_link_length
 
-        line = self.lines[line_id]
-        line_stops = line["nodes"]
-        ind_user = line_stops.index(user_node)
-        ind_veh = line_stops.index(veh.current_link.upstream)
+        line_path: GraphPath = self.lines[line_id]['path']
+        ind_user = line_path.nodes.index(user_node)
+        ind_veh = line_path.nodes.index(veh.current_link.upstream)
 
-        path = line_stops[ind_veh:ind_user+1]
-        if len(path) > 1:
-            pickup_time = veh_remaining_length / self.graph.nodes[path[0]].adj[path[1]].costs[self.id]['speed']
-            for i in range(1, len(path)-1):
-                link = self.graph.nodes[path[i]].adj[path[i+1]]
+        links = [self.graph.links[link_id] for link_id in line_path.links[ind_veh:ind_user]]
+        if len(links) > 0:
+            pickup_time = veh_remaining_length / links[0].costs[self.id]['speed']
+            for link in links[1:]:
                 pickup_time += link.length / link.costs[self.id]['speed']
             pickup_time = Dt(seconds=pickup_time)
         else:
@@ -456,9 +451,9 @@ class PublicTransportMobilityService(AbstractMobilityService):
             departure_time, waiting_veh = self._next_veh_departure[user_line_id]
             chosen_veh = waiting_veh
         else:
-            ind_start = chosen_line["nodes"].index(start)
+            ind_start = chosen_line['path'].nodes.index(start)
             for veh in reversed(list(self.vehicles[user_line_id])):
-                ind_curr_veh = chosen_line["nodes"].index(veh.current_link.downstream)
+                ind_curr_veh = chosen_line['path'].nodes.index(veh.current_link.downstream)
                 if ind_curr_veh <= ind_start:
                     chosen_veh = veh
                     departure_time = None
@@ -484,7 +479,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         drop_node = request.drop_node
         veh, line = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self.id}')
-        self.add_passenger(user, drop_node, veh, line["nodes"])
+        self.add_passenger(user, drop_node, veh, line['path'])
 
     def step_maintenance(self, dt: Dt):
         """Method that proceeds to the maintenance phase. For PublicTransportMobilityService,
@@ -518,7 +513,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -chosen_line: the line serving the node
         """
         for lid, line in self.lines.items():
-            if node in line['nodes']:
+            if node in line['path'].nodes:
                 chosen_line = line
                 chosen_line_id = lid
                 break

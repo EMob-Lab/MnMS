@@ -7,6 +7,7 @@ import numpy as np
 from hipop.graph import OrientedGraph, graph_to_dict, link_to_dict, merge_oriented_graph, node_to_dict
 
 from mnms.graph.dynamic_space_sharing import DynamicSpaceSharing
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.specific_layers import OriginDestinationLayer
 from mnms.graph.zone import MLZone
@@ -731,21 +732,21 @@ class PublicTransportLayer(AbstractLayer):
         self.lines[lid] = {'stops': stops,
                            'sections': sections,
                            'table': timetable,
-                           'bidirectional': bidirectional,
-                           'nodes': [],
-                           'links': []}
+                           'bidirectional': bidirectional}
 
+        nodes = []
         for s in stops:
             nid = f"{lid}_{s}"
-            self.lines[lid]['nodes'].append(nid)
+            nodes.append(nid)
             self._create_stop(nid, s)
 
+        links = []
+        backward_links = []
         for i in range(len(stops)-1):
             up = stops[i]
             down = stops[i+1]
             link_id = f"{lid}_{up}_{down}"
-            self.lines[lid]['links'].append(link_id)
-
+            links.append(link_id)
             self._connect_stops(link_id,
                                 lid,
                                 up,
@@ -754,12 +755,16 @@ class PublicTransportLayer(AbstractLayer):
 
             if bidirectional:
                 link_id = f"{lid}_{down}_{up}"
-                self.lines[lid]['links'].append(link_id)
+                backward_links.append(link_id)
                 self._connect_stops(link_id,
                                     lid,
                                     down,
                                     up,
                                     sections[i][::-1])
+
+        self.lines[lid]['path'] = GraphPath(nodes, links)
+        if bidirectional:
+            self.lines[lid]['backward_path'] = GraphPath(nodes[::-1], backward_links[::-1])
 
     def initialize(self):
         for lid, line in self.lines.items():
