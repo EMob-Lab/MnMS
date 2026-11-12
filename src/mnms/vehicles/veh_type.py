@@ -61,7 +61,8 @@ class VehicleActivity(ABC):
         _check_link_lengths(self.path, self.link_lengths)
 
     @property
-    def node(self) -> str: # TODO OrientedGraphPath remove or rename?
+    def node(self) -> str:
+        """ID of the node where the current activity ends (which is the last node of the path)."""
         return self.path.destination
 
     def next_link(self) -> tuple[LinkDescriptor, float]:
