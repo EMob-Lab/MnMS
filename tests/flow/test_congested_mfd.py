@@ -21,6 +21,13 @@ from mnms.tools.observer import CSVUserObserver, CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 
 
+def check_path_nodes(path: Path, graph):
+    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
+    for node in path.nodes:
+        if node not in graph.nodes:
+            raise ValueError(f'Node {node} does not exist in the graph')
+
+
 class TestCongestedMFD(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -167,6 +174,7 @@ def test_congested_mfd_no_congestion():
     user = User('U0', '0', '4', Time('00:01:00'))
     user.set_path(Path(3400,
                        ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    check_path_nodes(user.path, mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
@@ -222,6 +230,7 @@ def test_congested_mfd_congestion():
     user = User('U0', '0', '4', Time('00:01:00'))
     user.set_path(Path(3400,
                        ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    check_path_nodes(user.path, mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
@@ -229,6 +238,7 @@ def test_congested_mfd_congestion():
     user2 = User('U1', '0', '4', Time('00:01:00'))
     user2.set_path(Path(3400,
                        ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    check_path_nodes(user2.path, mlgraph.graph)
     personal_car.add_request(user2, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user2, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))

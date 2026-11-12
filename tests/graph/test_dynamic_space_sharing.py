@@ -88,8 +88,10 @@ def test_dynamic_space_sharing_initialize():
     assert mlgraph.graph.links['CAR_1_2'].costs['PersonalVehicle']['travel_time'] == float('inf')
 
     df_veh = pd.read_csv('_veh.csv', sep=";")
-    path = df_veh['LINK'].unique()
-    assert (path == ['CAR_0 CAR_1', 'CAR_1 CAR_3', 'CAR_3 CAR_2']).all()
+    path = df_veh.drop_duplicates(subset=['LINK'])
+    assert path['LINK'].tolist() == ['CAR_0 CAR_1', 'CAR_1 CAR_3', 'CAR_3 CAR_2']
+    assert path['UP'].tolist() == ['CAR_0', 'CAR_1', 'CAR_3']
+    assert path['DOWN'].tolist() == ['CAR_1', 'CAR_3', 'CAR_2']
 
     try:
         os.remove("_veh.csv")
@@ -302,18 +304,18 @@ class TestDynamicSpaceSharing(unittest.TestCase):
         for vid in [0, 3]:
             dfv = df_vehs[df_vehs['ID'] == vid]
             nodes = [n.split(' ') for n in dfv['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-            nodes = [elem for elems in nodes for elem in elems] + [dfv['LINK'].iloc[-1].split(' ')[-1]]
+            nodes = [elem for elems in nodes for elem in elems] + [dfv['DOWN'].iloc[-1]]
             self.assertEqual(nodes, ['RH_2', 'RH_5', 'RH_5b', 'RH_4b', 'RH_3b', 'RH_3', 'RH_6'])
 
         for vid in [1, 2, 5, 6, 7]:
             dfv = df_vehs[df_vehs['ID'] == vid]
             nodes = [n.split(' ') for n in dfv['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-            nodes = [elem for elems in nodes for elem in elems] + [dfv['LINK'].iloc[-1].split(' ')[-1]]
+            nodes = [elem for elems in nodes for elem in elems] + [dfv['DOWN'].iloc[-1]]
             self.assertEqual(nodes, ['RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         dfv4 = df_vehs[df_vehs['ID'] == 4]
         nodes4 = [n.split(' ') for n in dfv4['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes4 = [elem for elems in nodes4 for elem in elems] + [dfv4['LINK'].iloc[-1].split(' ')[-1]]
+        nodes4 = [elem for elems in nodes4 for elem in elems] + [dfv4['DOWN'].iloc[-1]]
         self.assertEqual(nodes4, ['RH_2', 'RH_5', 'RH_5b', 'RH_4b', 'RH_4', 'RH_3', 'RH_6'])
 
         # Users achieved paths
@@ -354,12 +356,12 @@ class TestDynamicSpaceSharing(unittest.TestCase):
             df_vehs = pd.read_csv(f, sep=';')
         dfv0 = df_vehs[df_vehs['ID'] == 0]
         nodes0 = [n.split(' ') for n in dfv0['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes0 = [elem for elems in nodes0 for elem in elems] + [dfv0['LINK'].iloc[-1].split(' ')[-1]]
+        nodes0 = [elem for elems in nodes0 for elem in elems] + [dfv0['DOWN'].iloc[-1]]
         self.assertEqual(nodes0, ['RH_4', 'RH_4b', 'RH_5b', 'RH_5', 'RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         dfv1 = df_vehs[df_vehs['ID'] == 1]
         nodes1 = [n.split(' ') for n in dfv1['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes1 = [elem for elems in nodes1 for elem in elems] + [dfv1['LINK'].iloc[-1].split(' ')[-1]]
+        nodes1 = [elem for elems in nodes1 for elem in elems] + [dfv1['DOWN'].iloc[-1]]
         self.assertEqual(nodes1, ['RH_3', 'RH_3b', 'RH_4b', 'RH_4', 'RH_1', 'RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         # Users achieved paths
