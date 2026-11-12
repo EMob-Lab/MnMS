@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
@@ -151,7 +149,7 @@ class VehicleActivityStop(VehicleActivity):
     is_moving: bool = field(default=False, init=False)
 
     @classmethod
-    def at_node(cls, node: str, is_done: bool = False) -> VehicleActivityStop:
+    def at_node(cls, node: str, is_done: bool = False) -> "VehicleActivityStop":
         """Build a stop activity at the given node (i.e. with a path made of this single node and no link)."""
         return cls(path=GraphPath([node], []), link_lengths=[], is_done=is_done)
 

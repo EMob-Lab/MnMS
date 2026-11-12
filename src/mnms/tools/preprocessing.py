@@ -31,7 +31,7 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
         [{layer_name}]*len(origins))
 
     # Build a dict of shortest paths
-    sps = {}
+    sps: dict[str, dict[str, str]] = {}
     for i,(o,d) in enumerate(all_ods):
         current_path_with_cost = paths[i]
         if current_path_with_cost is None:
@@ -114,7 +114,7 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
                       multiprocessing.cpu_count(),
                       [{layer_name}]*len(origins))
     print(f'Done in {time.time()-st}')
-    spts_dict = {}
+    spts_dict: dict[str, dict[str, str]] = {}
     for i,o in enumerate(origins):
         current_spt = spts[i]
 
@@ -122,11 +122,11 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
         # save the ID of the last node encountered before reaching the destination.
         # WARNING: in presence of a graph with excluded movements on some nodes,
         # what is saved may not be sufficient to rebuild the whole paths from origin to destination.
-        output = {}
+        output: dict[str, str] = {}
         for destination in current_spt.destinations:
             path_nodes = current_spt.path_to(destination).nodes
             if len(path_nodes) >= 2:
-                output[destination] = path_nodes[-2].id
+                output[destination.id] = path_nodes[-2].id
 
         if len(output) > 0:
             spts_dict[o] = output
@@ -136,7 +136,7 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
     with open(outfile, 'w') as f:
         json.dump(spts_dict, f)
 
-def decode_shortest_path_tree(spts, origin, destination):
+def decode_shortest_path_tree(spts: dict[str, dict[str, str]], origin: str, destination: str) -> list[str] | None:
     """Function to build the shortest path from the shortest path tree.
 
     Args:
@@ -145,16 +145,18 @@ def decode_shortest_path_tree(spts, origin, destination):
         -destination: destination of the shortest path
 
     Returns:
-        -sp: the shortest path (list of nodes)
+        -sp: the shortest path (list of nodes), or None if no path exists from origin to destination in the tree
     """
-    spt = spts[origin]
-    d = destination
-    path = [d]
-    while d != origin:
-        d = spt[d]
-        if d == '':
-            return []
-        path.append(d)
+    spt = spts.get(origin)
+    if spt is None:
+        return None
+    path = [destination]
+    current_node = destination
+    while current_node != origin:
+        current_node = spt.get(current_node)
+        if current_node is None:
+            return None
+        path.append(current_node)
     path = list(reversed(path))
 
     return path
