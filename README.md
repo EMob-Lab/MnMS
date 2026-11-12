@@ -95,4 +95,4 @@ mkdocs serve
 ### Detailed
 
 The detailed documentation is available here:
-https://github.com/EMob-Lab/MnMS/blob/develop/doc/MnMS_detailed_documentation.pdf
+https://github.com/EMob-Lab/MnMS/blob/main/doc/MnMS_detailed_documentation.pdf
