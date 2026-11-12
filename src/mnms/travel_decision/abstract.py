@@ -20,7 +20,6 @@ from mnms.log import create_logger
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.time import Time
 from mnms.tools.dict_tools import sum_dict
-from mnms.tools.legacy_path import compute_path_cost_from_links, compute_path_length_from_links
 
 log = create_logger(__name__)
 
@@ -542,7 +541,7 @@ class AbstractDecisionModel(ABC):
                         self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                   str(chosen_path.path_cost),
                                                   ' '.join(chosen_path.nodes),
-                                                  compute_path_length_from_links(self._mlgraph.graph, chosen_path.links),
+                                                  chosen_path.graph_path.compute_length(self._mlgraph.graph),
                                                   ' '.join(chosen_path.mobility_services),
                                                   '1'])
                     else:
@@ -554,7 +553,7 @@ class AbstractDecisionModel(ABC):
                             self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                        str(p.path_cost),
                                                        ' '.join(p.nodes),
-                                                       compute_path_length_from_links(self._mlgraph.graph, p.links),
+                                                       p.graph_path.compute_length(self._mlgraph.graph),
                                                        ' '.join(p.mobility_services),
                                                        chosen])
 
@@ -888,7 +887,7 @@ class AbstractDecisionModel(ABC):
 
                 # Recompute the cost of the saved routes with current costs
                 candidates_paths = [
-                    Path(route, compute_path_cost_from_links(self._mlgraph.graph, route.links, self._cost, mss))
+                    Path(route, route.compute_cost(self._mlgraph.graph, self._cost, mss))
                     for route in self._saved_routes[o][d][mss_str]
                 ]
                 # Select the k bests

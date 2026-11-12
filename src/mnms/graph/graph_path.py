@@ -96,6 +96,25 @@ class GraphPath:
                     raise ValueError(f'Link {lid} goes from {link.upstream} to {link.downstream}, '
                         f'not from {self._nodes[i]} to {self._nodes[i+1]}')
 
+    def compute_length(self, graph: OrientedGraph) -> float:
+        """Compute the length of the path (i.e. the sum of the lengths of its links in the given graph)."""
+        return sum(graph.links[lid].length for lid in self._links)
+
+    def compute_cost(self, graph: OrientedGraph, cost_metric: str, chosen_mservices: dict[str, str]) -> float:
+        """Compute the cost of the path in the given graph.
+
+        Args:
+            -graph: the graph
+            -cost_metric: the type of cost (e.g. "time", "generalized_cost", etc.)
+            -chosen_mservices: the dict specifying which mobility service is used on each layer
+             (the layer of a link being given by its label)
+        """
+        path_cost = 0
+        for lid in self._links:
+            link = graph.links[lid]
+            path_cost += link.costs[chosen_mservices[link.label]][cost_metric]
+        return path_cost
+
     def sub_path(self, pos: int, link_count: int | None = None) -> GraphPath:
         """Return a part of the path.
 

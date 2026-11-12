@@ -17,7 +17,6 @@ from mnms.mobility_service.filters import InRadiusFilter
 from mnms.time import Dt, Time
 from mnms.tools.exceptions import PathNotFound
 from mnms.tools.geometry import get_bounding_box, polygon_area
-from mnms.tools.legacy_path import compute_path_length_from_links
 from mnms.vehicles.veh_type import (
     ActivityType,
     Vehicle,
@@ -480,7 +479,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 passenger.modify_path_leg(self.id, path_at_match)
             if passenger.id == user.id:
                 ## Save user's info at matching
-                initial_path_dist = compute_path_length_from_links(self.graph, service_path.links)
+                initial_path_dist = service_path.compute_length(self.graph)
                 self.users[user.id] = UserInfo(request, user.distance, initial_path_dist) # NB: support only one simultaneous req per user
 
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self.id} (new plan = {new_plan})')
@@ -596,7 +595,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             service_index = user.get_mobility_service_index_in_path(self.id)
             service_slice = user.path.layers[service_index][1]
             service_path = user.path.graph_path.sub_path(service_slice.start, service_slice.stop - 1 - service_slice.start)
-            initial_path_distance = compute_path_length_from_links(self.graph, service_path.links)
+            initial_path_distance = service_path.compute_length(self.graph)
 
         # Deduce detour ratio for the user
         detour_ratio = total_distance / initial_path_distance

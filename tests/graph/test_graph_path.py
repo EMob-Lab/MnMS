@@ -261,12 +261,24 @@ class TestGraphPath(unittest.TestCase):
 class TestGraphPathWithGraph(unittest.TestCase):
 
     def setUp(self):
-        # Create a line graph A -> B -> C -> D.
+        # Create the following line graph:
+        #
+        #          A_B             B_C             C_D
+        #   A ------------> B ------------> C ------------> D
+        #      length=10       length=20       length=30
+        #      layer=L1        layer=L1        layer=L2
+        #      cost:           cost:           cost:
+        #      -S1/time=1      -S1/time=2      -S1/time=3
+        #      -S2/time=11     -S2/time=21     -S2/time=31
+        #
         self.graph = OrientedGraph()
-        for i, nid in enumerate(['A', 'B', 'C', 'D']):
-            self.graph.add_node(nid, 10 * i, 0, '')
-        for up, down in pairwise(['A', 'B', 'C', 'D']):
-            self.graph.add_link(f'{up}_{down}', up, down, 10, {}, '')
+        self.graph.add_node('A', 0, 0, '')
+        self.graph.add_node('B', 10, 0, '')
+        self.graph.add_node('C', 30, 0, '')
+        self.graph.add_node('D', 60, 0, '')
+        self.graph.add_link('A_B', 'A', 'B', 10, {'S1': {'time': 1}, 'S2': {'time': 11}}, 'L1')
+        self.graph.add_link('B_C', 'B', 'C', 20, {'S1': {'time': 2}, 'S2': {'time': 21}}, 'L1')
+        self.graph.add_link('C_D', 'C', 'D', 30, {'S1': {'time': 3}, 'S2': {'time': 31}}, 'L2')
 
     def test_from_hipop(self):
         hipop_path = make_hipop_path(self.graph, ['A_B', 'B_C', 'C_D'])
@@ -275,6 +287,16 @@ class TestGraphPathWithGraph(unittest.TestCase):
     def test_from_hipop_single_node(self):
         hipop_path = make_empty_hipop_path(self.graph, 'B')
         self.assertEqual(GraphPath.from_hipop(hipop_path), make_empty_path('B'))
+
+    def test_compute_length(self):
+        self.assertEqual(make_path('A', 'B', 'C', 'D').compute_length(self.graph), 60)
+        self.assertEqual(make_path('B', 'C').compute_length(self.graph), 20)
+        self.assertEqual(make_empty_path('B').compute_length(self.graph), 0)
+
+    def test_compute_cost(self):
+        self.assertEqual(make_path('A', 'B', 'C', 'D').compute_cost(self.graph, 'time', {'L1': 'S1', 'L2': 'S2'}), 34)
+        self.assertEqual(make_path('B', 'C', 'D').compute_cost(self.graph, 'time', {'L1': 'S2', 'L2': 'S1'}), 24)
+        self.assertEqual(make_empty_path('B').compute_cost(self.graph, 'time', {}), 0)
 
     def test_check_consistency(self):
         make_path('A', 'B', 'C').check_consistency(self.graph)
