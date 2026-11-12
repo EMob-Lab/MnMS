@@ -113,12 +113,16 @@ class TestForcedPath(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
     def test_forced_path_csv_demand_manager(self):
         """Check that we can force user to choose one path at departure with a CSVDemandManager.
@@ -136,12 +140,16 @@ class TestForcedPath(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
     def test_wrong_forced_path(self):
         """Check that an error is triggered when the forced path is wrong.

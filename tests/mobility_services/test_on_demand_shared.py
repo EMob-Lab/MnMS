@@ -144,28 +144,36 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 DESTINATION_21'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_DESTINATION_21'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'DESTINATION_21'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:16:40'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:16:40').add_time(flow_dt))
 
         df2 = df[df['ID'] == 'U2']
-        link_list2 = [l for i,l in enumerate(df2['LINK'].tolist()) if i == 0 or (i > 0 and l != df2['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list2, ['ORIGIN_12 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 DESTINATION_24'])
+        df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_12_RIDESHARING_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_DESTINATION_24'])
+        self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_12', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24'])
+        self.assertEqual(df2_links['DOWN'].tolist(), ['RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'DESTINATION_24'])
         self.assertGreaterEqual(Time(df2.iloc[-1]['TIME']), Time('07:21:40'))
         self.assertLessEqual(Time(df2.iloc[-1]['TIME']), Time('07:21:40').add_time(flow_dt))
 
         df3 = df[df['ID'] == 'U3']
-        link_list3 = [l for i,l in enumerate(df3['LINK'].tolist()) if i == 0 or (i > 0 and l != df3['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list3, ['ORIGIN_22 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_19', 'RIDESHARING_19 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_9', 'RIDESHARING_9 RIDESHARING_4', 'RIDESHARING_4 DESTINATION_4'])
+        df3_links = df3[df3['LINK'] != df3['LINK'].shift()]
+        self.assertEqual(df3_links['LINK'].tolist(), ['ORIGIN_22_RIDESHARING_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_19', 'RIDESHARING_19_14', 'RIDESHARING_14_9', 'RIDESHARING_9_4', 'RIDESHARING_4_DESTINATION_4'])
+        self.assertEqual(df3_links['UP'].tolist(), ['ORIGIN_22', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4'])
+        self.assertEqual(df3_links['DOWN'].tolist(), ['RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df3.iloc[-1]['TIME']), Time('07:28:20'))
         self.assertLessEqual(Time(df3.iloc[-1]['TIME']), Time('07:28:20').add_time(flow_dt))
 
         with open(self.dir_results / "vehs.csv") as f:
             dfv = pd.read_csv(f, sep=';')
-        link_listv = [l for i,l in enumerate(dfv['LINK'].tolist()) if i == 0 or (i > 0 and l != dfv['LINK'].tolist()[i-1])]
-        link_listv = [elem for elem in link_listv if isinstance(elem, str)]
-        self.assertEqual(link_listv, ['RIDESHARING_7 RIDESHARING_2', 'RIDESHARING_2 RIDESHARING_1', 'RIDESHARING_1 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_19', 'RIDESHARING_19 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_9', 'RIDESHARING_9 RIDESHARING_4'])
+        dfv_links = dfv[dfv['LINK'] != dfv['LINK'].shift()]
+        dfv_links = dfv_links.dropna(subset=['LINK'])
+        self.assertEqual(dfv_links['LINK'].tolist(), ['RIDESHARING_7_2', 'RIDESHARING_2_1', 'RIDESHARING_1_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_19', 'RIDESHARING_19_14', 'RIDESHARING_14_9', 'RIDESHARING_9_4'])
+        self.assertEqual(dfv_links['UP'].tolist(), ['RIDESHARING_7', 'RIDESHARING_2', 'RIDESHARING_1', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9'])
+        self.assertEqual(dfv_links['DOWN'].tolist(), ['RIDESHARING_2', 'RIDESHARING_1', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4'])
 
     def test_all_pickups_first_fifo_replanning_2(self):
         """Test that the replanning strategy all_pickups_first_fifo correctly works,
@@ -187,28 +195,36 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 DESTINATION_21'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_12', 'RIDESHARING_12_11', 'RIDESHARING_11_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_DESTINATION_21'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'DESTINATION_21'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:20:00'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:20:00').add_time(flow_dt))
 
         df2 = df[df['ID'] == 'U2']
-        link_list2 = [l for i,l in enumerate(df2['LINK'].tolist()) if i == 0 or (i > 0 and l != df2['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list2, ['ORIGIN_12 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 DESTINATION_24'])
+        df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_12_RIDESHARING_12', 'RIDESHARING_12_11', 'RIDESHARING_11_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_DESTINATION_24'])
+        self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_12', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24'])
+        self.assertEqual(df2_links['DOWN'].tolist(), ['RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'DESTINATION_24'])
         self.assertGreaterEqual(Time(df2.iloc[-1]['TIME']), Time('07:25:00'))
         self.assertLessEqual(Time(df2.iloc[-1]['TIME']), Time('07:25:00').add_time(flow_dt))
 
         df3 = df[df['ID'] == 'U3']
-        link_list3 = [l for i,l in enumerate(df3['LINK'].tolist()) if i == 0 or (i > 0 and l != df3['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list3, ['ORIGIN_22 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_19', 'RIDESHARING_19 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_9', 'RIDESHARING_9 RIDESHARING_4', 'RIDESHARING_4 DESTINATION_4'])
+        df3_links = df3[df3['LINK'] != df3['LINK'].shift()]
+        self.assertEqual(df3_links['LINK'].tolist(), ['ORIGIN_22_RIDESHARING_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_19', 'RIDESHARING_19_14', 'RIDESHARING_14_9', 'RIDESHARING_9_4', 'RIDESHARING_4_DESTINATION_4'])
+        self.assertEqual(df3_links['UP'].tolist(), ['ORIGIN_22', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4'])
+        self.assertEqual(df3_links['DOWN'].tolist(), ['RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df3.iloc[-1]['TIME']), Time('07:31:40'))
         self.assertLessEqual(Time(df3.iloc[-1]['TIME']), Time('07:31:40').add_time(flow_dt))
 
         with open(self.dir_results / "vehs.csv") as f:
             dfv = pd.read_csv(f, sep=';')
-        link_listv = [l for i,l in enumerate(dfv['LINK'].tolist()) if i == 0 or (i > 0 and l != dfv['LINK'].tolist()[i-1])]
-        link_listv = [elem for elem in link_listv if isinstance(elem, str)]
-        self.assertEqual(link_listv, ['RIDESHARING_7 RIDESHARING_2', 'RIDESHARING_2 RIDESHARING_1', 'RIDESHARING_1 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_17', 'RIDESHARING_17 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_19', 'RIDESHARING_19 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_9', 'RIDESHARING_9 RIDESHARING_4'])
+        dfv_links = dfv[dfv['LINK'] != dfv['LINK'].shift()]
+        dfv_links = dfv_links.dropna(subset=['LINK'])
+        self.assertEqual(dfv_links['LINK'].tolist(), ['RIDESHARING_7_2', 'RIDESHARING_2_1', 'RIDESHARING_1_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_12', 'RIDESHARING_12_11', 'RIDESHARING_11_12', 'RIDESHARING_12_17', 'RIDESHARING_17_22', 'RIDESHARING_22_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_19', 'RIDESHARING_19_14', 'RIDESHARING_14_9', 'RIDESHARING_9_4'])
+        self.assertEqual(dfv_links['UP'].tolist(), ['RIDESHARING_7', 'RIDESHARING_2', 'RIDESHARING_1', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9'])
+        self.assertEqual(dfv_links['DOWN'].tolist(), ['RIDESHARING_2', 'RIDESHARING_1', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_17', 'RIDESHARING_22', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'RIDESHARING_19', 'RIDESHARING_14', 'RIDESHARING_9', 'RIDESHARING_4'])
 
     def test_limiting_max_detour_ratio(self):
         """Test that the maximum detour ratio of user is respected.
@@ -228,8 +244,10 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_21', 'RIDESHARING_21 DESTINATION_21'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_16', 'RIDESHARING_16_21', 'RIDESHARING_21_DESTINATION_21'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21', 'DESTINATION_21'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20').add_time(flow_dt))
 
@@ -254,8 +272,10 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_21', 'RIDESHARING_21 DESTINATION_21'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_16', 'RIDESHARING_16_21', 'RIDESHARING_21_DESTINATION_21'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21', 'DESTINATION_21'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20').add_time(flow_dt))
 
@@ -281,14 +301,18 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_5', 'RIDESHARING_5 RIDESHARING_10', 'RIDESHARING_10 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_21', 'RIDESHARING_21 DESTINATION_21'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_5', 'RIDESHARING_5_10', 'RIDESHARING_10_11', 'RIDESHARING_11_12', 'RIDESHARING_12_11', 'RIDESHARING_11_16', 'RIDESHARING_16_21', 'RIDESHARING_21_DESTINATION_21'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_5', 'RIDESHARING_10', 'RIDESHARING_11', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21', 'DESTINATION_21'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:16:40'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:16:40').add_time(flow_dt))
 
         df2 = df[df['ID'] == 'U2']
-        link_list2 = [l for i,l in enumerate(df2['LINK'].tolist()) if i == 0 or (i > 0 and l != df2['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list2, ['ORIGIN_12 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_11', 'RIDESHARING_11 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_21', 'RIDESHARING_21 RIDESHARING_22', 'RIDESHARING_22 RIDESHARING_23', 'RIDESHARING_23 RIDESHARING_24', 'RIDESHARING_24 DESTINATION_24'])
+        df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_12_RIDESHARING_12', 'RIDESHARING_12_11', 'RIDESHARING_11_16', 'RIDESHARING_16_21', 'RIDESHARING_21_22', 'RIDESHARING_22_23', 'RIDESHARING_23_24', 'RIDESHARING_24_DESTINATION_24'])
+        self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_12', 'RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24'])
+        self.assertEqual(df2_links['DOWN'].tolist(), ['RIDESHARING_12', 'RIDESHARING_11', 'RIDESHARING_16', 'RIDESHARING_21', 'RIDESHARING_22', 'RIDESHARING_23', 'RIDESHARING_24', 'DESTINATION_24'])
         self.assertGreaterEqual(Time(df2.iloc[-1]['TIME']), Time('07:21:40'))
         self.assertLessEqual(Time(df2.iloc[-1]['TIME']), Time('07:21:40').add_time(flow_dt))
 
@@ -314,22 +338,28 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_6', 'RIDESHARING_6 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_13', 'RIDESHARING_13 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_20', 'RIDESHARING_20 RIDESHARING_26', 'RIDESHARING_26 RIDESHARING_32', 'RIDESHARING_32 DESTINATION_32'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_6', 'RIDESHARING_6_12', 'RIDESHARING_12_13', 'RIDESHARING_13_14', 'RIDESHARING_14_20', 'RIDESHARING_20_26', 'RIDESHARING_26_32', 'RIDESHARING_32_DESTINATION_32'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_6', 'RIDESHARING_12', 'RIDESHARING_13', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_32'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_6', 'RIDESHARING_12', 'RIDESHARING_13', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_32', 'DESTINATION_32'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20').add_time(flow_dt))
         veh1 = set(df1['VEHICLE'].dropna().tolist())
 
         df2 = df[df['ID'] == 'U2']
-        link_list2 = [l for i,l in enumerate(df2['LINK'].tolist()) if i == 0 or (i > 0 and l != df2['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list2, ['ORIGIN_16 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_15', 'RIDESHARING_15 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_13', 'RIDESHARING_13 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_18', 'RIDESHARING_18 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_30', 'RIDESHARING_30 DESTINATION_30'])
+        df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_16_RIDESHARING_16', 'RIDESHARING_16_15', 'RIDESHARING_15_14', 'RIDESHARING_14_13', 'RIDESHARING_13_12', 'RIDESHARING_12_18', 'RIDESHARING_18_24', 'RIDESHARING_24_30', 'RIDESHARING_30_DESTINATION_30'])
+        self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_16', 'RIDESHARING_16', 'RIDESHARING_15', 'RIDESHARING_14', 'RIDESHARING_13', 'RIDESHARING_12', 'RIDESHARING_18', 'RIDESHARING_24', 'RIDESHARING_30'])
+        self.assertEqual(df2_links['DOWN'].tolist(), ['RIDESHARING_16', 'RIDESHARING_15', 'RIDESHARING_14', 'RIDESHARING_13', 'RIDESHARING_12', 'RIDESHARING_18', 'RIDESHARING_24', 'RIDESHARING_30', 'DESTINATION_30'])
         self.assertGreaterEqual(Time(df2.iloc[-1]['TIME']), Time('07:15:00'))
         self.assertLessEqual(Time(df2.iloc[-1]['TIME']), Time('07:15:00').add_time(flow_dt))
         veh2 = set(df2['VEHICLE'].dropna().tolist())
 
         df3 = df[df['ID'] == 'U3']
-        link_list3 = [l for i,l in enumerate(df3['LINK'].tolist()) if i == 0 or (i > 0 and l != df3['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list3, ['ORIGIN_26 RIDESHARING_26', 'RIDESHARING_26 RIDESHARING_32', 'RIDESHARING_32 RIDESHARING_33', 'RIDESHARING_33 RIDESHARING_34', 'RIDESHARING_34 DESTINATION_34'])
+        df3_links = df3[df3['LINK'] != df3['LINK'].shift()]
+        self.assertEqual(df3_links['LINK'].tolist(), ['ORIGIN_26_RIDESHARING_26', 'RIDESHARING_26_32', 'RIDESHARING_32_33', 'RIDESHARING_33_34', 'RIDESHARING_34_DESTINATION_34'])
+        self.assertEqual(df3_links['UP'].tolist(), ['ORIGIN_26', 'RIDESHARING_26', 'RIDESHARING_32', 'RIDESHARING_33', 'RIDESHARING_34'])
+        self.assertEqual(df3_links['DOWN'].tolist(), ['RIDESHARING_26', 'RIDESHARING_32', 'RIDESHARING_33', 'RIDESHARING_34', 'DESTINATION_34'])
         self.assertGreaterEqual(Time(df3.iloc[-1]['TIME']), Time('07:16:40'))
         self.assertLessEqual(Time(df3.iloc[-1]['TIME']), Time('07:16:40').add_time(flow_dt))
         veh3 = set(df3['VEHICLE'].dropna().tolist())
@@ -356,22 +386,28 @@ class TestOnDemandSharedMobilityService(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 RIDESHARING_0', 'RIDESHARING_0 RIDESHARING_6', 'RIDESHARING_6 RIDESHARING_12', 'RIDESHARING_12 RIDESHARING_13', 'RIDESHARING_13 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_20', 'RIDESHARING_20 RIDESHARING_26', 'RIDESHARING_26 RIDESHARING_32', 'RIDESHARING_32 DESTINATION_32'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_RIDESHARING_0', 'RIDESHARING_0_6', 'RIDESHARING_6_12', 'RIDESHARING_12_13', 'RIDESHARING_13_14', 'RIDESHARING_14_20', 'RIDESHARING_20_26', 'RIDESHARING_26_32', 'RIDESHARING_32_DESTINATION_32'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'RIDESHARING_0', 'RIDESHARING_6', 'RIDESHARING_12', 'RIDESHARING_13', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_32'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_0', 'RIDESHARING_6', 'RIDESHARING_12', 'RIDESHARING_13', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_32', 'DESTINATION_32'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:13:20').add_time(flow_dt))
         veh1 = set(df1['VEHICLE'].dropna().tolist())
 
         df2 = df[df['ID'] == 'U2']
-        link_list2 = [l for i,l in enumerate(df2['LINK'].tolist()) if i == 0 or (i > 0 and l != df2['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list2, ['ORIGIN_16 RIDESHARING_16', 'RIDESHARING_16 RIDESHARING_15', 'RIDESHARING_15 RIDESHARING_14', 'RIDESHARING_14 RIDESHARING_20', 'RIDESHARING_20 RIDESHARING_26', 'RIDESHARING_26 RIDESHARING_25', 'RIDESHARING_25 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_30', 'RIDESHARING_30 DESTINATION_30'])
+        df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_16_RIDESHARING_16', 'RIDESHARING_16_15', 'RIDESHARING_15_14', 'RIDESHARING_14_20', 'RIDESHARING_20_26', 'RIDESHARING_26_25', 'RIDESHARING_25_24', 'RIDESHARING_24_30', 'RIDESHARING_30_DESTINATION_30'])
+        self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_16', 'RIDESHARING_16', 'RIDESHARING_15', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_25', 'RIDESHARING_24', 'RIDESHARING_30'])
+        self.assertEqual(df2_links['DOWN'].tolist(), ['RIDESHARING_16', 'RIDESHARING_15', 'RIDESHARING_14', 'RIDESHARING_20', 'RIDESHARING_26', 'RIDESHARING_25', 'RIDESHARING_24', 'RIDESHARING_30', 'DESTINATION_30'])
         self.assertGreaterEqual(Time(df2.iloc[-1]['TIME']), Time('07:15:00'))
         self.assertLessEqual(Time(df2.iloc[-1]['TIME']), Time('07:15:00').add_time(flow_dt))
         veh2 = set(df2['VEHICLE'].dropna().tolist())
 
         df3 = df[df['ID'] == 'U3']
-        link_list3 = [l for i,l in enumerate(df3['LINK'].tolist()) if i == 0 or (i > 0 and l != df3['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list3, ['ORIGIN_26 RIDESHARING_26', 'RIDESHARING_26 RIDESHARING_25', 'RIDESHARING_25 RIDESHARING_24', 'RIDESHARING_24 RIDESHARING_30', 'RIDESHARING_30 RIDESHARING_31', 'RIDESHARING_31 RIDESHARING_32', 'RIDESHARING_32 RIDESHARING_33', 'RIDESHARING_33 RIDESHARING_34', 'RIDESHARING_34 DESTINATION_34'])
+        df3_links = df3[df3['LINK'] != df3['LINK'].shift()]
+        self.assertEqual(df3_links['LINK'].tolist(), ['ORIGIN_26_RIDESHARING_26', 'RIDESHARING_26_25', 'RIDESHARING_25_24', 'RIDESHARING_24_30', 'RIDESHARING_30_31', 'RIDESHARING_31_32', 'RIDESHARING_32_33', 'RIDESHARING_33_34', 'RIDESHARING_34_DESTINATION_34'])
+        self.assertEqual(df3_links['UP'].tolist(), ['ORIGIN_26', 'RIDESHARING_26', 'RIDESHARING_25', 'RIDESHARING_24', 'RIDESHARING_30', 'RIDESHARING_31', 'RIDESHARING_32', 'RIDESHARING_33', 'RIDESHARING_34'])
+        self.assertEqual(df3_links['DOWN'].tolist(), ['RIDESHARING_26', 'RIDESHARING_25', 'RIDESHARING_24', 'RIDESHARING_30', 'RIDESHARING_31', 'RIDESHARING_32', 'RIDESHARING_33', 'RIDESHARING_34', 'DESTINATION_34'])
         self.assertGreaterEqual(Time(df3.iloc[-1]['TIME']), Time('07:21:40'))
         self.assertLessEqual(Time(df3.iloc[-1]['TIME']), Time('07:21:40').add_time(flow_dt))
         veh3 = set(df3['VEHICLE'].dropna().tolist())
