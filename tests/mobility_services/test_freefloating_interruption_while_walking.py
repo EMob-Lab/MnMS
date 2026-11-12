@@ -179,15 +179,19 @@ class TestFreeFloatingVehicleSharingInterruptionWhileWalking(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_2', 'L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20'))
         self.assertLessEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20').add_time(flow_dt))
         self.assertEqual(df0.iloc[-1]['DISTANCE'], 1500)
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BIKESHARING_1', 'ORIGIN_0 L1_S1+', 'L1_S1+ L1_S3', 'L1_S3 DESTINATION_3'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BIKESHARING_1', 'ORIGIN_0 L1_S1+', 'L1_S1+ L1_S3', 'L1_S3 DESTINATION_3'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'ORIGIN_0', 'L1_S1+', 'L1_S3'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BIKESHARING_1', 'L1_S1+', 'L1_S3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:33'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:33').add_time(flow_dt))
         self.assertEqual(df1.iloc[-1]['DISTANCE'], 1798.2)
@@ -211,15 +215,19 @@ class TestFreeFloatingVehicleSharingInterruptionWhileWalking(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_2', 'L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20'))
         self.assertLessEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20').add_time(flow_dt))
         self.assertEqual(df0.iloc[-1]['DISTANCE'], 1500)
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BIKESHARING_1', 'ORIGIN_0 CAR_0', 'CAR_0 CAR_3', 'CAR_3 DESTINATION_3'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BIKESHARING_1', 'ORIGIN_0 CAR_0', 'CAR_0 CAR_3', 'CAR_3 DESTINATION_3'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'ORIGIN_0', 'CAR_0', 'CAR_3'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BIKESHARING_1', 'CAR_0', 'CAR_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:12:49'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:12:49').add_time(flow_dt))
         self.assertEqual(df1.iloc[-1]['DISTANCE'], 1416.234)
@@ -243,15 +251,19 @@ class TestFreeFloatingVehicleSharingInterruptionWhileWalking(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_2', 'L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20'))
         self.assertLessEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20').add_time(flow_dt))
         self.assertEqual(df0.iloc[-1]['DISTANCE'], 1500)
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BIKESHARING_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BIKESHARING_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BIKESHARING_1'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:03:30'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:03:30').add_time(flow_dt))
         self.assertEqual(df1.iloc[-1]['DISTANCE'], 298.2)
@@ -275,15 +287,19 @@ class TestFreeFloatingVehicleSharingInterruptionWhileWalking(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_2 L0_S2', 'L0_S2 L0_S1', 'L0_S1 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_2', 'L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['L0_S2', 'L0_S1', 'BIKESHARING_1', 'BIKESHARING_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20'))
         self.assertLessEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:20').add_time(flow_dt))
         self.assertEqual(df0.iloc[-1]['DISTANCE'], 1500)
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 CAR_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 CAR_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['CAR_1'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:05:52'))
         self.assertLessEqual(Time(df1.iloc[-1]['TIME']), Time('07:05:53').add_time(flow_dt))
         self.assertEqual(df1.iloc[-1]['DISTANCE'], 500)
