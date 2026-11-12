@@ -38,6 +38,9 @@ dependencies = [
     "shapely >= 2.1",
 ]
 
+[project.scripts]
+mnms = "mnms.cli.run:main"
+
 [project.urls]
 Repository = "https://github.com/EMob-Lab/MnMS"
 Issues = "https://github.com/EMob-Lab/MnMS/issues"
