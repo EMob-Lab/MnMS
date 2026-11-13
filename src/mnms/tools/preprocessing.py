@@ -51,7 +51,7 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
         # If the current destination node is reachable from the current origin,
         # save the IDs of the penultimate node and last link
         # in the path from the origin to that destination node.
-        output_item: ShortestPathTreeEntry = { 'node': path.nodes[-2].id, 'link': path.links[-1] }
+        output_item: ShortestPathTreeEntry = { 'node': path.nodes[-2].id, 'link': path.links[-1].id }
         if o in sps:
             sps[o][d] = output_item
         else:
