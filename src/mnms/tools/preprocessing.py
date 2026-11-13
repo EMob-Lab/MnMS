@@ -5,6 +5,8 @@ from typing import TypedDict
 
 from hipop.shortest_path import floyd_warshall, parallel_dijkstra, parallel_dijkstra_single_source
 
+from mnms.graph.graph_path import GraphPath
+
 
 class ShortestPathTreeEntry(TypedDict):
     node: str  # ID of the last node before the destination
@@ -142,7 +144,12 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
     with open(outfile, 'w') as f:
         json.dump(spts_dict, f)
 
-def decode_shortest_path_tree(spts: dict[str, dict[str, str]], origin: str, destination: str) -> list[str] | None:
+
+def decode_shortest_path_tree(
+        spts: dict[str, dict[str, ShortestPathTreeEntry]],
+        origin: str,
+        destination: str,
+    ) -> GraphPath | None:
     """Function to build the shortest path from the shortest path tree.
 
     Args:
@@ -151,18 +158,19 @@ def decode_shortest_path_tree(spts: dict[str, dict[str, str]], origin: str, dest
         -destination: destination of the shortest path
 
     Returns:
-        -sp: the shortest path (list of nodes), or None if no path exists from origin to destination in the tree
+        -sp: the shortest path, or None if no path exists from origin to destination in the tree
     """
     spt = spts.get(origin)
     if spt is None:
         return None
-    path = [destination]
+    path_nodes: list[str] = [destination]
+    path_links: list[str] = []
     current_node = destination
     while current_node != origin:
-        current_node = spt.get(current_node)
-        if current_node is None:
+        entry = spt.get(current_node)
+        if entry is None:
             return None
-        path.append(current_node)
-    path = list(reversed(path))
-
-    return path
+        current_node = entry['node']
+        path_nodes.append(current_node)
+        path_links.append(entry['link'])
+    return GraphPath(reversed(path_nodes), reversed(path_links))

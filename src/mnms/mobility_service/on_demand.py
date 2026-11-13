@@ -375,15 +375,12 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             # Let's read the shortest paths
             paths = []
             for o,d in zip(origins, destinations):
-                raw_path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
-                if raw_path is None:
+                path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
+                if path is None:
                     paths.append(None)
                 else:
                     # Compute the travel time
-                    tt = compute_path_nodes_travel_time(raw_path, self.graph.nodes, self.id)
-                    path = GraphPath(raw_path, [ # TODO OrientedGraphPath: links resolved from pairs of nodes as long as shortest path trees are described by nodes
-                        self.graph.nodes[raw_path[i]].adj[raw_path[i+1]].id for i in range(len(raw_path) - 1)
-                    ])
+                    tt = compute_path_nodes_travel_time(path.nodes, self.graph.nodes, self.id)
                     paths.append((path, tt))
         else:
             # Let's compute the shortest paths

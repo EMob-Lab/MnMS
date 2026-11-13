@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable
 
 from hipop.graph import OrientedGraph, OrientedGraphPath
 
@@ -21,7 +21,7 @@ class GraphPath:
 
     __slots__ = ('_links', '_nodes')
 
-    def __init__(self, nodes: Sequence[str], links: Sequence[str]):
+    def __init__(self, nodes: Iterable[str], links: Iterable[str]):
         """Build a GraphPath from the IDs of its nodes and links.
 
         Args:
