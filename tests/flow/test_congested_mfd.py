@@ -9,6 +9,7 @@ from mnms.demand.user import Path
 from mnms.flow.congested_MFD import CongestedMFDFlowMotor, CongestedReservoir
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
@@ -165,8 +166,13 @@ def test_congested_mfd_no_congestion():
     flow.initialize()
 
     user = User('U0', '0', '4', Time('00:01:00'))
-    user.set_path(Path(3400,
-                       ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    user.set_path(Path(
+        GraphPath(
+            ['CarLayer_0', 'CarLayer_1', 'CarLayer_2'],
+            ['CarLayer_0_1', 'CarLayer_1_2'],
+        ),
+        3400,
+    ))
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
@@ -220,15 +226,25 @@ def test_congested_mfd_congestion():
     flow.initialize()
 
     user = User('U0', '0', '4', Time('00:01:00'))
-    user.set_path(Path(3400,
-                       ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    user.set_path(Path(
+        GraphPath(
+            ['CarLayer_0', 'CarLayer_1', 'CarLayer_2'],
+            ['CarLayer_0_1', 'CarLayer_1_2'],
+        ),
+        3400,
+    ))
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
 
     user2 = User('U1', '0', '4', Time('00:01:00'))
-    user2.set_path(Path(3400,
-                       ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    user2.set_path(Path(
+        GraphPath(
+            ['CarLayer_0', 'CarLayer_1', 'CarLayer_2'],
+            ['CarLayer_0_1', 'CarLayer_1_2'],
+        ),
+        3400,
+    ))
     personal_car.add_request(user2, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user2, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))

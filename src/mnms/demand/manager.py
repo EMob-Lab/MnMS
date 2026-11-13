@@ -10,6 +10,7 @@ from typing import Literal
 import numpy as np
 
 from mnms.demand.user import Path, User
+from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Time
 from mnms.tools.exceptions import CSVDemandParseError
@@ -242,7 +243,9 @@ class CSVDemandManager(AbstractDemandManager):
         forced_path = None
         chosen_ms = None
         if 'PATH' in self._optional_columns and row[self._optional_columns['PATH']] != '':
-            forced_path = Path(None, row[self._optional_columns['PATH']].split(' '))
+            # TODO OrientedGraphPath BROKEN: Path requires the link IDs in addition to the node IDs,
+            # but only the node IDs are available in the CSV file, so this call raises a ValueError.
+            forced_path = Path(GraphPath(row[self._optional_columns['PATH']].split(' '), []))
             chosen_ms = row[self._optional_columns['CHOSEN SERVICES']].split(' ')
             chosen_ms = {cms.split(':')[0]:cms.split(':')[1] for cms in chosen_ms}
         return User(

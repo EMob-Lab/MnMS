@@ -28,7 +28,7 @@ class FleetManager:
         return new_veh
 
     def create_waiting_vehicle(self, node: str, capacity: int):
-        return self.create_vehicle(node, capacity, [VehicleActivityStop(node, is_done=False)])
+        return self.create_vehicle(node, capacity, [VehicleActivityStop.at_node(node, is_done=False)])
 
     def delete_vehicle(self, vehid:str):
         self.__veh_manager.remove_vehicle(self.vehicles[vehid])

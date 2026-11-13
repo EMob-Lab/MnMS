@@ -88,8 +88,10 @@ def test_dynamic_space_sharing_initialize():
     assert mlgraph.graph.links['CAR_1_2'].costs['PersonalVehicle']['travel_time'] == float('inf')
 
     df_veh = pd.read_csv('_veh.csv', sep=";")
-    path = df_veh['LINK'].unique()
-    assert (path == ['CAR_0 CAR_1', 'CAR_1 CAR_3', 'CAR_3 CAR_2']).all()
+    path = df_veh.drop_duplicates(subset=['LINK'])
+    assert path['LINK'].tolist() == ['CAR_0_1', 'CAR_1_3', 'CAR_3_2']
+    assert path['UP'].tolist() == ['CAR_0', 'CAR_1', 'CAR_3']
+    assert path['DOWN'].tolist() == ['CAR_1', 'CAR_3', 'CAR_2']
 
     try:
         os.remove("_veh.csv")
@@ -289,11 +291,15 @@ class TestDynamicSpaceSharing(unittest.TestCase):
         #     because dynamic space sharing step is called before mob service matching
         for uid in ['U0', 'U3', 'U4']:
             dfpu = df_paths[df_paths['ID'] == uid]
-            self.assertEqual(dfpu['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+            self.assertEqual(dfpu['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+            self.assertEqual(dfpu['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+            self.assertEqual(dfpu['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_5 RH_5_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         for uid in ['U1', 'U2', 'U5', 'U6', 'U7', 'U8']:
             dfpu = df_paths[df_paths['ID'] == uid]
-            self.assertEqual(dfpu['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_1 RH_0 RH_3 RH_6 DESTINATION_6')
+            self.assertEqual(dfpu['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+            self.assertEqual(dfpu['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+            self.assertEqual(dfpu['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_1 RH_1_0 RH_0_3 RH_3_6 RH_6_DESTINATION_6')
 
         # Vehicles achieved paths
         with open(self.dir_results / "uber_vehs.csv") as f:
@@ -302,18 +308,18 @@ class TestDynamicSpaceSharing(unittest.TestCase):
         for vid in [0, 3]:
             dfv = df_vehs[df_vehs['ID'] == vid]
             nodes = [n.split(' ') for n in dfv['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-            nodes = [elem for elems in nodes for elem in elems] + [dfv['LINK'].iloc[-1].split(' ')[-1]]
+            nodes = [elem for elems in nodes for elem in elems] + [dfv['DOWN'].iloc[-1]]
             self.assertEqual(nodes, ['RH_2', 'RH_5', 'RH_5b', 'RH_4b', 'RH_3b', 'RH_3', 'RH_6'])
 
         for vid in [1, 2, 5, 6, 7]:
             dfv = df_vehs[df_vehs['ID'] == vid]
             nodes = [n.split(' ') for n in dfv['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-            nodes = [elem for elems in nodes for elem in elems] + [dfv['LINK'].iloc[-1].split(' ')[-1]]
+            nodes = [elem for elems in nodes for elem in elems] + [dfv['DOWN'].iloc[-1]]
             self.assertEqual(nodes, ['RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         dfv4 = df_vehs[df_vehs['ID'] == 4]
         nodes4 = [n.split(' ') for n in dfv4['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes4 = [elem for elems in nodes4 for elem in elems] + [dfv4['LINK'].iloc[-1].split(' ')[-1]]
+        nodes4 = [elem for elems in nodes4 for elem in elems] + [dfv4['DOWN'].iloc[-1]]
         self.assertEqual(nodes4, ['RH_2', 'RH_5', 'RH_5b', 'RH_4b', 'RH_4', 'RH_3', 'RH_6'])
 
         # Users achieved paths
@@ -347,19 +353,21 @@ class TestDynamicSpaceSharing(unittest.TestCase):
             df_paths = pd.read_csv(f, sep=';')
         for u in ['U0', 'U1']:
             dfpu = df_paths[df_paths['ID'] == u]
-            self.assertEqual(dfpu['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+            self.assertEqual(dfpu['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+            self.assertEqual(dfpu['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+            self.assertEqual(dfpu['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_5 RH_5_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         # Vehicles achieved paths
         with open(self.dir_results / "uber_vehs.csv") as f:
             df_vehs = pd.read_csv(f, sep=';')
         dfv0 = df_vehs[df_vehs['ID'] == 0]
         nodes0 = [n.split(' ') for n in dfv0['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes0 = [elem for elems in nodes0 for elem in elems] + [dfv0['LINK'].iloc[-1].split(' ')[-1]]
+        nodes0 = [elem for elems in nodes0 for elem in elems] + [dfv0['DOWN'].iloc[-1]]
         self.assertEqual(nodes0, ['RH_4', 'RH_4b', 'RH_5b', 'RH_5', 'RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         dfv1 = df_vehs[df_vehs['ID'] == 1]
         nodes1 = [n.split(' ') for n in dfv1['TRAVELED_NODES'].tolist() if str(n) != 'nan']
-        nodes1 = [elem for elems in nodes1 for elem in elems] + [dfv1['LINK'].iloc[-1].split(' ')[-1]]
+        nodes1 = [elem for elems in nodes1 for elem in elems] + [dfv1['DOWN'].iloc[-1]]
         self.assertEqual(nodes1, ['RH_3', 'RH_3b', 'RH_4b', 'RH_4', 'RH_1', 'RH_2', 'RH_1', 'RH_0', 'RH_3', 'RH_6'])
 
         # Users achieved paths
@@ -387,13 +395,19 @@ class TestDynamicSpaceSharing(unittest.TestCase):
             df_paths = pd.read_csv(f, sep=';')
 
         dfpu0 = df_paths[df_paths['ID'] == 'U0']
-        self.assertEqual(dfpu0['PATH'].iloc[0], 'ORIGIN_3 RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_ORIGIN'].iloc[0], 'ORIGIN_3')
+        self.assertEqual(dfpu0['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_LINKS'].iloc[0], 'ORIGIN_3_RH_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu1 = df_paths[df_paths['ID'] == 'U1']
-        self.assertEqual(dfpu1['PATH'].iloc[0], 'ORIGIN_5 RH_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_ORIGIN'].iloc[0], 'ORIGIN_5')
+        self.assertEqual(dfpu1['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_LINKS'].iloc[0], 'ORIGIN_5_RH_5 RH_5_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu2 = df_paths[df_paths['ID'] == 'U2']
-        self.assertEqual(dfpu2['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+        self.assertEqual(dfpu2['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_5 RH_5_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         # Vehicle achieved path
         with open(self.dir_results / "uber_vehs.csv") as f:
@@ -436,13 +450,19 @@ class TestDynamicSpaceSharing(unittest.TestCase):
             df_paths = pd.read_csv(f, sep=';')
 
         dfpu0 = df_paths[df_paths['ID'] == 'U0']
-        self.assertEqual(dfpu0['PATH'].iloc[0], 'ORIGIN_3 RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_ORIGIN'].iloc[0], 'ORIGIN_3')
+        self.assertEqual(dfpu0['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_LINKS'].iloc[0], 'ORIGIN_3_RH_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu1 = df_paths[df_paths['ID'] == 'U1']
-        self.assertEqual(dfpu1['PATH'].iloc[0], 'ORIGIN_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_ORIGIN'].iloc[0], 'ORIGIN_5')
+        self.assertEqual(dfpu1['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_LINKS'].iloc[0], 'ORIGIN_5_RH_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu2 = df_paths[df_paths['ID'] == 'U2']
-        self.assertEqual(dfpu2['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_5 RH_5b RH_4b RH_3b RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+        self.assertEqual(dfpu2['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_5 RH_5_5b RH_5b_4b RH_4b_3b RH_3b_3 RH_3_6 RH_6_DESTINATION_6')
 
         # Vehicle achieved path
         with open(self.dir_results / "uber_vehs.csv") as f:
@@ -482,13 +502,19 @@ class TestDynamicSpaceSharing(unittest.TestCase):
         with open(self.dir_results / "paths.csv") as f:
             df_paths = pd.read_csv(f, sep=';')
         dfpu0 = df_paths[df_paths['ID'] == 'U0']
-        self.assertEqual(dfpu0['PATH'].iloc[0], 'ORIGIN_3 RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_ORIGIN'].iloc[0], 'ORIGIN_3')
+        self.assertEqual(dfpu0['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu0['PATH_LINKS'].iloc[0], 'ORIGIN_3_RH_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu1 = df_paths[df_paths['ID'] == 'U1']
-        self.assertEqual(dfpu1['PATH'].iloc[0], 'ORIGIN_5 RH_5 RH_4 RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_ORIGIN'].iloc[0], 'ORIGIN_5')
+        self.assertEqual(dfpu1['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu1['PATH_LINKS'].iloc[0], 'ORIGIN_5_RH_5 RH_5_4 RH_4_3 RH_3_6 RH_6_DESTINATION_6')
 
         dfpu2 = df_paths[df_paths['ID'] == 'U2']
-        self.assertEqual(dfpu2['PATH'].iloc[0], 'ORIGIN_2 RH_2 RH_1 RH_0 RH_3 RH_6 DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_ORIGIN'].iloc[0], 'ORIGIN_2')
+        self.assertEqual(dfpu2['PATH_DESTINATION'].iloc[0], 'DESTINATION_6')
+        self.assertEqual(dfpu2['PATH_LINKS'].iloc[0], 'ORIGIN_2_RH_2 RH_2_1 RH_1_0 RH_0_3 RH_3_6 RH_6_DESTINATION_6')
 
         # Vehicle achieved path
         with open(self.dir_results / "uber_vehs.csv") as f:

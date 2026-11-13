@@ -6,6 +6,7 @@ from hipop.shortest_path import dijkstra
 
 from mnms.demand.horizon import AbstractDemandHorizon
 from mnms.demand.user import User
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.zone import LayerZone, construct_zone_from_contour
 from mnms.log import create_logger
 from mnms.mobility_service.interfaces import Depot
@@ -17,46 +18,26 @@ from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity, Vehic
 
 log = create_logger(__name__)
 
-def compute_path_travel_time(path, gnodes, ms_id):
+def compute_path_travel_time(path: GraphPath, link_lengths: list[float], glinks, ms_id):
     """Method that computes the travel time of a VehicleActivity path.
 
     Args:
         -path: VehicleActivity path
-        -gnodes: nodes of the graph where path is defined
+        -link_lengths: the length to travel on each link of the path
+        -glinks: links of the graph where path is defined
         -ms_id: id of the mobility service the path concerns
 
     Returns:
         -tt: the path travel time
     """
     tt = 0
-    for leg in path:
-        leg_link = leg[0]
-        leg_link = gnodes[leg_link[0]].adj[leg_link[1]]
-        leg_dist = leg[1]
+    for lid, leg_dist in zip(path.links, link_lengths, strict=True):
+        leg_link = glinks[lid]
         if leg_dist == leg_link.costs[ms_id]['length']:
             tt += leg_link.costs[ms_id]['travel_time']
         else:
             # Path starts in the middle of one link
             tt += leg_dist / leg_link.costs[ms_id]['speed']
-    return tt
-
-def compute_path_nodes_travel_time(path_nodes, gnodes, ms_id):
-    """Method that computes the travel time of a VehicleActivity path.
-
-    Args:
-        -path_nodes: the list of nodes defining a path
-        -gnodes: nodes of the graph where path is defined
-        -ms_id: id of the mobility service the path concerns
-
-    Returns:
-        -tt: the path travel time
-    """
-    tt = 0
-    for i in range(len(path_nodes)-1):
-        un = path_nodes[i]
-        dn = path_nodes[i+1]
-        link = gnodes[un].adj[dn]
-        tt += link.costs[ms_id]['travel_time']
     return tt
 
 
@@ -155,15 +136,9 @@ class AbstractMobilityService(ABC):
     def is_personal(self):
         return False
 
-    def construct_veh_path(self, upath: list[str]):
-        veh_path = []
-        for i in range(len(upath)-1):
-            unode = upath[i]
-            dnode = upath[i+1]
-            key = (unode, dnode)
-            link_length = self.graph.get_length(unode,dnode)
-            veh_path.append((key, link_length))
-        return veh_path
+    def compute_link_lengths(self, path: GraphPath) -> list[float]:
+        """Return the length of each link of the given path (to be used as VehicleActivity link lengths)."""
+        return [self.graph.links[lid].length for lid in path.links]
 
     @abstractmethod
     def service_level_costs(self, nodes: list[str]) -> dict:
@@ -322,8 +297,8 @@ class AbstractMobilityService(ABC):
                 # There is no other activities in vehicle's plan, interrupt current
                 # activity and create a repositioning activity to finish traveling current link
                 veh.activity = None
-                a = VehicleActivityRepositioning(node=veh.current_link[1],
-                    path=[((veh.current_link[0],veh.current_link[1]),veh._remaining_link_length)])
+                path = veh.current_link.to_path()
+                a = VehicleActivityRepositioning(path=path, link_lengths=[veh._remaining_link_length])
                 veh.activities.insert(0, a)
             else:
                 # There is a next activity in vehicle's plan, update its path
@@ -332,20 +307,21 @@ class AbstractMobilityService(ABC):
                 next_a_modified_path_cost_name = 'travel_time' if type(next_a).__name__ in ['VehicleActivityPickup', 'VehicleActivityRepositioning'] else cost
                 veh_layer = mlgraph.mapping_layer_services[self.id]
                 try:
-                    next_a_modified_path, cost_val = dijkstra(mlgraph.graph,
-                                veh.current_link[1],
+                    path_with_cost = dijkstra(mlgraph.graph,
+                                veh.current_link.downstream,
                                 next_a.node,
                                 next_a_modified_path_cost_name, {veh_layer.id: self.id}, {veh_layer.id})
                 except ValueError as ex:
                     log.error(f'HiPOP.Error: {ex}')
                     sys.exit(-1)
-                assert cost_val != float('inf'), \
-                        f'Path not found between {veh.current_link[1]} '\
+                assert path_with_cost is not None, \
+                        f'Path not found between {veh.current_link.downstream} '\
                         f'and {next_a.node} on layer {veh_layer.id}'
+                next_a_modified_path = GraphPath.from_hipop(path_with_cost[0])
                 # Effectively update next activity path
-                built_next_a_modified_path = [((veh.current_link[0],veh.current_link[1]),veh._remaining_link_length)]
-                built_next_a_modified_path += self.construct_veh_path(next_a_modified_path)
-                next_a.modify_path(built_next_a_modified_path)
+                built_next_a_modified_path = veh.current_link.to_path() + next_a_modified_path
+                built_next_a_modified_lengths = [veh._remaining_link_length] + self.compute_link_lengths(next_a_modified_path)
+                next_a.modify_path(built_next_a_modified_path, built_next_a_modified_lengths)
         else:
             # The activity to remove is not ongoing
             if len(all_activities) > index+1:
@@ -359,26 +335,28 @@ class AbstractMobilityService(ABC):
                     check_remaining_link_length = True
                 next_a_dnode = next_a.node
                 if prev_a_dnode == next_a_dnode:
-                    next_a_modified_path = []
+                    next_a_modified_path = GraphPath([next_a_dnode], [])
                 else:
                     next_a_modified_path_cost_name = 'travel_time' if type(next_a).__name__ in ['VehicleActivityPickup', 'VehicleActivityRepositioning'] else cost
                     veh_layer = mlgraph.mapping_layer_services[self.id]
                     try:
-                        next_a_modified_path, cost_val = dijkstra(mlgraph.graph,
+                        path_with_cost = dijkstra(mlgraph.graph,
                                     prev_a_dnode,
                                     next_a_dnode,
                                     next_a_modified_path_cost_name, {veh_layer.id: self.id}, {veh_layer.id})
                     except ValueError as ex:
                         log.error(f'HiPOP.Error: {ex}')
                         sys.exit(-1)
-                    assert cost_val != float('inf'), \
+                    assert path_with_cost is not None, \
                             f'Path not found between {prev_a_dnode} '\
                             f'and {next_a_dnode} on layer {veh_layer.id}'
+                    next_a_modified_path = GraphPath.from_hipop(path_with_cost[0])
                 # Effectively update next activity path
-                built_next_a_modified_path = self.construct_veh_path(next_a_modified_path)
-                if check_remaining_link_length and built_next_a_modified_path[0][0] == veh._current_link:
-                    built_next_a_modified_path[0] = (built_next_a_modified_path[0][0], veh._remaining_link_length)
-                next_a.modify_path(built_next_a_modified_path)
+                built_next_a_modified_lengths = self.compute_link_lengths(next_a_modified_path)
+                if check_remaining_link_length and veh._current_link is not None and next_a_modified_path.links \
+                        and next_a_modified_path.links[0] == veh._current_link.id:
+                    built_next_a_modified_lengths[0] = veh._remaining_link_length
+                next_a.modify_path(next_a_modified_path, built_next_a_modified_lengths)
             # Remove activity from plan
             del veh.activities[index-1]
 
@@ -448,15 +426,13 @@ class AbstractMobilityService(ABC):
             new_drop_node_ind = user.get_node_index_in_path(new_drop_node)
             assert new_drop_node_ind != -1, 'The modify_user_drop_node method should be called'\
                 ' once user path has been updated with the new drop node'
-            u_serving_act_new_nodes = user.path.nodes[current_node_ind:new_drop_node_ind+1]
-            u_serving_act_new_path = [((u_serving_act_new_nodes[i],u_serving_act_new_nodes[i+1]),
-                mlgraph.graph.nodes[u_serving_act_new_nodes[i]].adj[u_serving_act_new_nodes[i+1]].length) \
-                for i in range(len(u_serving_act_new_nodes)-1)]
+            u_serving_act_new_path = user.path.graph_path.sub_path(current_node_ind, new_drop_node_ind - current_node_ind)
+            u_serving_act_new_lengths = [mlgraph.graph.links[lid].length for lid in u_serving_act_new_path.links]
             if user_serving_act_ind == 0:
                 # Vehicle is currently serving the user: update current activity path by
                 # taking into account traveled distance on current link
-                u_serving_act_new_path[0] = (u_serving_act_new_path[0][0], veh._remaining_link_length)
-                veh.activity.modify_path_and_next(u_serving_act_new_path)
+                u_serving_act_new_lengths[0] = veh._remaining_link_length
+                veh.activity.modify_path_and_next(u_serving_act_new_path, u_serving_act_new_lengths)
             else:
                 # Vehicle is currently not serving the user: update user serving activity
                 # and pay attention to the users that will be directly impacted because
@@ -475,14 +451,13 @@ class AbstractMobilityService(ABC):
                         f'is about to modify her drop node, it will directly impact the achieved path of users {users_impacted}')
                     log.error('Case not yet developped: when other users than the one who want to modify her drop node are directly impacted')
                     sys.exit(-1)
-                veh.activities[user_serving_act_ind-1].modify_path(u_serving_act_new_path)
+                veh.activities[user_serving_act_ind-1].modify_path(u_serving_act_new_path, u_serving_act_new_lengths)
             all_activities = [veh.activity] + list(veh.activities)
 
             # Step 2: Adapt path of the next activity if required
             if len(all_activities) > user_serving_act_ind+1:
                 # There is a next activity
-                next_act_start_node = all_activities[user_serving_act_ind+1].path[0][0][0] \
-                    if all_activities[user_serving_act_ind+1].path else all_activities[user_serving_act_ind+1].node
+                next_act_start_node = all_activities[user_serving_act_ind+1].path.origin
                 start_node_not_corresponding = next_act_start_node !=\
                     all_activities[user_serving_act_ind].node
                 if start_node_not_corresponding:
@@ -494,22 +469,23 @@ class AbstractMobilityService(ABC):
                             type(all_activities[user_serving_act_ind+1]).__name__ in ['VehicleActivityPickup', 'VehicleActivityRepositioning'] else cost
                         veh_layer = mlgraph.mapping_layer_services[self.id]
                         try:
-                            next_act_modified_path, cost_val = dijkstra(mlgraph.graph,
-                                all_activities[user_serving_act_ind].path[-1][0][1],
+                            path_with_cost = dijkstra(mlgraph.graph,
+                                all_activities[user_serving_act_ind].path.destination,
                                 all_activities[user_serving_act_ind+1].node,
                                 next_act_modified_path_cost_name, {veh_layer.id: self.id}, {veh_layer.id})
                         except ValueError as ex:
                             log.error(f'HiPOP.Error: {ex}')
                             sys.exit(-1)
-                        assert cost_val != float('inf'), \
-                            f'Path not found between {all_activities[user_serving_act_ind].path[-1][0][1]} '\
+                        assert path_with_cost is not None, \
+                            f'Path not found between {all_activities[user_serving_act_ind].path.destination} '\
                             f'and {all_activities[user_serving_act_ind+1].node} on layer {veh_layer.id}'
+                        next_act_modified_path = GraphPath.from_hipop(path_with_cost[0])
                     else:
                         # The new path for user serving activity leads to the end node of next activity, next activity path is then empty
-                        next_act_modified_path, cost_val = [], 0
+                        next_act_modified_path = GraphPath([all_activities[user_serving_act_ind+1].node], [])
                     # Effectively update next activity path
-                    built_next_act_modified_path = self.construct_veh_path(next_act_modified_path)
-                    veh.activities[user_serving_act_ind].modify_path(built_next_act_modified_path)
+                    next_act_modified_lengths = self.compute_link_lengths(next_act_modified_path)
+                    veh.activities[user_serving_act_ind].modify_path(next_act_modified_path, next_act_modified_lengths)
                 else:
                     # Next activity path is correct, there is nothing to do
                     pass
@@ -684,7 +660,7 @@ class AbstractOnDemandMobilityService(AbstractMobilityService, metaclass=ABCMeta
         assert node in self.graph.nodes
         new_veh = self.fleet.create_vehicle(node,
                                             capacity=self.veh_capacity,
-                                            activities=[VehicleActivityStop(node=node)])
+                                            activities=[VehicleActivityStop.at_node(node)])
         new_veh.set_position(self.graph.nodes[node].position)
 
         if self.observer is not None:

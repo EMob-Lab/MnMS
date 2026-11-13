@@ -1,21 +1,18 @@
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Generator
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
 
+from mnms.graph.graph_path import GraphPath
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.log import create_logger
 from mnms.time import Dt, Time
 from mnms.tools.observer import TimeDependentSubject
 
 log = create_logger(__name__)
 _norm = np.linalg.norm
-
-_TYPE_ITEM_PATH = tuple[tuple[str, str], float]
-_TYPE_PATH = list[_TYPE_ITEM_PATH]
 
 
 class ActivityType(Enum):
@@ -27,6 +24,11 @@ class ActivityType(Enum):
     SERVING = 3
 
 
+def _check_link_lengths(path: GraphPath, link_lengths: list[float]):
+    if len(link_lengths) != len(path.links):
+        raise ValueError(f'Inconsistent link lengths {link_lengths} for path {path}')
+
+
 @dataclass(slots=True)
 class VehicleActivity(ABC):
     """Class representing a vehicle activity.
@@ -34,49 +36,84 @@ class VehicleActivity(ABC):
         Attributes:
             activity_type (ActivityType): the type of the activity
             is_moving (bool): indicates if the vehicle moves or not during the activity
-            node (str): the ID of the node (linked to the activity type)
-            path (_TYPE_PATH): the path linked to the activity
+            path (GraphPath): the path linked to the activity
+            link_lengths (list[float]): the length to travel on each link of the path
+                (len(link_lengths) == len(path.links))
             user: the user linked to the activity
             is_done: indicates if the activity is terminated
-            iter_path: the iterator of the path
-
     """
     activity_type: ActivityType
     is_moving: bool
 
-    node: str
-    path: _TYPE_PATH = field(default_factory=list)
-    iter_path: Generator[_TYPE_ITEM_PATH, None, None] = field(default=None, init=False)
-
+    path: GraphPath
+    link_lengths: list[float]
     user: "User" = None
-
     is_done: bool = False
 
+    # Execution state:
+    # _next_link_index: index of the next link of the path to be entered by the vehicle
+    #     (0 <= _next_link_index <= len(path.links)):
+    #     - 0: the vehicle has not entered any link of the path yet,
+    #     - i > 0: the vehicle is on the link at index i-1 (i.e. it is traveling it, or it has just reached its end).
+    _next_link_index: int = field(default=0, init=False) # Execution state, see class documentation
+
     def __post_init__(self):
-        self.reset_path_iterator()
+        _check_link_lengths(self.path, self.link_lengths)
 
-    def reset_path_iterator(self):
-        self.iter_path = iter(self.path)
+    @property
+    def node(self) -> str:
+        """ID of the node where the current activity ends (which is the last node of the path)."""
+        return self.path.destination
 
-    def modify_path(self, new_path: _TYPE_PATH):
+    def next_link(self) -> tuple[LinkDescriptor, float]:
+        """Return the next link of the path to travel, and the length to travel on it.
+
+        Raises:
+            -StopIteration: if the end of the path is reached
+        """
+        index = self._next_link_index
+        if index >= len(self.path.links):
+            raise StopIteration
+        self._next_link_index += 1
+        return LinkDescriptor.from_path(self.path, index), self.link_lengths[index]
+
+    def modify_path(self, new_path: GraphPath, new_link_lengths: list[float]):
         """Method to update this activity path.
 
         Args:
             -new_path: the new path
+            -new_link_lengths: the length to travel on each link of the new path
         """
+        _check_link_lengths(new_path, new_link_lengths)
         self.path = new_path
-        if new_path:
-            self.node = new_path[-1][0][1]
-        self.reset_path_iterator()
+        self.link_lengths = new_link_lengths
+        self._next_link_index = 0
 
-    def modify_path_and_next(self, new_path: _TYPE_PATH):
+    def modify_path_and_next(self, new_path: GraphPath, new_link_lengths: list[float]):
         """Method to update this activity path and set the iterator on path to the next node.
 
         Args:
             -new_path: the new path
+            -new_link_lengths: the length to travel on each link of the new path
         """
-        self.modify_path(new_path)
-        next(self.iter_path)
+        self.modify_path(new_path, new_link_lengths)
+        self.next_link()
+
+    def sub_path(self, pos: int, link_count: int | None = None) -> tuple[GraphPath, list[float]]:
+        """Return a part of the path of this activity, and the corresponding link lengths.
+
+        Args:
+            -pos, link_count: same as GraphPath.sub_path
+
+        Returns:
+            -path: the part of path (same as GraphPath.sub_path)
+            -link_lengths: the length to travel on each link of the part of path
+
+        Raises:
+            -same as GraphPath.sub_path
+        """
+        path = self.path.sub_path(pos, link_count)
+        return path, self.link_lengths[pos:pos+len(path.links)]
 
     @abstractmethod
     def done(self, veh: "Vehicle", tcurrent: Time):
@@ -99,10 +136,10 @@ class VehicleActivity(ABC):
         return
 
     def copy(self):
-        return self.__class__(deepcopy(self.node),
-                              deepcopy(self.path),
-                              self.user,
-                              self.is_done)
+        return self.__class__(path=self.path,
+                              link_lengths=self.link_lengths.copy(),
+                              user=self.user,
+                              is_done=self.is_done)
 
 
 @dataclass(slots=True)
@@ -111,6 +148,11 @@ class VehicleActivityStop(VehicleActivity):
 
     activity_type: ActivityType = field(default=ActivityType.STOP, init=False)
     is_moving: bool = field(default=False, init=False)
+
+    @classmethod
+    def at_node(cls, node: str, is_done: bool = False) -> "VehicleActivityStop":
+        """Build a stop activity at the given node (i.e. with a path made of this single node and no link)."""
+        return cls(path=GraphPath([node], []), link_lengths=[], is_done=is_done)
 
     def start(self, veh: "Vehicle"):
         """Update when the activity is started
@@ -211,17 +253,18 @@ class VehicleActivityServing(VehicleActivity):
         veh.passengers.pop(self.user.id)
 
         self.user.remaining_link_length = 0
-        upath = self.user.path.nodes
+        upath = self.user.path.graph_path
         last_achieved = False
         if veh._current_link is not None:
-            if veh._current_link[1] == veh._current_node and self.user.achieved_path and veh._current_node == \
+            if veh._current_link.downstream == veh._current_node and self.user.achieved_path and veh._current_node == \
                     self.user.achieved_path[-1]:
                 last_achieved = True
-            unode = veh._current_link[1]
+            unode = veh._current_link.downstream
         else:
             unode = veh._current_node
-        next_node_ind = self.user.get_node_index_in_path(unode, last_achieved=last_achieved) + 1
-        self.user.set_position((unode, upath[min(next_node_ind, len(upath)-1)]), unode, 0, veh.position, tcurrent)
+        unode_ind = self.user.get_node_index_in_path(unode, last_achieved=last_achieved)
+        ucurrent_link = LinkDescriptor.from_path(upath, unode_ind) if unode_ind < len(upath.links) else None
+        self.user.set_position(ucurrent_link, unode, 0, veh.position, tcurrent)
         self.user.update_achieved_path_ms(veh.mobility_service)
         self.user.vehicle = None
         # self.user.notify(tcurrent)
@@ -274,7 +317,6 @@ class Vehicle(TimeDependentSubject):
         self._position = None  # current vehicle coordinates
         self._distance = 0  # travelled distance ( reset to zero if other trip ?)
         self._distance_at_last_res_change = 0  # distance this vehicle has traveled since it enters current reservoir
-        self._iter_path = None
         self.speed = None  # current speed
         self._dt_move = None
         self._achieved_path = []
@@ -339,7 +381,7 @@ class Vehicle(TimeDependentSubject):
         return self.__class__.__name__
 
     @property
-    def current_link(self):
+    def current_link(self) -> LinkDescriptor | None:
         return self._current_link
 
     @property
@@ -398,10 +440,10 @@ class Vehicle(TimeDependentSubject):
         self.activity = activity
         self.activity.start(self)
         if activity.activity_type is not ActivityType.STOP:
-            if activity.path:
-                self._current_link, self._remaining_link_length = next(activity.iter_path)
-                assert self._current_node == self._current_link[
-                    0], f"Veh {self.id} current node {self._current_node} is not equal to the next upstream link {self._current_link[0]}"
+            if activity.path.links:
+                self._current_link, self._remaining_link_length = activity.next_link()
+                assert self._current_node == self._current_link.upstream, \
+                    f"Veh {self.id} current node {self._current_node} is not equal to the next upstream link {self._current_link.upstream}"
             else:
                 activity.is_done = True
 
@@ -412,19 +454,15 @@ class Vehicle(TimeDependentSubject):
         self.activity.start(self)
 
         if last_activity.activity_type is ActivityType.STOP:
-            if next_activity.path:
-                self._current_link, self._remaining_link_length = next(next_activity.iter_path)
-                assert self._current_node == self._current_link[0]
+            if next_activity.path.links:
+                self._current_link, self._remaining_link_length = next_activity.next_link()
+                assert self._current_node == self._current_link.upstream
             else:
                 next_activity.is_done = True
 
     def iter_activities(self):
         yield self.activity
         yield from self.activities
-
-    def set_path(self, path: list[tuple[tuple[str, str], float]]):
-        self._iter_path = iter(path)
-        self._current_link, self._remaining_link_length = next(self._iter_path)
 
     def update_distance(self, dist: float):
         self._distance += dist
@@ -435,12 +473,11 @@ class Vehicle(TimeDependentSubject):
         self._position = position
 
     def drop_user(self, tcurrent: Time, user: 'User', drop_pos: np.ndarray):
-        log.info(f"{user} is dropped at {self._current_link[0]}")
+        log.info(f"{user} is dropped at {self._current_link.upstream}")
         user.remaining_link_length = 0
-        upath = user.path.nodes
-        unode = self._current_link[0]
-        next_node_ind = user.get_node_index_in_path(unode) + 1
-        user.set_position((unode, upath[next_node_ind]), unode, 0, drop_pos, tcurrent)
+        unode = self._current_link.upstream
+        next_link = LinkDescriptor.from_path(user.path.graph_path, user.get_node_index_in_path(unode))
+        user.set_position(next_link, unode, 0, drop_pos, tcurrent)
         user.vehicle = None
         user.notify(tcurrent)
 
@@ -448,8 +485,8 @@ class Vehicle(TimeDependentSubject):
 
     def drop_all_passengers(self, tcurrent: Time):
         for _, user in self.passengers.values():
-            log.info(f"{user} is dropped at {self._current_link[1]}")
-            unode = self._current_link[1]
+            log.info(f"{user} is dropped at {self._current_link.downstream}")
+            unode = self._current_link.downstream
             user.current_node = unode
             user.remaining_link_length = 0
             user.position = self._position
@@ -465,28 +502,11 @@ class Vehicle(TimeDependentSubject):
         self.passengers[userid] = (take_time, user)
 
     def default_activity(self):
-        return VehicleActivityStop(node=self._current_node,
-                                   path=[],
-                                   is_done=False)
+        return VehicleActivityStop.at_node(self._current_node, is_done=False)
 
     def notify_passengers(self, tcurrent: Time):
         for user in self.passengers.values():
             user.notify(tcurrent)
-
-    def path_to_nodes(self, path):
-        """Method that converts a VehicleActivity path into a list of nodes.
-
-        Args:
-            -path: path to convert
-
-        Returns:
-            -path_nodes: the converted path
-        """
-        if len(path) > 0:
-            path_nodes = [l[0][0] for l in path] + [path[-1][0][1]]
-        else:
-            path_nodes = [self._current_node]
-        return path_nodes
 
     @classmethod
     def reset_counter(cls):

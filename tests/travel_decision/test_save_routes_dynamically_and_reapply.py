@@ -146,27 +146,37 @@ class TestSaveRoutesAndReapply(unittest.TestCase):
 
         dfp_dep0 = dfp_dep[dfp_dep['ID'] == 'U0']
         self.assertEqual(len(dfp_dep0), 1)
-        self.assertEqual(dfp_dep0['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep0['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep0['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep0['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep0['COST'].iloc[0], 234.629125)
 
         dfp_dep1 = dfp_dep[dfp_dep['ID'] == 'U1']
         self.assertEqual(len(dfp_dep1), 1)
-        self.assertEqual(dfp_dep1['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep1['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep1['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep1['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep1['COST'].iloc[0], 369.258250)
 
         dfp_dep2 = dfp_dep[dfp_dep['ID'] == 'U2']
         self.assertEqual(len(dfp_dep2), 1)
-        self.assertEqual(dfp_dep2['PATH'].iloc[0], 'ORIGIN_0 RH_0 RH_1 RH_3 RH_4 DESTINATION_4')
+        self.assertEqual(dfp_dep2['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep2['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep2['PATH_LINKS'].iloc[0], 'ORIGIN_0_RH_0 RH_0_1 RH_1_3 RH_3_4 RH_4_DESTINATION_4')
         self.assertEqual(dfp_dep2['COST'].iloc[0], 255.901700)
 
         dfp_dep3 = dfp_dep[dfp_dep['ID'] == 'U3']
         self.assertEqual(len(dfp_dep3), 1)
-        self.assertEqual(dfp_dep3['PATH'].iloc[0], 'ORIGIN_0 RH_0 RH_1 RH_3 RH_4 DESTINATION_4')
+        self.assertEqual(dfp_dep3['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep3['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep3['PATH_LINKS'].iloc[0], 'ORIGIN_0_RH_0 RH_0_1 RH_1_3 RH_3_4 RH_4_DESTINATION_4')
         self.assertEqual(dfp_dep3['COST'].iloc[0], 255.901700)
 
         dfp_dep4 = dfp_dep[dfp_dep['ID'] == 'U4']
         self.assertEqual(len(dfp_dep4), 1)
-        self.assertEqual(dfp_dep4['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep4['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep4['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep4['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep4['COST'].iloc[0], 234.629125)
 
     def test_intermodal(self):
@@ -190,30 +200,42 @@ class TestSaveRoutesAndReapply(unittest.TestCase):
 
         dfp_dep0 = dfp_dep[dfp_dep['ID'] == 'U0']
         self.assertEqual(len(dfp_dep0), 6)
-        self.assertEqual(dfp_dep0[dfp_dep0['CHOSEN'] == 1]['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep0[dfp_dep0['CHOSEN'] == 1]['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep0[dfp_dep0['CHOSEN'] == 1]['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep0[dfp_dep0['CHOSEN'] == 1]['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep0[dfp_dep0['CHOSEN'] == 1]['COST'].iloc[0], 234.629125)
 
         dfp_dep1 = dfp_dep[dfp_dep['ID'] == 'U1']
         self.assertEqual(len(dfp_dep1), 1)
-        self.assertEqual(dfp_dep1['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep1['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep1['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep1['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep1['COST'].iloc[0], 369.258250)
 
         dfp_dep2 = dfp_dep[dfp_dep['ID'] == 'U2']
         self.assertEqual(len(dfp_dep2), 2)
-        self.assertEqual(dfp_dep2[dfp_dep2['CHOSEN'] == 1]['PATH'].iloc[0], 'ORIGIN_0 RH_0 RH_1 RH_3 RH_4 DESTINATION_4')
+        self.assertEqual(dfp_dep2[dfp_dep2['CHOSEN'] == 1]['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep2[dfp_dep2['CHOSEN'] == 1]['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep2[dfp_dep2['CHOSEN'] == 1]['PATH_LINKS'].iloc[0], 'ORIGIN_0_RH_0 RH_0_1 RH_1_3 RH_3_4 RH_4_DESTINATION_4')
         self.assertEqual(dfp_dep2['COST'].iloc[0], 255.901700)
 
         dfp_dep3 = dfp_dep[dfp_dep['ID'] == 'U3']
         self.assertEqual(len(dfp_dep3), 6)
-        self.assertEqual(dfp_dep3[dfp_dep3['CHOSEN'] == 1]['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_3 RH_3 RH_4 DESTINATION_4')
+        self.assertEqual(dfp_dep3[dfp_dep3['CHOSEN'] == 1]['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep3[dfp_dep3['CHOSEN'] == 1]['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep3[dfp_dep3['CHOSEN'] == 1]['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 TRANSIT_CAR_1_RH_1 RH_1_3 RH_3_4 RH_4_DESTINATION_4')
         self.assertEqual(dfp_dep3['COST'].iloc[0], 255.901700)
 
         dfp_dep4 = dfp_dep[dfp_dep['ID'] == 'U4']
         self.assertEqual(len(dfp_dep4), 2)
-        self.assertEqual(dfp_dep4['PATH'].iloc[0], 'ORIGIN_0 RH_0 RH_1 RH_4 DESTINATION_4')
+        self.assertEqual(dfp_dep4['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep4['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep4['PATH_LINKS'].iloc[0], 'ORIGIN_0_RH_0 RH_0_1 RH_1_4 RH_4_DESTINATION_4')
         self.assertEqual(dfp_dep4['COST'].iloc[0], 234.629125)
 
         dfp_dep5 = dfp_dep[dfp_dep['ID'] == 'U5']
         self.assertEqual(len(dfp_dep5), 6)
-        self.assertEqual(dfp_dep5['PATH'].iloc[0], 'ORIGIN_0 CAR_0 CAR_1 CAR_4 DESTINATION_4')
+        self.assertEqual(dfp_dep5['PATH_ORIGIN'].iloc[0], 'ORIGIN_0')
+        self.assertEqual(dfp_dep5['PATH_DESTINATION'].iloc[0], 'DESTINATION_4')
+        self.assertEqual(dfp_dep5['PATH_LINKS'].iloc[0], 'ORIGIN_0_CAR_0 CAR_0_1 CAR_1_4 CAR_4_DESTINATION_4')
         self.assertEqual(dfp_dep5['COST'].iloc[0], 234.629125)

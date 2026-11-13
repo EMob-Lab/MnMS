@@ -22,20 +22,12 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
 
-def common_rel_dist(pn, pn_, graph):
+def common_rel_dist(pl, pl_, graph):
+    pnl = [graph.links[lid] for lid in pl]
+    dist = sum(l.length for l in pnl)
+    pnl_ = [graph.links[lid] for lid in pl_]
+    dist_ = sum(l_.length for l_ in pnl_)
     common_dist = 0
-    dist = 0
-    pnl = []
-    for i in range(len(pn)-1):
-        l = graph.nodes[pn[i]].adj[pn[i+1]]
-        pnl.append(l)
-        dist += l.length
-    dist_ = 0
-    pnl_ = []
-    for i in range(len(pn_)-1):
-        l_ = graph.nodes[pn_[i]].adj[pn_[i+1]]
-        pnl_.append(l_)
-        dist_ += l_.length
     assert len(set(pnl)) == len(pnl) and len(set(pnl_)) == len(pnl_), 'Path invalid'
     inter = set(pnl).intersection(set(pnl_))
     for cl in inter:
@@ -226,9 +218,12 @@ class TestMobilityServicesGraph(unittest.TestCase):
             min_cost = min(df_['COST'])
             max_diff_cost_checked = [c <= 1.25 * min_cost for c in df_['COST']]
             self.assertEqual(sum(max_diff_cost_checked), len(max_diff_cost_checked))
-            paths_nodes = [p.split(' ') for p in df_['PATH']]
-            for i,pn in enumerate(paths_nodes):
-                common_rel_dists = [common_rel_dist(pn, pn_, self.supervisor._mlgraph.graph) for j,pn_ in enumerate(paths_nodes) if i != j]
+            paths_links = [p.split(' ') for p in df_['PATH_LINKS']]
+            for i, pl in enumerate(paths_links):
+                common_rel_dists = [
+                    common_rel_dist(pl, pl_, self.supervisor._mlgraph.graph)
+                    for j, pl_ in enumerate(paths_links) if i != j
+                ]
                 max_dist_in_common_checked = [ dc <= 0.95 for dc in common_rel_dists]
                 self.assertEqual(sum(max_dist_in_common_checked), len(max_dist_in_common_checked))
 
@@ -268,13 +263,25 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             dummy_dfd_u = dummy_dfd[dummy_dfd['ID'] == u]
             logit_dfd_u = logit_dfd[logit_dfd['ID'] == u]
-            self.assertEqual(
-                {(p,ms) for p,ms in zip(dummy_dfd_u['PATH'], dummy_dfd_u['SERVICES'])},
-                {(p,ms) for p,ms in zip(logit_dfd_u['PATH'], logit_dfd_u['SERVICES'])}
-            )
+            dummy_path_signature = set(zip(
+                dummy_dfd_u['PATH_ORIGIN'],
+                dummy_dfd_u['PATH_DESTINATION'],
+                dummy_dfd_u['PATH_LINKS'],
+                dummy_dfd_u['SERVICES'],
+            ))
+            logit_path_signature = set(zip(
+                logit_dfd_u['PATH_ORIGIN'],
+                logit_dfd_u['PATH_DESTINATION'],
+                logit_dfd_u['PATH_LINKS'],
+                logit_dfd_u['SERVICES'],
+            ))
+            self.assertEqual(dummy_path_signature, logit_path_signature)
             dummy_dfd_u_chosen = dummy_dfd_u[dummy_dfd_u['CHOSEN'] == 1].drop_duplicates()
             logit_dfd_u_chosen = logit_dfd_u[logit_dfd_u['CHOSEN'] == 1].drop_duplicates()
-            same_choices = same_choices and (dummy_dfd_u_chosen['PATH'].iloc[0] == logit_dfd_u_chosen['PATH'].iloc[0]) \
+            same_choices = same_choices \
+                and (dummy_dfd_u_chosen['PATH_ORIGIN'].iloc[0] == logit_dfd_u_chosen['PATH_ORIGIN'].iloc[0]) \
+                and (dummy_dfd_u_chosen['PATH_DESTINATION'].iloc[0] == logit_dfd_u_chosen['PATH_DESTINATION'].iloc[0]) \
+                and (dummy_dfd_u_chosen['PATH_LINKS'].iloc[0] == logit_dfd_u_chosen['PATH_LINKS'].iloc[0]) \
                 and (dummy_dfd_u_chosen['SERVICES'].iloc[0] == logit_dfd_u_chosen['SERVICES'].iloc[0])
         self.assertEqual(same_choices, False)
 
@@ -342,13 +349,25 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             df1_u = df1[df1['ID'] == u]
             df2_u = df2[df2['ID'] == u]
-            self.assertEqual(
-                {(p,ms) for p,ms in zip(df1_u['PATH'], df1_u['SERVICES'])},
-                {(p,ms) for p,ms in zip(df2_u['PATH'], df2_u['SERVICES'])}
-            )
+            path_signature1 = set(zip(
+                df1_u['PATH_ORIGIN'],
+                df1_u['PATH_DESTINATION'],
+                df1_u['PATH_LINKS'],
+                df1_u['SERVICES'],
+            ))
+            path_signature2 = set(zip(
+                df2_u['PATH_ORIGIN'],
+                df2_u['PATH_DESTINATION'],
+                df2_u['PATH_LINKS'],
+                df2_u['SERVICES'],
+            ))
+            self.assertEqual(path_signature1, path_signature2)
             df1_u_chosen = df1_u[df1_u['CHOSEN'] == 1].drop_duplicates()
             df2_u_chosen = df2_u[df2_u['CHOSEN'] == 1].drop_duplicates()
-            same_choices = same_choices and (df1_u_chosen['PATH'].iloc[0] == df2_u_chosen['PATH'].iloc[0]) \
+            same_choices = same_choices \
+                and (df1_u_chosen['PATH_ORIGIN'].iloc[0] == df2_u_chosen['PATH_ORIGIN'].iloc[0]) \
+                and (df1_u_chosen['PATH_DESTINATION'].iloc[0] == df2_u_chosen['PATH_DESTINATION'].iloc[0]) \
+                and (df1_u_chosen['PATH_LINKS'].iloc[0] == df2_u_chosen['PATH_LINKS'].iloc[0]) \
                 and (df1_u_chosen['SERVICES'].iloc[0] == df2_u_chosen['SERVICES'].iloc[0])
         self.assertEqual(same_choices, False)
 
@@ -372,7 +391,7 @@ class TestMobilityServicesGraph(unittest.TestCase):
         for u in ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9']:
             dfu = df[df['ID'] == u]
             cost_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['COST']
-            path_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['PATH'] # ruff: ignore[F841] FIXME The path should be checked.
+            path_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['PATH_LINKS'] # ruff: ignore[F841] FIXME The path should be checked.
             ms_chosen = dfu[dfu['CHOSEN'] == 1].iloc[0]['SERVICES']
             if 'CAR' in ms_chosen:
                 dfu_CAR = dfu[dfu['SERVICES'] == 'WALK CAR WALK']

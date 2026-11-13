@@ -6,10 +6,12 @@ from queue import PriorityQueue
 from typing import Any
 
 import numpy as np
-from hipop.shortest_path import compute_path_length, dijkstra
+from hipop.shortest_path import dijkstra
 
 from mnms import create_logger
 from mnms.demand import User
+from mnms.graph.graph_path import GraphPath
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.mobility_service.abstract import AbstractOnDemandMobilityService, Request, compute_path_travel_time
 from mnms.mobility_service.filters import InRadiusFilter
 from mnms.time import Dt, Time
@@ -83,40 +85,25 @@ def get_remaining_distance(veh: Vehicle, plan: list[VehicleActivity]) -> float:
     """Method that computes the remaining distance vehicle has to run to achieve
     the plan.
     """
-    flatten_path_link = [p[0] for activity in plan for p in activity.path]
-    flatten_path_dist = [p[1] for activity in plan for p in activity.path]
+    flatten_path_link = [lid for activity in plan for lid in activity.path.links]
+    flatten_path_dist = [l for activity in plan for l in activity.link_lengths]
     try:
         # Vehicle has already started to run plan
-        index_current_link = flatten_path_link.index(veh.current_link)
+        index_current_link = flatten_path_link.index(veh.current_link.id if veh.current_link is not None else None)
         remaining_dist = sum(flatten_path_dist[index_current_link+1:]) + veh.remaining_link_length
     except ValueError:
         # Vehicle should run the whole plan
         remaining_dist = sum(flatten_path_dist)
     return remaining_dist
 
-def path_to_nodes(path) -> list[str]:
-    """Method that converts a built path into a list of nodes.
-
-    Args:
-        -path: path to convert
-
-    Returns:
-        -path_nodes: the converted path
-    """
-    if len(path) > 0:
-        path_nodes = [l[0][0] for l in path] + [path[-1][0][1]]
-    else:
-        path_nodes = []
-    return path_nodes
-
-def get_user_nodes_from_plan(uid: str, plan: list[VehicleActivity]) -> list[str]:
-    """Method that deduce the nodes user will go through based on a plan.
+def get_user_path_from_plan(uid: str, plan: list[VehicleActivity]) -> GraphPath:
+    """Method that deduce the path user will go through based on a plan.
 
     Args:
         -uid: id of the user
         -plan: the plan
     """
-    nodes = []
+    path = None
     user_pu_act_ind = [i for i,a in enumerate(plan) if a.user.id == uid and isinstance(a, VehicleActivityPickup)]
     if user_pu_act_ind:
         start = False
@@ -126,14 +113,15 @@ def get_user_nodes_from_plan(uid: str, plan: list[VehicleActivity]) -> list[str]
 
     for i, a in enumerate(plan):
         if start:
-            nodes.extend(path_to_nodes(a.path)[:-1])
+            path = a.path if path is None else path + a.path
         if i == user_pu_act_ind:
             start = True
         if a.user.id == uid and isinstance(a, VehicleActivityServing):
-            nodes.append(a.node)
-            break
+            if path is None:
+                raise ValueError(f'Serving activity before pickup activity for user {uid} in plan {plan}')
+            return path
 
-    return nodes
+    raise ValueError(f'No serving activity for user {uid} in plan {plan}')
 
 
 class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
@@ -244,9 +232,11 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         veh_new_plan = {}
         for veh in vehs_in_radius:
             if self.able_to_serve_new_request(veh):
-                activities = [VehicleActivityPickup(node=user.current_node,
+                activities = [VehicleActivityPickup(path=GraphPath([user.current_node], []),
+                                                    link_lengths=[],
                                                     user=user),
-                              VehicleActivityServing(node=drop_node,
+                              VehicleActivityServing(path=GraphPath([drop_node], []),
+                                                     link_lengths=[],
                                                      user=user)]
                 #log.info(f'Add {activities} to {veh.id} plan {veh.activity} - {veh.activities}')
                 new_plan = self.replanning(veh, activities)
@@ -281,7 +271,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         """
         pickup_time = Dt()
         for a in plan:
-            pickup_time += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
+            pickup_time += Dt(seconds=compute_path_travel_time(a.path, a.link_lengths, self.graph.links, self.id))
             if isinstance(a, VehicleActivityPickup) and a.user == user:
                 break
         return pickup_time
@@ -329,8 +319,8 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
                 sys.exit(-1)
 
         new_plan = [veh.activity.copy()] + [activity.copy() for activity in veh.activities]
-        veh_next_node = veh.current_link[1] if (not isinstance(veh.activity, VehicleActivityStop) and veh.current_link is not None) else None
-        remaining_first_link_length = veh.remaining_link_length if veh_next_node is not None else None
+        veh_current_link = veh.current_link if not isinstance(veh.activity, VehicleActivityStop) else None
+        remaining_first_link_length = veh.remaining_link_length if veh_current_link is not None else None
 
         if new_pu_activities:
             ## Insert the pickup activities after the last pickup activity of vehicle's current plan
@@ -342,19 +332,26 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             insertion_index =  last_pu_activity_index + 1
             for new_pu_activity in reversed(new_pu_activities):
                 new_plan = self.insert_activity_by_index_in_plan(new_plan, new_pu_activity,
-                    insertion_index, veh.current_node, forced_next_node=veh_next_node,
+                    insertion_index, veh.current_node, forced_first_link=veh_current_link,
                     remaining_first_link_length=remaining_first_link_length)
 
         if new_serv_activities:
             ## Insert the serving activities at the end of plan
             for new_serv_activity in new_serv_activities:
                 new_plan = self.insert_activity_by_index_in_plan(new_plan, new_serv_activity,
-                    len(new_plan), veh.current_node, forced_next_node=veh_next_node,
+                    len(new_plan), veh.current_node, forced_first_link=veh_current_link,
                     remaining_first_link_length=remaining_first_link_length)
 
         return new_plan
 
-    def insert_activity_by_index_in_plan(self, plan: list[VehicleActivity], activity: VehicleActivity, index: int, start_node: str, forced_next_node: str | None = None, remaining_first_link_length: float | None = None) -> list[VehicleActivity]:
+    def insert_activity_by_index_in_plan(self,
+            plan: list[VehicleActivity],
+            activity: VehicleActivity,
+            index: int,
+            start_node: str,
+            forced_first_link: LinkDescriptor | None = None,
+            remaining_first_link_length: float | None = None,
+        ) -> list[VehicleActivity]:
         """Method that insert an activity in a plan by index.
         NB: if activity at this index before the insertion is of type VehicleActivityStop
         or VehicleActivityRepositioning, it is removed from the plan.
@@ -364,9 +361,8 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             -activity: activity to insert
             -index: index at which the activity should be inserted
             -start_node: node where plan should start if relevant
-            -forced_next_node: node where vehicle should arrive right after start_node
-            -remaining_first_link_length: the distance vehicle already has to run between
-             start_node and forced_next_node
+            -forced_first_link: link vehicle should travel first (starting at start_node)
+            -remaining_first_link_length: the distance vehicle already has to run on forced_first_link
 
         Returns:
             -incremented_plan: the plan with the new activity inserted
@@ -380,14 +376,14 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         if prev_a is not None:
             prev_node = prev_a.node
         else:
-            if forced_next_node is None:
+            if forced_first_link is None:
                 prev_node = start_node
             else:
-                prev_node = forced_next_node
+                prev_node = forced_first_link.downstream
                 add_current_node = True
         if prev_node != activity.node:
             try:
-                path, cost = dijkstra(self.graph,
+                path_with_cost = dijkstra(self.graph,
                                       prev_node,
                                       activity.node,
                                       'travel_time',
@@ -396,35 +392,35 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             except ValueError as ex:
                 log.error(f'HiPOP.Error: {ex}')
                 sys.exit(-1)
-            if cost == float('inf'):
+            if path_with_cost is None:
                 raise PathNotFound(prev_node, activity.node)
+            path = GraphPath.from_hipop(path_with_cost[0])
         else:
-            if add_current_node:
-                path = [forced_next_node]
-            else:
-                path = []
-            cost = 0
+            path = GraphPath([prev_node], [])
         if add_current_node:
-            path = [start_node] + path
-        activity.modify_path(self.construct_veh_path(path))
-        if add_current_node:
-            activity.path[0] = (activity.path[0][0], remaining_first_link_length)
+            activity.modify_path(
+                forced_first_link.to_path() + path,
+                [remaining_first_link_length] + self.compute_link_lengths(path)
+            )
+        else:
+            activity.modify_path(path, self.compute_link_lengths(path))
+
         ## Insert the new activity
         plan.insert(index, activity)
 
         ## Overwrite first activity path and remaining length on first link if relevant
-        if forced_next_node is not None and not add_current_node:
+        if forced_first_link is not None and not add_current_node:
             assert remaining_first_link_length is not None
-            found = len(plan[0].path) == 0
-            for i in range(len(plan[0].path)):
-                if plan[0].path[i][0] == (start_node, forced_next_node):
-                    first_a_new_path = plan[0].path[i:]
-                    first_a_new_path[0] = (first_a_new_path[0][0], remaining_first_link_length)
-                    plan[0].modify_path_and_next(first_a_new_path)
+            found = len(plan[0].path.links) == 0
+            for i, lid in enumerate(plan[0].path.links):
+                if lid == forced_first_link.id:
+                    first_a_new_path, first_a_new_lengths = plan[0].sub_path(i)
+                    first_a_new_lengths[0] = remaining_first_link_length
+                    plan[0].modify_path_and_next(first_a_new_path, first_a_new_lengths)
                     found = True
                     break
             if not found:
-                log.error(f"Cannot find current link {start_node}-{forced_next_node} "\
+                log.error(f"Cannot find current link {forced_first_link} "\
                     f"in plan's first activity {plan[0]} (remaining_first_link_length={remaining_first_link_length})")
                 sys.exit(-1)
 
@@ -435,7 +431,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             next_a = plan[index+1] if index+1 < len(plan) else None
         if next_a is not None:
             try:
-                path, cost = dijkstra(self.graph,
+                path_with_cost = dijkstra(self.graph,
                                       activity.node,
                                       next_a.node,
                                       'travel_time',
@@ -444,9 +440,10 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
             except ValueError as ex:
                 log.error(f'HiPOP.Error: {ex}')
                 sys.exit(-1)
-            if cost == float('inf'):
+            if path_with_cost is None:
                 raise PathNotFound(activity.node, next_a.node)
-            next_a.modify_path(self.construct_veh_path(path))
+            path = GraphPath.from_hipop(path_with_cost[0])
+            next_a.modify_path(path, self.compute_link_lengths(path))
 
         return plan
 
@@ -465,7 +462,7 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         veh.override_current_activity()
         user.set_state_waiting_vehicle(veh)
         immediate_match = len(new_plan) > 1 \
-            and new_plan[0].user == request.user and new_plan[0].path == [] \
+            and new_plan[0].user == request.user and len(new_plan[0].path.links) == 0 \
             and new_plan[1].user == request.user and type(new_plan[1]).__name__ == 'VehicleActivityServing'\
             and self._tcurrent - request.request_time <= dt
         if immediate_match:
@@ -474,15 +471,15 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         ## Update user's and (future) passengers' paths' with regard to this match
         passengers = {a.user for a in new_plan}
         for passenger in passengers:
-            nodes_at_match = get_user_nodes_from_plan(passenger.id, new_plan)
+            path_at_match = get_user_path_from_plan(passenger.id, new_plan)
             service_index = passenger.get_mobility_service_index_in_path(self.id)
             service_slice = passenger.path.layers[service_index][1]
-            nodes = passenger.path.nodes[service_slice]
-            if nodes != nodes_at_match:
-                passenger.modify_path_leg(self.id, nodes_at_match)
+            service_path = passenger.path.graph_path.sub_path(service_slice.start, service_slice.stop - 1 - service_slice.start)
+            if service_path != path_at_match:
+                passenger.modify_path_leg(self.id, path_at_match)
             if passenger.id == user.id:
                 ## Save user's info at matching
-                initial_path_dist = compute_path_length(self.graph, nodes)
+                initial_path_dist = service_path.compute_length(self.graph)
                 self.users[user.id] = UserInfo(request, user.distance, initial_path_dist) # NB: support only one simultaneous req per user
 
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self.id} (new plan = {new_plan})')
@@ -597,8 +594,8 @@ class OnDemandSharedMobilityService(AbstractOnDemandMobilityService):
         else:
             service_index = user.get_mobility_service_index_in_path(self.id)
             service_slice = user.path.layers[service_index][1]
-            nodes = user.path.nodes[service_slice]
-            initial_path_distance = compute_path_length(self.graph, nodes)
+            service_path = user.path.graph_path.sub_path(service_slice.start, service_slice.stop - 1 - service_slice.start)
+            initial_path_distance = service_path.compute_length(self.graph)
 
         # Deduce detour ratio for the user
         detour_ratio = total_distance / initial_path_distance

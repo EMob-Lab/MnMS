@@ -22,7 +22,7 @@ def analyze_paths(df_paths):
     for index, path in df_paths.iterrows():
         if path["COST"] == np.inf:  # Check for infinite cost
             paths_inf_cost = paths_inf_cost + 1
-        if path["PATH"] == '':  # Check for missing path
+        if path["PATH_ORIGIN"] == '':  # Check for missing path (NB: PATH_LINKS is also empty for paths with no link)
             paths_not_defined = paths_not_defined + 1
         if path["LENGTH"] == np.inf:  # Check for infinite length
             paths_inf_length = paths_inf_length + 1

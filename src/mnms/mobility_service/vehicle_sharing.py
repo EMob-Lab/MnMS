@@ -93,7 +93,7 @@ class VehicleSharingMobilityService(AbstractMobilityService):
         for v in range(nb_initial_veh):
             v = self.fleet.create_vehicle(layer_node,
                                           capacity=self._veh_capacity,
-                                          activities=[VehicleActivityStop(node=layer_node)])
+                                          activities=[VehicleActivityStop.at_node(layer_node)])
             v.set_position(self.graph.nodes[layer_node].position)
             station.waiting_vehicles.append(v)
 
@@ -279,13 +279,13 @@ class VehicleSharingMobilityService(AbstractMobilityService):
         drop_node = request.drop_node
         veh_id, _ = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh_id} of mobility service {self._id}')
-        upath = list(user.path.nodes)
-        upath = upath[user.get_current_node_index():user.get_node_index_in_path(drop_node) + 1]
-        user_path = self.construct_veh_path(upath)
+        current_node_ind = user.get_current_node_index()
+        drop_node_ind = user.get_node_index_in_path(drop_node)
+        user_path = user.path.graph_path.sub_path(current_node_ind, drop_node_ind - current_node_ind)
 
         activities = [
-            VehicleActivityServing(node=drop_node,
-                                   path=user_path,
+            VehicleActivityServing(path=user_path,
+                                   link_lengths=self.compute_link_lengths(user_path),
                                    user=user)
         ]
 

@@ -9,11 +9,11 @@ from scipy.optimize import linear_sum_assignment
 
 from mnms import create_logger
 from mnms.demand import User
+from mnms.graph.graph_path import GraphPath
 from mnms.mobility_service.abstract import (
     AbstractOnDemandDepotMobilityService,
     AbstractOnDemandMobilityService,
     Request,
-    compute_path_nodes_travel_time,
     compute_path_travel_time,
 )
 from mnms.mobility_service.filters import (
@@ -309,28 +309,26 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             sys.exit(-1)
 
         ## Parse outputs and complete the pickup times and veh paths matrices
-        for i in range(len(paths)):
+        for i, path_with_cost in enumerate(paths):
+            if path_with_cost is None: # If vehicle cannot reach user, skip and consider next vehicle
+                continue
             ridx = ridxs[i]
             req = reqs[ridx]
             vidx = vidxs[i]
             veh = vehs[vidx]
-            veh_path, tt = paths[i]
-            # If vehicle cannot reach user, skip and consider next vehicle
-            if tt == float('inf'):
-                continue
+            veh_path, tt = path_with_cost
             service_dt = Dt(seconds=tt)
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
-                veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
-                veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
-                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                veh_curr_node_ind_in_path = veh.activity.path.nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
+                service_dt += Dt(seconds=compute_path_travel_time(*veh.activity.sub_path(veh_curr_node_ind_in_path+1), self.graph.links, self.id))
+                current_link = self.graph.links[veh.activity.path.links[veh_curr_node_ind_in_path]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, a.link_lengths, self.graph.links, self.id))
             # Apply user's waiting tolerance
             if service_dt < req.user.pickup_dt[self.id]:
                 pickup_times_matrix[ridx][vidx] = service_dt.to_seconds()
-                veh_paths_matrix[ridx][vidx] = veh_path
+                veh_paths_matrix[ridx][vidx] = GraphPath.from_hipop(veh_path)
 
         ### Solve the minimum total pickup time matching problem
         row_ind, col_ind = linear_sum_assignment(pickup_times_matrix)
@@ -376,36 +374,35 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             # Let's read the shortest paths
             paths = []
             for o,d in zip(origins, destinations):
-                veh_path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
-                if o != d and len(veh_path) > 1:
-                    # Compute the travel time
-                    tt = compute_path_nodes_travel_time(veh_path, self.graph.nodes, self.id)
-                elif o == d:
-                    veh_path = []
-                    tt = 0
+                path = decode_shortest_path_tree(self.layer.shortest_paths, o, d)
+                if path is None:
+                    paths.append(None)
                 else:
-                    tt = float('inf')
-                paths.append((veh_path, tt))
+                    tt = path.compute_cost(self.graph, 'travel_time', {self.layer.id: self.id})
+                    paths.append((path, tt))
         else:
             # Let's compute the shortest paths
             try:
-                paths = parallel_dijkstra(self.graph,
-                                        origins,
-                                        destinations,
-                                        [{self.layer.id: self.id}]*len(origins),
-                                        'travel_time',
-                                        multiprocessing.cpu_count(),
-                                        [{self.layer.id}]*len(origins))
+                hipop_paths = parallel_dijkstra(
+                    self.graph,
+                    origins,
+                    destinations,
+                    [{self.layer.id: self.id}]*len(origins),
+                    'travel_time',
+                    multiprocessing.cpu_count(),
+                    [{self.layer.id}]*len(origins)
+                )
             except ValueError as ex:
                 log.error(f'HiPOP.Error: {ex}')
                 sys.exit(-1)
+            paths = [None if p is None else (GraphPath.from_hipop(p[0]), p[1]) for p in hipop_paths]
 
         # Gather valid candidates
         candidates = []
-        for i, (veh_path, tt) in enumerate(paths):
-            if tt == float('inf'):
-                # This vehicle cannot reach user, skip and consider next vehicle
+        for i, path_with_cost in enumerate(paths):
+            if path_with_cost is None: # This vehicle cannot reach user, skip and consider next vehicle
                 continue
+            veh_path, tt = path_with_cost
             veh = idle_vehs_in_radius[i]
             service_dt = Dt(seconds=tt)
             candidates.append((veh, service_dt, veh_path))
@@ -447,24 +444,25 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
             veh_last_node = veh.activity.node if not veh.activities else \
                     veh.activities[-1].node
             try:
-                veh_path, tt = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
+                path_with_cost = dijkstra(self.graph, veh_last_node, user.current_node, 'travel_time', {self.layer.id: self.id}, {self.layer.id})
             except ValueError as ex:
                 log.error(f'HiPOP.Error: {ex}')
                 sys.exit(-1)
             # If vehicle cannot reach user, skip and consider next vehicle
-            if tt == float('inf'):
+            if path_with_cost is None:
                 continue
+            veh_path = GraphPath.from_hipop(path_with_cost[0])
+            tt = path_with_cost[1]
 
             # Compute the estimated pickup time including end of current vehicle's plan plus the pickup activity for user
             service_dt = Dt(seconds=tt)
             if veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
-                veh_curr_act_path_nodes = veh.path_to_nodes(veh.activity.path)
-                veh_curr_node_ind_in_path = veh_curr_act_path_nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
-                service_dt += Dt(seconds=compute_path_travel_time(veh.activity.path[veh_curr_node_ind_in_path+1:], self.graph.nodes, self.id))
-                current_link = self.graph.nodes[veh.current_node].adj[veh_curr_act_path_nodes[veh_curr_node_ind_in_path+1]]
+                veh_curr_node_ind_in_path = veh.activity.path.nodes.index(veh.current_node) # NB: works only when an acticity path does not contain several times the same node
+                service_dt += Dt(seconds=compute_path_travel_time(*veh.activity.sub_path(veh_curr_node_ind_in_path+1), self.graph.links, self.id))
+                current_link = self.graph.links[veh.activity.path.links[veh_curr_node_ind_in_path]]
                 service_dt += Dt(seconds=veh.remaining_link_length / current_link.costs[self.id]['speed'])
             for a in veh.activities:
-                service_dt += Dt(seconds=compute_path_travel_time(a.path, self.graph.nodes, self.id))
+                service_dt += Dt(seconds=compute_path_travel_time(a.path, a.link_lengths, self.graph.links, self.id))
             candidates.append((veh, service_dt, veh_path))
 
         # Select the veh with the smallest service time
@@ -540,16 +538,14 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
         drop_node = request.drop_node
         veh, veh_path = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self._id}')
-        upath = list(user.path.nodes)
-        upath = upath[user.get_current_node_index():user.get_node_index_in_path(drop_node) + 1]
-        user_path = self.construct_veh_path(upath)
-        veh_path = self.construct_veh_path(veh_path)
+        curr_node_ind = user.get_current_node_index()
+        user_path = user.path.graph_path.sub_path(curr_node_ind, user.get_node_index_in_path(drop_node) - curr_node_ind)
         activities = [
-            VehicleActivityPickup(node=user.current_node,
-                                  path=veh_path,
+            VehicleActivityPickup(path=veh_path,
+                                  link_lengths=self.compute_link_lengths(veh_path),
                                   user=user),
-            VehicleActivityServing(node=drop_node,
-                                   path=user_path,
+            VehicleActivityServing(path=user_path,
+                                   link_lengths=self.compute_link_lengths(user_path),
                                    user=user)
         ]
 
@@ -558,7 +554,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
 
         if veh.activity_type is ActivityType.STOP:
             veh.activity.is_done = True
-            immediate_match = len(veh.activities) == 2 and len(veh_path) == 0 \
+            immediate_match = len(veh.activities) == 2 and len(veh_path.links) == 0 \
                 and self._tcurrent - request.request_time <= dt
             if immediate_match:
                 # This is an immediate match, take into account effective remaining
@@ -623,7 +619,7 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                         # Get the shortest path till the nearest depot
                         nearest_depot = nearest_depot[0]
                         try:
-                            veh_path, cost = dijkstra(self.graph,
+                            path_with_cost = dijkstra(self.graph,
                                                     veh._current_node,
                                                     nearest_depot.node,
                                                     'travel_time',
@@ -633,12 +629,12 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
                         except ValueError as ex:
                             log.error(f'HiPOP.Error: {ex}')
                             sys.exit(-1)
-                        if cost == float('inf'):
+                        if path_with_cost is None:
                             raise PathNotFound(veh._current_node, depots)
                         # Make the vehicle reposition till the nearest depot
-                        veh_path = self.construct_veh_path(veh_path)
-                        repositioning = VehicleActivityRepositioning(node=nearest_depot.node,
-                                                                 path=veh_path)
+                        veh_path = GraphPath.from_hipop(path_with_cost[0])
+                        repositioning = VehicleActivityRepositioning(path=veh_path,
+                                                                     link_lengths=self.compute_link_lengths(veh_path))
                         veh.activity.is_done = True
                         veh.add_activities([repositioning])
                 else:
@@ -658,26 +654,23 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
         drop_node = request.drop_node
         veh, veh_path = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self._id}')
-        upath = list(user.path.nodes)
-        upath = upath[user.get_current_node_index():user.get_node_index_in_path(drop_node) + 1]
+        curr_node_ind = user.get_current_node_index()
+        user_path = user.path.graph_path.sub_path(curr_node_ind, user.get_node_index_in_path(drop_node) - curr_node_ind)
 
-        user_path = self.construct_veh_path(upath)
-        veh_path = self.construct_veh_path(veh_path)
-
-        if veh_path:
-            pickup = VehicleActivityPickup(node=user.current_node,
-                                           path=veh_path,
+        if len(veh_path.links) > 0:
+            pickup = VehicleActivityPickup(path=veh_path,
+                                           link_lengths=self.compute_link_lengths(veh_path),
                                            user=user)
         else:
-            pickup = VehicleActivityPickup(node=user.current_node,
-                                           path=veh_path,
+            pickup = VehicleActivityPickup(path=veh_path,
+                                           link_lengths=[],
                                            user=user,
                                            is_done=True)
 
         activities = [
             pickup,
-            VehicleActivityServing(node=drop_node,
-                                   path=user_path,
+            VehicleActivityServing(path=user_path,
+                                   link_lengths=self.compute_link_lengths(user_path),
                                    user=user)
         ]
 
@@ -686,7 +679,7 @@ class OnDemandDepotMobilityService(OnDemandMobilityService, AbstractOnDemandDepo
 
         if veh.activity_type is ActivityType.STOP:
             veh.activity.is_done = True
-            immediate_match = len(veh.activities) == 2 and len(veh_path) == 0 \
+            immediate_match = len(veh.activities) == 2 and len(veh_path.links) == 0 \
                 and self._tcurrent - request.request_time <= dt
             if immediate_match:
                 # This is an immediate match , take into account effective remaining

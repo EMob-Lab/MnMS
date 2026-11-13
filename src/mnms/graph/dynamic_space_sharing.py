@@ -6,26 +6,13 @@ from dataclasses import dataclass
 from hipop.graph import NodeMap
 from hipop.shortest_path import parallel_dijkstra_heterogeneous_costs
 
+from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Time
 from mnms.vehicles.veh_type import ActivityType, Vehicle, VehicleActivity
 
 log = create_logger(__name__)
 
-def path_to_nodes(path) -> list[str]:
-    """Method that converts a built path into a list of nodes.
-
-    Args:
-        -path: path to convert
-
-    Returns:
-        -path_nodes: the converted path
-    """
-    if len(path) > 0:
-        path_nodes = [l[0][0] for l in path] + [path[-1][0][1]]
-    else:
-        path_nodes = []
-    return path_nodes
 
 @dataclass
 class BannedLink:
@@ -100,21 +87,19 @@ class DynamicSpaceSharing:
         # NB: a vehicle is considered to be impacted by the banning if it has the banned
         #     link in its plan, has not yet passed it, and is not currently on it
         vehicles_to_reroute = []
-        link_border = (link.upstream, link.downstream)
         for veh in vehicles:
-            current_link = veh.current_link
+            current_link_id = veh.current_link.id if veh.current_link is not None else None
             current_act = veh.activity
-            path = [p[0] for p in current_act.path]
+            path_links = current_act.path.links
             try:
-                ind_veh_link = path.index(current_link) # NB: works only when activity path does not pass through the same link several times
-                ind_banned_link = path.index(link_border) # NB: works only when activity path does not pass through the same link several times
+                ind_veh_link = path_links.index(current_link_id) # NB: works only when activity path does not pass through the same link several times
+                ind_banned_link = path_links.index(lid) # NB: works only when activity path does not pass through the same link several times
                 if ind_banned_link > ind_veh_link:
                     vehicles_to_reroute.append((veh, current_act))
             except ValueError:
                 pass
             for act in veh.activities:
-                path = [p[0] for p in act.path]
-                if link_border in path:
+                if lid in act.path.links:
                     vehicles_to_reroute.append((veh, act))
 
         return vehicles_to_reroute
@@ -209,10 +194,10 @@ class DynamicSpaceSharing:
         costs = []
         for veh, activity in vehs:
             if activity == veh.activity:
-                origins.append(veh.current_link[1])
+                origins.append(veh.current_link.downstream)
             else:
-                origins.append(activity.path[0][0][0])
-            destinations.append(activity.path[-1][0][1])
+                origins.append(activity.path.origin)
+            destinations.append(activity.path.destination)
             mservices.append(veh.mobility_service)
             layers.append(self.graph.mapping_layer_services[mservices[-1]])
             map_layers_services.append({layers[-1].id: mservices[-1]})
@@ -234,20 +219,23 @@ class DynamicSpaceSharing:
             sys.exit(-1)
 
         # Parse new paths computed
-        for i in range(len(new_paths)):
-            new_path, _ = new_paths[i]
-            if new_path:
-                mservice = layers[i].mobility_services[mservices[i]]
-                new_veh_path = mservice.construct_veh_path(new_path)
-                veh = vehs[i][0]
-                activity = vehs[i][1]
+        for i, new_path_with_cost in enumerate(new_paths):
+            mservice = layers[i].mobility_services[mservices[i]]
+            veh = vehs[i][0]
+            activity = vehs[i][1]
+            if new_path_with_cost is not None and len(new_path_with_cost[0].links) > 0:
+                new_part = GraphPath.from_hipop(new_path_with_cost[0])
+                new_part_lengths = mservice.compute_link_lengths(new_part)
                 old_veh_path = activity.path
 
                 if activity == veh.activity:
-                    new_veh_path = [(veh.current_link, veh.remaining_link_length)] + new_veh_path
-                    activity.modify_path_and_next(new_veh_path)
+                    current_link_path = veh.current_link.to_path()
+                    activity.modify_path_and_next(
+                        current_link_path + new_part,
+                        [veh.remaining_link_length] + new_part_lengths
+                    )
                 else:
-                    activity.modify_path(new_veh_path)
+                    activity.modify_path(new_part, new_part_lengths)
                 log.info(f'Vehicle {veh.id} modified path of activity {old_veh_path} to {activity} following a banning')
 
                 # Find all users concerned by this rerouting
@@ -264,16 +252,16 @@ class DynamicSpaceSharing:
                         users_impacted.append(puser)
                 # Modify their path
                 for passenger in users_impacted:
-                    old_veh_path_nodes = path_to_nodes(old_veh_path)
+                    old_part = old_veh_path
                     if activity == veh.activity:
                         # Find part to effectively modify (remove the part of old path already achieved)
                         try:
-                            idx = old_veh_path_nodes.index(new_path[0])
+                            idx = old_veh_path.nodes.index(new_part.origin)
                         except ValueError:
-                            log.error(f'Cannot find new path first node {new_path[0]} into old path {old_veh_path_nodes}...')
+                            log.error(f'Cannot find new path first node {new_part.origin} into old path {old_veh_path}...')
                             sys.exit(-1)
-                        old_veh_path_nodes = old_veh_path_nodes[idx:]
-                    passenger.modify_part_of_path(old_veh_path_nodes, new_path, self.graph, self.cost)
+                        old_part = old_veh_path.sub_path(idx)
+                    passenger.modify_part_of_path(old_part, new_part, self.graph, self.cost)
                     log.info(f'User {passenger.id} updated her path consequently: {passenger.path}')
             else:
                 log.warning(f'Cannot find an alternative route '\

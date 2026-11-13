@@ -4,6 +4,7 @@ import numpy as np
 
 from mnms.demand.user import User, UserState
 from mnms.graph.layers import MultiLayerGraph
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.log import create_logger
 from mnms.mobility_service.abstract import AbstractMobilityService
 from mnms.time import Dt, Time
@@ -84,7 +85,8 @@ class UserFlow:
         Args:
             -user: user to move
         """
-        unode, dnode = user.current_link
+        unode = user.current_link.upstream
+        dnode = user.current_link.downstream
         remaining_length = user.remaining_link_length
 
         unode_pos = np.array(self._graph.graph.nodes[unode].position)
@@ -138,14 +140,13 @@ class UserFlow:
                                 dist_travelled = 0
                             else:
                                 cnode_ind = user.get_current_node_index()
-                                next_next_node = upath[cnode_ind + 1]
-                                next_link = self._graph.graph.nodes[user.current_node].adj[next_next_node]
+                                next_link = self._graph.graph.links[user.path.links[cnode_ind]]
                                 if next_link.label == 'TRANSIT':
                                     # User keeps walking
                                     log.info(f"User {uid} enters connection on {next_link.id}")
                                     dist_travelled = dist_travelled - remaining_length
                                     self._walking[uid] = next_link.length
-                                    user.current_link = (user.current_node, next_next_node)
+                                    user.current_link = LinkDescriptor.from_path(user.path.graph_path, cnode_ind)
                                 else:
                                     # User stops walking
                                     user.set_state_stop()
@@ -253,7 +254,7 @@ class UserFlow:
                     self._walking.pop(u.id, None)
                     u.notify(self._tcurrent)
                 else:
-                    next_link = self._graph.graph.nodes[cnode].adj[upath[cnode_ind + 1]]
+                    next_link = self._graph.graph.links[u.path.links[cnode_ind]]
                     if next_link.label == "TRANSIT":
                         # User is about to walk
                         log.info(f"User {u.id} enters connection on {next_link.id}")
@@ -305,14 +306,14 @@ class UserFlow:
 
         return refused_users
 
-    def manage_links_removal_after_match(self, deleted_links, new_users, matched_user_id, service, decision_model):
+    def manage_links_removal_after_match(self, deleted_links: set[str], new_users, matched_user_id, service, decision_model):
         """Method that manages the interruption of users who were supposed to pass
         through a link that was deleted following a match.
         NB: For now only a match with a free-floating vehicle sharing service can
         lead to link deletion.
 
         Args:
-            -deleted_links: the list of links that have been deleted
+            -deleted_links: the IDs of the links that have been deleted
             -new_users: user who are about to depart but not yet taken into account
              by the user flow
             -matched_user_id: the id of the user who was matched
@@ -327,9 +328,7 @@ class UserFlow:
         users_canceling = []
         for u in list(self.users.values()) + new_users:
             if u.id != matched_user_id and u.path is not None:
-                unodes = u.path.nodes
-                path_links = [(unodes[i],unodes[i+1]) for i in range(len(unodes)-1)]
-                intersect = set(deleted_links).intersection(set(path_links))
+                intersect = deleted_links.intersection(u.path.links)
                 if len(intersect) > 0:
                     log.info(f"User {u.id} was supposed to pass through links {intersect} which were deleted, '\
                         f'trigger an INTERRUPTION event (current node = {u.current_node}, state = {u.state})")
