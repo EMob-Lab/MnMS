@@ -40,25 +40,6 @@ def compute_path_travel_time(path: GraphPath, link_lengths: list[float], glinks,
             tt += leg_dist / leg_link.costs[ms_id]['speed']
     return tt
 
-def compute_path_nodes_travel_time(path_nodes, gnodes, ms_id):
-    """Method that computes the travel time of a VehicleActivity path.
-
-    Args:
-        -path_nodes: the list of nodes defining a path
-        -gnodes: nodes of the graph where path is defined
-        -ms_id: id of the mobility service the path concerns
-
-    Returns:
-        -tt: the path travel time
-    """
-    tt = 0
-    for i in range(len(path_nodes)-1):
-        un = path_nodes[i]
-        dn = path_nodes[i+1]
-        link = gnodes[un].adj[dn]
-        tt += link.costs[ms_id]['travel_time']
-    return tt
-
 
 class Request:
 

@@ -14,7 +14,6 @@ from mnms.mobility_service.abstract import (
     AbstractOnDemandDepotMobilityService,
     AbstractOnDemandMobilityService,
     Request,
-    compute_path_nodes_travel_time,
     compute_path_travel_time,
 )
 from mnms.mobility_service.filters import (
@@ -379,8 +378,7 @@ class OnDemandMobilityService(AbstractOnDemandMobilityService):
                 if path is None:
                     paths.append(None)
                 else:
-                    # Compute the travel time
-                    tt = compute_path_nodes_travel_time(path.nodes, self.graph.nodes, self.id)
+                    tt = path.compute_cost(self.graph, 'travel_time', {self.layer.id: self.id})
                     paths.append((path, tt))
         else:
             # Let's compute the shortest paths
