@@ -23,6 +23,20 @@ from mnms.tools.dict_tools import sum_dict
 
 log = create_logger(__name__)
 
+# Columns of the CSV output file
+_CSV_HEADER = [
+    'ID',                # user ID
+    'EVENT',             # event which triggered planning
+    'TIME',              # planning time
+    'COST',              # path cost
+    'PATH_ORIGIN',       # ID of the path origin node
+    'PATH_DESTINATION',  # ID of the path destination node
+    'PATH_LINKS',        # ID of the path links
+    'LENGTH',            # path length
+    'SERVICES',          # list of mob services
+    'CHOSEN',            # bool specifying if path has been chosen or not
+]
+
 class Event(Enum):
     DEPARTURE = 0
     MATCH_FAILURE = 1
@@ -114,10 +128,7 @@ class AbstractDecisionModel(ABC):
             self._write = True
             self._outfile = open(outfile, 'w')
             self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
-            # Columns of the CSV output file are:
-            # user id, event which triggered planning, path cost, path list of nodes, path length,
-            # path list of mob services, bool specifying if path has been chosen or not
-            self._csvhandler.writerow(['ID', 'EVENT', 'TIME', 'COST', 'PATH', 'LENGTH', 'SERVICES', 'CHOSEN'])
+            self._csvhandler.writerow(_CSV_HEADER)
 
     def __getstate__(self):
         # On retire l'attribut 'b' de la sérialisation
@@ -134,7 +145,7 @@ class AbstractDecisionModel(ABC):
 
         if self._write == True:
             self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
-            self._csvhandler.writerow(['ID', 'EVENT', 'TIME', 'COST', 'PATH', 'LENGTH', 'SERVICES', 'CHOSEN'])
+            self._csvhandler.writerow(_CSV_HEADER)
 
     def update_k_shortest_paths_finding_parameters(self, max_diff_cost: float, max_dist_in_common: float, cost_multiplier_to_find_k_paths: float, max_retry_to_find_k_paths: int):
         self._max_diff_cost = max_diff_cost
@@ -540,7 +551,9 @@ class AbstractDecisionModel(ABC):
                     if not self._verbose_file:
                         self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                   str(chosen_path.path_cost),
-                                                  ' '.join(chosen_path.nodes),
+                                                  chosen_path.graph_path.origin,
+                                                  chosen_path.graph_path.destination,
+                                                  ' '.join(chosen_path.links),
                                                   chosen_path.graph_path.compute_length(self._mlgraph.graph),
                                                   ' '.join(chosen_path.mobility_services),
                                                   '1'])
@@ -552,7 +565,9 @@ class AbstractDecisionModel(ABC):
                                                                   # know the path discovery may be improved
                             self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                                        str(p.path_cost),
-                                                       ' '.join(p.nodes),
+                                                       p.graph_path.origin,
+                                                       p.graph_path.destination,
+                                                       ' '.join(p.links),
                                                        p.graph_path.compute_length(self._mlgraph.graph),
                                                        ' '.join(p.mobility_services),
                                                        chosen])
@@ -618,7 +633,9 @@ class AbstractDecisionModel(ABC):
             # Write down the fact that user could not find any shortest path
             self._csvhandler.writerow([user.id, event._name_, tcurrent,
                                        'INF',
-                                       user.current_node,
+                                       '',
+                                       '',
+                                       '',
                                        'INF',
                                        '',
                                        ''])
