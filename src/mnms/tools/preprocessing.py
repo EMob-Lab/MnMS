@@ -1,8 +1,14 @@
 import json
 import multiprocessing
 import time
+from typing import TypedDict
 
 from hipop.shortest_path import floyd_warshall, parallel_dijkstra, parallel_dijkstra_single_source
+
+
+class ShortestPathTreeEntry(TypedDict):
+    node: str  # ID of the last node before the destination
+    link: str  # ID of the link from that node to the destination
 
 
 def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile):
@@ -31,20 +37,19 @@ def compute_all_shortest_paths_naive(graph, chosen_mservice, layer_name, outfile
         [{layer_name}]*len(origins))
 
     # Build a dict of shortest paths
-    sps: dict[str, dict[str, str]] = {}
+    sps: dict[str, dict[str, ShortestPathTreeEntry]] = {}
     for i,(o,d) in enumerate(all_ods):
         current_path_with_cost = paths[i]
         if current_path_with_cost is None:
             continue
-        path_nodes = current_path_with_cost[0].nodes
-        if len(path_nodes) < 2: # Skip empty paths (i.e. when the origin and destination are the same)
+        path = current_path_with_cost[0]
+        if len(path.links) == 0: # Skip empty paths (i.e. when the origin and destination are the same)
             continue
 
-        # If the current destination is reachable from the current origin,
-        # save the ID of the last node encountered before reaching the destination.
-        # WARNING: in presence of a graph with excluded movements on some nodes,
-        # what is saved may not be sufficient to rebuild the whole paths from origin to destination.
-        output_item = path_nodes[-2].id
+        # If the current destination node is reachable from the current origin,
+        # save the IDs of the penultimate node and last link
+        # in the path from the origin to that destination node.
+        output_item: ShortestPathTreeEntry = { 'node': path.nodes[-2].id, 'link': path.links[-1] }
         if o in sps:
             sps[o][d] = output_item
         else:
@@ -58,6 +63,10 @@ def compute_all_shortest_paths_floyd_warshall(graph, chosen_mservice, layer_name
     """Fonction that pre-computes the shortest paths for each pair of nodes of the
     graph of a layer and write them to a file. By shortest we mean in distance.
     It launches the Floyd-Warshall algorithm to do so.
+
+    WARNING: the output format of the file generated with this function
+    is different from the one generated with compute_all_shortest_paths_naive(..)
+    and compute_all_shortest_paths(..): in particular, the 'link' fields are missing.
 
     Args:
         -graph: graph of the layer
@@ -114,19 +123,16 @@ def compute_all_shortest_paths(graph, chosen_mservice, layer_name, outfile):
                       multiprocessing.cpu_count(),
                       [{layer_name}]*len(origins))
     print(f'Done in {time.time()-st}')
-    spts_dict: dict[str, dict[str, str]] = {}
+    spts_dict: dict[str, dict[str, ShortestPathTreeEntry]] = {}
     for i,o in enumerate(origins):
         current_spt = spts[i]
 
-        # For each destination reachable from the current origin,
-        # save the ID of the last node encountered before reaching the destination.
-        # WARNING: in presence of a graph with excluded movements on some nodes,
-        # what is saved may not be sufficient to rebuild the whole paths from origin to destination.
-        output: dict[str, str] = {}
-        for destination in current_spt.destinations:
-            path_nodes = current_spt.path_to(destination).nodes
-            if len(path_nodes) >= 2:
-                output[destination.id] = path_nodes[-2].id
+        # For each destination node reachable from the current origin,
+        # save the IDs of the penultimate node and last link
+        # in the path from the origin to that destination node.
+        output: dict[str, ShortestPathTreeEntry] = {}
+        for destination, last_link in current_spt.items():
+            output[destination.id] = { 'node': last_link.upstream, 'link': last_link.id }
 
         if len(output) > 0:
             spts_dict[o] = output
