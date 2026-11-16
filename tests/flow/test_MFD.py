@@ -25,6 +25,13 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Vehicle
 
 
+def check_path_nodes(path: Path, graph):
+    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
+    for node in path.nodes:
+        if node not in graph.nodes:
+            raise ValueError(f'Node {node} does not exist in the graph')
+
+
 class TestMFDFlow(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -105,7 +112,8 @@ class TestMFDFlow(unittest.TestCase):
     def test_accumulation_speed(self):
         user = User('U0', '0', '4', Time('00:01:00'))
         user.set_path(Path(3400,
-                           ['C0', 'C2', 'B2', 'B3', 'B4']))
+                           ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4']))
+        check_path_nodes(user.path, self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -121,7 +129,8 @@ class TestMFDFlow(unittest.TestCase):
 
         user = User('U0', '0', '4', Time('00:01:00'))
         user.set_path(Path(3400,
-                           ['C0', 'C2', 'B2', 'B3', 'B4']))
+                           ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4']))
+        check_path_nodes(user.path, self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -227,6 +236,7 @@ def test_move_veh_activity_change():
     user._position = np.array([0, 10])
     user.set_path(Path(3400,
                        ['CarLayer_1', 'CarLayer_2']))
+    check_path_nodes(user.path, mlgraph.graph)
     on_demand.step_maintenance(Dt(seconds=1))
     on_demand.request_nearest_vehicle_in_radius_fifo(user, "CarLayer_2")
     on_demand.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
@@ -275,6 +285,7 @@ def test_move_veh_res_change():
     user = User('U0', '0', '4', Time('09:00:00'))
     user.set_path(Path(3400,
                        ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
+    check_path_nodes(user.path, mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('09:00:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))

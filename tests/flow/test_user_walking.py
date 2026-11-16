@@ -20,6 +20,11 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
 
+def select_up_down(df, up, down):
+    """Select the rows of the dataframe df corresponding to the link going from node up to node down."""
+    return (df['UP'] == up) & (df['DOWN'] == down)
+
+
 class TestMobilityServicesGraph(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -140,22 +145,22 @@ class TestMobilityServicesGraph(unittest.TestCase):
         ## Get results and check
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L0_S0 L1_S1']['TIME'].iloc[0]), Time('07:02:56.06'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L0_S0 L1_S1']['TIME'].iloc[0]), Time('07:02:56.06').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L0_S0 L1_S1']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L0_S0 L1_S1']['POSITION'].iloc[0].split(' ')[1]), 250.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L1_S1 L2_S2']['TIME'].iloc[0]), Time('07:05:52.11'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L1_S1 L2_S2']['TIME'].iloc[0]), Time('07:05:52.11').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L1_S1 L2_S2']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L1_S1 L2_S2']['POSITION'].iloc[0].split(' ')[1]), 500.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L2_S2 L3_S3']['TIME'].iloc[0]), Time('07:08:48.17'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L2_S2 L3_S3']['TIME'].iloc[0]), Time('07:08:48.17').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L2_S2 L3_S3']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L2_S2 L3_S3']['POSITION'].iloc[0].split(' ')[1]), 750.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L3_S3 L4_S4']['TIME'].iloc[0]), Time('07:11:44.23'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L3_S3 L4_S4']['TIME'].iloc[0]), Time('07:11:44.23').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L3_S3 L4_S4']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L3_S3 L4_S4']['POSITION'].iloc[0].split(' ')[1]), 1000.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L0_S0', 'L1_S1')]['TIME'].iloc[0]), Time('07:02:56.06'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L0_S0', 'L1_S1')]['TIME'].iloc[0]), Time('07:02:56.06').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L0_S0', 'L1_S1')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L0_S0', 'L1_S1')]['POSITION'].iloc[0].split(' ')[1]), 250.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L1_S1', 'L2_S2')]['TIME'].iloc[0]), Time('07:05:52.11'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L1_S1', 'L2_S2')]['TIME'].iloc[0]), Time('07:05:52.11').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L1_S1', 'L2_S2')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L1_S1', 'L2_S2')]['POSITION'].iloc[0].split(' ')[1]), 500.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L2_S2', 'L3_S3')]['TIME'].iloc[0]), Time('07:08:48.17'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L2_S2', 'L3_S3')]['TIME'].iloc[0]), Time('07:08:48.17').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L2_S2', 'L3_S3')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L2_S2', 'L3_S3')]['POSITION'].iloc[0].split(' ')[1]), 750.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L3_S3', 'L4_S4')]['TIME'].iloc[0]), Time('07:11:44.23'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L3_S3', 'L4_S4')]['TIME'].iloc[0]), Time('07:11:44.23').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L3_S3', 'L4_S4')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L3_S3', 'L4_S4')]['POSITION'].iloc[0].split(' ')[1]), 1000.)
 
         self.assertEqual(df['DISTANCE'].iloc[-1], 1000.)
         self.assertEqual(df['STATE'].iloc[-1], 'ARRIVED')
@@ -178,22 +183,22 @@ class TestMobilityServicesGraph(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         print(df)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L0_S0 L1_S1']['TIME'].iloc[0]), Time('07:00:12.5'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L0_S0 L1_S1']['TIME'].iloc[0]), Time('07:00:12.5').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L0_S0 L1_S1']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L0_S0 L1_S1']['POSITION'].iloc[0].split(' ')[1]), 250.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L1_S1 L2_S2']['TIME'].iloc[0]), Time('07:00:25'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L1_S1 L2_S2']['TIME'].iloc[0]), Time('07:00:25').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L1_S1 L2_S2']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L1_S1 L2_S2']['POSITION'].iloc[0].split(' ')[1]), 500.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L2_S2 L3_S3']['TIME'].iloc[0]), Time('07:00:37.5'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L2_S2 L3_S3']['TIME'].iloc[0]), Time('07:00:37.5').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L2_S2 L3_S3']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L2_S2 L3_S3']['POSITION'].iloc[0].split(' ')[1]), 750.)
-        self.assertGreaterEqual(Time(df[df['LINK'] == 'L3_S3 L4_S4']['TIME'].iloc[0]), Time('07:00:50'))
-        self.assertLessEqual(Time(df[df['LINK'] == 'L3_S3 L4_S4']['TIME'].iloc[0]), Time('07:00:50').add_time(self.flow_dt))
-        self.assertEqual(float(df[df['LINK'] == 'L3_S3 L4_S4']['POSITION'].iloc[0].split(' ')[0]), 0.)
-        self.assertEqual(float(df[df['LINK'] == 'L3_S3 L4_S4']['POSITION'].iloc[0].split(' ')[1]), 1000.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L0_S0', 'L1_S1')]['TIME'].iloc[0]), Time('07:00:12.5'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L0_S0', 'L1_S1')]['TIME'].iloc[0]), Time('07:00:12.5').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L0_S0', 'L1_S1')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L0_S0', 'L1_S1')]['POSITION'].iloc[0].split(' ')[1]), 250.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L1_S1', 'L2_S2')]['TIME'].iloc[0]), Time('07:00:25'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L1_S1', 'L2_S2')]['TIME'].iloc[0]), Time('07:00:25').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L1_S1', 'L2_S2')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L1_S1', 'L2_S2')]['POSITION'].iloc[0].split(' ')[1]), 500.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L2_S2', 'L3_S3')]['TIME'].iloc[0]), Time('07:00:37.5'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L2_S2', 'L3_S3')]['TIME'].iloc[0]), Time('07:00:37.5').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L2_S2', 'L3_S3')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L2_S2', 'L3_S3')]['POSITION'].iloc[0].split(' ')[1]), 750.)
+        self.assertGreaterEqual(Time(df[select_up_down(df, 'L3_S3', 'L4_S4')]['TIME'].iloc[0]), Time('07:00:50'))
+        self.assertLessEqual(Time(df[select_up_down(df, 'L3_S3', 'L4_S4')]['TIME'].iloc[0]), Time('07:00:50').add_time(self.flow_dt))
+        self.assertEqual(float(df[select_up_down(df, 'L3_S3', 'L4_S4')]['POSITION'].iloc[0].split(' ')[0]), 0.)
+        self.assertEqual(float(df[select_up_down(df, 'L3_S3', 'L4_S4')]['POSITION'].iloc[0].split(' ')[1]), 1000.)
 
         self.assertEqual(df['DISTANCE'].iloc[-1], 1000.)
         self.assertEqual(df['STATE'].iloc[-1], 'ARRIVED')

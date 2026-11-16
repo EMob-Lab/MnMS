@@ -97,8 +97,10 @@ class TestMultiModal(unittest.TestCase):
     def test_run_and_results(self):
         with open(self.dir_results / "user.csv") as f:
             df = pd.read_csv(f, sep=';')
-        link_list = [l for i,l in enumerate(df['LINK'].tolist()) if i == 0 or (i > 0 and l != df['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 CAR_2', 'CAR_2 CAR_3', 'CAR_3 L0_S0', 'L0_S0 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_5'])
+        df_links = df[df['LINK'] != df['LINK'].shift()]
+        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 CAR_2', 'CAR_2 CAR_3', 'CAR_3 L0_S0', 'L0_S0 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_5'])
+        self.assertEqual(df_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1', 'CAR_2', 'CAR_3', 'L0_S0', 'L0_S1', 'L0_S2'])
+        self.assertEqual(df_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'CAR_2', 'CAR_3', 'L0_S0', 'L0_S1', 'L0_S2', 'DESTINATION_5'])
 
         arrival_time = Time(df['TIME'].iloc[-1])
         self.assertGreaterEqual(arrival_time, Time('07:16:40').remove_time(self.flow_dt))

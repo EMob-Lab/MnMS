@@ -113,8 +113,10 @@ class TestAvailabilityPersonalVehicle(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b', 'CAR_1 CAR_2', 'CAR_2 DESTINATION_2'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b', 'CAR_1 CAR_2', 'CAR_2 DESTINATION_2'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1', 'CAR_1', 'CAR_2'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'RIDEHAILING_1b', 'CAR_2', 'DESTINATION_2'])
         self.assertEqual(df0['STATE'].iloc[-1], 'ARRIVED')
         self.assertEqual(supervisor._demand._users[0]._parked_personal_vehicles, {'CAR': 'CAR_2'})
         first_veh_id = df0[df0['STATE'] == 'INSIDE_VEHICLE']['VEHICLE'].iloc[0]
@@ -141,7 +143,9 @@ class TestAvailabilityPersonalVehicle(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'RIDEHAILING_1b'])
         self.assertEqual(df0['STATE'].iloc[-1], 'DEADEND')
         self.assertEqual(supervisor._demand._users[0]._parked_personal_vehicles, {'CAR': 'CAR_1'})

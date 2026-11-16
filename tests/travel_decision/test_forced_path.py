@@ -20,6 +20,13 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
 
+def check_path_nodes(path: Path, graph):
+    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
+    for node in path.nodes:
+        if node not in graph.nodes:
+            raise ValueError(f'Node {node} does not exist in the graph')
+
+
 class TestForcedPath(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -61,6 +68,7 @@ class TestForcedPath(unittest.TestCase):
 
         if manager_type == 'base':
             forced_path = Path(None, ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            check_path_nodes(forced_path, mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -71,6 +79,7 @@ class TestForcedPath(unittest.TestCase):
             demand = CSVDemandManager(self.wrong_file)
         elif manager_type == 'wrong_base':
             forced_path = Path(None, ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            check_path_nodes(forced_path, mlgraph.graph) # The nodes exist but there is no link ORIGIN_1 -> BUSL_S0.
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -111,12 +120,16 @@ class TestForcedPath(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
     def test_forced_path_csv_demand_manager(self):
         """Check that we can force user to choose one path at departure with a CSVDemandManager.
@@ -134,12 +147,16 @@ class TestForcedPath(unittest.TestCase):
         with open(self.dir_results / "users.csv") as f:
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
-        link_list0 = [l for i,l in enumerate(df0['LINK'].tolist()) if i == 0 or (i > 0 and l != df0['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list0, ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
+        self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
-        link_list1 = [l for i,l in enumerate(df1['LINK'].tolist()) if i == 0 or (i > 0 and l != df1['LINK'].tolist()[i-1])]
-        self.assertEqual(link_list1, ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
+        self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
     def test_wrong_forced_path(self):
         """Check that an error is triggered when the forced path is wrong.

@@ -116,12 +116,14 @@ class TestPublicTransport(unittest.TestCase):
 
         df_bus0 = dfveh[dfveh['ID'] == 0]
         df_bus1 = dfveh[dfveh['ID'] == 1]
-        link_list_bus0 = df_bus0['LINK'].tolist()
-        link_list_bus1 = df_bus1['LINK'].tolist()
-        link_list_bus0_u = [l for i,l in enumerate(link_list_bus0) if i == 0 or (i > 0 and l != link_list_bus0[i-1])]
-        link_list_bus1_u = [l for i,l in enumerate(link_list_bus1) if i == 0 or (i > 0 and l != link_list_bus1[i-1])]
-        self.assertEqual(link_list_bus0_u, ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
-        self.assertEqual(link_list_bus1_u, ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
+        df_bus0_links = df_bus0[df_bus0['LINK'] != df_bus0['LINK'].shift()]
+        self.assertEqual(df_bus0_links['LINK'].tolist(), ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
+        self.assertEqual(df_bus0_links['UP'].tolist(), ['L0_S0', 'L0_S1'])
+        self.assertEqual(df_bus0_links['DOWN'].tolist(), ['L0_S1', 'L0_S2'])
+        df_bus1_links = df_bus1[df_bus1['LINK'] != df_bus1['LINK'].shift()]
+        self.assertEqual(df_bus1_links['LINK'].tolist(), ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
+        self.assertEqual(df_bus1_links['UP'].tolist(), ['L0_S0', 'L0_S1'])
+        self.assertEqual(df_bus1_links['DOWN'].tolist(), ['L0_S1', 'L0_S2'])
 
         arrival_time_bus0 = Time(df_bus0['TIME'].iloc[-1])
         arrival_time_bus1 = Time(df_bus1['TIME'].iloc[-1])
@@ -131,9 +133,10 @@ class TestPublicTransport(unittest.TestCase):
         self.assertLessEqual(arrival_time_bus1, Time('07:20:00').add_time(flow_dt))
 
         # Check user's route
-        link_list = df['LINK'].tolist()
-        link_list_u = [l for i,l in enumerate(link_list) if i == 0 or (i > 0 and l != link_list[i-1])]
-        self.assertEqual(link_list_u, ['ORIGIN_S1 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_3'])
+        df_links = df[df['LINK'] != df['LINK'].shift()]
+        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_S1 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_3'])
+        self.assertEqual(df_links['UP'].tolist(), ['ORIGIN_S1', 'L0_S1', 'L0_S2'])
+        self.assertEqual(df_links['DOWN'].tolist(), ['L0_S1', 'L0_S2', 'DESTINATION_3'])
 
         self.assertEqual(df['STATE'].iloc[-1], 'ARRIVED')
 
@@ -163,9 +166,10 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh1['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh1['DISTANCE'].iloc[-1], 3000)
         self.assertEqual(dfveh1['STATE'].iloc[-1], 'STOP')
-        link_list_bus1 = dfveh1['LINK'].tolist()
-        link_list_bus1 = [l for i,l in enumerate(link_list_bus1) if i == 0 or (i > 0 and l != link_list_bus1[i-1])]
-        self.assertEqual(link_list_bus1, ['L0r_S2r L0r_S1r', 'L0r_S1r L0r_S0r'])
+        dfveh1_links = dfveh1[dfveh1['LINK'] != dfveh1['LINK'].shift()]
+        self.assertEqual(dfveh1_links['LINK'].tolist(), ['L0r_S2r L0r_S1r', 'L0r_S1r L0r_S0r'])
+        self.assertEqual(dfveh1_links['UP'].tolist(), ['L0r_S2r', 'L0r_S1r'])
+        self.assertEqual(dfveh1_links['DOWN'].tolist(), ['L0r_S1r', 'L0r_S0r'])
 
         dfveh3 = dfveh[dfveh['ID'] == 3]
         self.assertEqual(dfveh3['TIME'].iloc[0], '07:15:00.00')
@@ -176,9 +180,10 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh3['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh3['DISTANCE'].iloc[-1], 1500)
         self.assertEqual(dfveh3['STATE'].iloc[-1], 'REPOSITIONING')
-        link_list_bus3 = dfveh3['LINK'].tolist()
-        link_list_bus3 = [l for i,l in enumerate(link_list_bus3) if i == 0 or (i > 0 and l != link_list_bus3[i-1])]
-        self.assertEqual(link_list_bus3, ['L0r_S2r L0r_S1r'])
+        dfveh3_links = dfveh3[dfveh3['LINK'] != dfveh3['LINK'].shift()]
+        self.assertEqual(dfveh3_links['LINK'].tolist(), ['L0r_S2r L0r_S1r'])
+        self.assertEqual(dfveh3_links['UP'].tolist(), ['L0r_S2r'])
+        self.assertEqual(dfveh3_links['DOWN'].tolist(), ['L0r_S1r'])
 
         dfveh2 = dfveh[dfveh['ID'] == 2]
         self.assertEqual(dfveh2['TIME'].iloc[0], '07:16:00.00')
@@ -189,6 +194,7 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh2['DISTANCE'].iloc[1], 300)
         self.assertEqual(dfveh2['DISTANCE'].iloc[-1], 1200)
         self.assertEqual(dfveh2['STATE'].iloc[-1], 'REPOSITIONING')
-        link_list_bus2 = dfveh2['LINK'].tolist()
-        link_list_bus2 = [l for i,l in enumerate(link_list_bus2) if i == 0 or (i > 0 and l != link_list_bus2[i-1])]
-        self.assertEqual(link_list_bus2, ['L0r-_S2r L0r-_S1r'])
+        dfveh2_links = dfveh2[dfveh2['LINK'] != dfveh2['LINK'].shift()]
+        self.assertEqual(dfveh2_links['LINK'].tolist(), ['L0r-_S2r L0r-_S1r'])
+        self.assertEqual(dfveh2_links['UP'].tolist(), ['L0r-_S2r'])
+        self.assertEqual(dfveh2_links['DOWN'].tolist(), ['L0r-_S1r'])
