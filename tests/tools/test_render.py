@@ -42,5 +42,6 @@ class TestRenderPath(unittest.TestCase):
             ),
             cost=0,
         )
+        path.graph_path.check_consistency(self.mlgraph.graph)
         _, ax = plt.subplots()
         draw_path(ax, self.mlgraph, path)

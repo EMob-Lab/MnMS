@@ -82,11 +82,12 @@ class TestUserFlow(unittest.TestCase):
         user._current_node = 'C0'
         user.set_path(Path(
             graph_path=GraphPath(
-                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
                 ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
             ),
             cost=3400,
         ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.user_flow.step(Dt(minutes=1), [user])
 
         self.assertIn('U0', self.user_flow.users)

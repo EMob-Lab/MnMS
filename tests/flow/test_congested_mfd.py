@@ -173,6 +173,7 @@ def test_congested_mfd_no_congestion():
         ),
         3400,
     ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
@@ -233,6 +234,7 @@ def test_congested_mfd_congestion():
         ),
         3400,
     ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
@@ -245,6 +247,7 @@ def test_congested_mfd_congestion():
         ),
         3400,
     ))
+    user2.path.graph_path.check_consistency(mlgraph.graph)
     personal_car.add_request(user2, 'C2', Time('00:01:00'))
     personal_car.matching(Request(user2, "CarLayer_2", Time('00:01:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))

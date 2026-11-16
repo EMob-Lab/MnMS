@@ -63,6 +63,8 @@ class TestForcedPath(unittest.TestCase):
 
         if manager_type == 'base':
             forced_path = Path(None, ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            # TODO OrientedGraphPath: when re-enabling this test, build forced_path from a GraphPath and validate it with
+            # forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -73,6 +75,9 @@ class TestForcedPath(unittest.TestCase):
             demand = CSVDemandManager(self.wrong_file)
         elif manager_type == 'wrong_base':
             forced_path = Path(None, ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
+            # TODO OrientedGraphPath: when re-enabling this test, build forced_path from a GraphPath and validate it with
+            # forced_path.graph_path.check_consistency(mlgraph.graph). Beware: this path is intentionally wrong (there is
+            # no link ORIGIN_1 -> BUSL_S0), so check_consistency would raise a ValueError instead of the expected KeyError.
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,

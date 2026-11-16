@@ -107,11 +107,12 @@ class TestMFDFlow(unittest.TestCase):
         user = User('U0', '0', '4', Time('00:01:00'))
         user.set_path(Path(
             GraphPath(
-                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
                 ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
             ),
             3400,
         ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -128,11 +129,12 @@ class TestMFDFlow(unittest.TestCase):
         user = User('U0', '0', '4', Time('00:01:00'))
         user.set_path(Path(
             GraphPath(
-                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'], # TODO OrientedGraphPath node change to be validated
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
                 ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
             ),
             3400,
         ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -243,6 +245,7 @@ def test_move_veh_activity_change():
         ),
         3400,
     ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     on_demand.step_maintenance(Dt(seconds=1))
     on_demand.request_nearest_vehicle_in_radius_fifo(user, "CarLayer_2")
     on_demand.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
@@ -296,6 +299,7 @@ def test_move_veh_res_change():
         ),
         3400,
     ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('09:00:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))
