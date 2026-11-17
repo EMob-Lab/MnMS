@@ -38,7 +38,7 @@ class GraphPath:
         if len(nodes) != len(links) + 1:
             raise GraphPathConsistencyError(
                 f'Inconsistent number of nodes ({len(nodes)}) with respect to number of links ({len(links)}), '
-                ' expecting N+1 nodes for N links'
+                'expecting N+1 nodes for N links'
             )
         self._nodes = nodes
         self._links = links
