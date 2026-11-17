@@ -53,17 +53,18 @@ class PersonalMobilityService(AbstractMobilityService):
         """
         user = request.user
         drop_node = request.drop_node
-        upath = list(user.path.nodes)
-        upath = upath[user.get_current_node_index():user.get_node_index_in_path(drop_node) + 1]
-        veh_path = self.construct_veh_path(upath)
+        current_node_ind = user.get_current_node_index()
+        drop_node_ind = user.get_node_index_in_path(drop_node)
+        veh_path = user.path.graph_path.sub_path(current_node_ind, drop_node_ind - current_node_ind)
+        veh_path_lengths = self.compute_link_lengths(veh_path)
         # Check if user has already used her personal vehicle
         if self.id in user.personal_vehicles:
             # If so, match her with her own vehicle
             veh = user.personal_vehicles[self.id]
             assert veh.activity_type is ActivityType.STOP, f'Personal vehicle of user {user.id} is not stopped...'
-            assert veh.current_node == upath[0], f'User {user.id} tried to take her personal vehcile back at the wrong node ({veh.current_node} != {upath[0]})'
-            activities = [VehicleActivityServing(node=upath[-1],
-                                                 path=veh_path,
+            assert veh.current_node == veh_path.origin, f'User {user.id} tried to take her personal vehcile back at the wrong node ({veh.current_node} != {veh_path.origin})'
+            activities = [VehicleActivityServing(path=veh_path,
+                                                 link_lengths=veh_path_lengths,
                                                  user=user)]
             veh.add_activities(activities)
             veh.activity.is_done = True
@@ -73,10 +74,10 @@ class PersonalMobilityService(AbstractMobilityService):
             veh.dt_move = self._tcurrent - request.request_time
         else:
             # If not, create a new personal vehicle
-            new_veh = self.fleet.create_vehicle(upath[0],
+            new_veh = self.fleet.create_vehicle(veh_path.origin,
                                             capacity=self._veh_capacity,
-                                            activities=[VehicleActivityServing(node=upath[-1],
-                                                                               path=veh_path,
+                                            activities=[VehicleActivityServing(path=veh_path,
+                                                                               link_lengths=veh_path_lengths,
                                                                                user=user)])
             user.add_personal_vehicle(self.id, new_veh)
             if self._observer is not None:

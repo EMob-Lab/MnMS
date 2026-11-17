@@ -10,6 +10,7 @@ from mnms.demand.user import Path
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
@@ -23,13 +24,6 @@ from mnms.tools.observer import CSVVehicleObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Vehicle
-
-
-def check_path_nodes(path: Path, graph):
-    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
-    for node in path.nodes:
-        if node not in graph.nodes:
-            raise ValueError(f'Node {node} does not exist in the graph')
 
 
 class TestMFDFlow(unittest.TestCase):
@@ -111,9 +105,14 @@ class TestMFDFlow(unittest.TestCase):
 
     def test_accumulation_speed(self):
         user = User('U0', '0', '4', Time('00:01:00'))
-        user.set_path(Path(3400,
-                           ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4']))
-        check_path_nodes(user.path, self.mlgraph.graph)
+        user.set_path(Path(
+            GraphPath(
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
+                ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            ),
+            3400,
+        ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -128,9 +127,14 @@ class TestMFDFlow(unittest.TestCase):
         self.flow.reservoirs['res2'].set_ghost_accumulation(lambda x: {"CAR": 40, "BUS": 3})
 
         user = User('U0', '0', '4', Time('00:01:00'))
-        user.set_path(Path(3400,
-                           ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4']))
-        check_path_nodes(user.path, self.mlgraph.graph)
+        user.set_path(Path(
+            GraphPath(
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
+                ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            ),
+            3400,
+        ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.personal_car.add_request(user, 'C2', Time('00:01:00'))
         self.personal_car.matching(Request(user, "C2", Time('00:01:00')), Dt(seconds=1))
         self.flow.step(Dt(seconds=1))
@@ -234,9 +238,14 @@ def test_move_veh_activity_change():
 
     user = User('U0', 'CarLayer_1', 'CarLayer_2', Time('09:00:00'))
     user._position = np.array([0, 10])
-    user.set_path(Path(3400,
-                       ['CarLayer_1', 'CarLayer_2']))
-    check_path_nodes(user.path, mlgraph.graph)
+    user.set_path(Path(
+        GraphPath(
+            ['CarLayer_1', 'CarLayer_2'],
+            ['CarLayer_1_2'],
+        ),
+        3400,
+    ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     on_demand.step_maintenance(Dt(seconds=1))
     on_demand.request_nearest_vehicle_in_radius_fifo(user, "CarLayer_2")
     on_demand.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
@@ -283,9 +292,14 @@ def test_move_veh_res_change():
     flow.initialize()
 
     user = User('U0', '0', '4', Time('09:00:00'))
-    user.set_path(Path(3400,
-                       ['CarLayer_0', 'CarLayer_1', 'CarLayer_2']))
-    check_path_nodes(user.path, mlgraph.graph)
+    user.set_path(Path(
+        GraphPath(
+            ['CarLayer_0', 'CarLayer_1', 'CarLayer_2'],
+            ['CarLayer_0_1', 'CarLayer_1_2'],
+        ),
+        3400,
+    ))
+    user.path.graph_path.check_consistency(mlgraph.graph)
     personal_car.add_request(user, 'C2', Time('09:00:00'))
     personal_car.matching(Request(user, "CarLayer_2", Time('09:00:00')), Dt(seconds=1))
     flow.step(Dt(seconds=1))

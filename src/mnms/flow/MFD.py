@@ -167,7 +167,8 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                     This estimate can be improved if the length is taken into account and the specific case of the
                     vehicle on the upstream or downstream node is considered separately
         """
-        unode, dnode = veh.current_link
+        unode = veh.current_link.upstream
+        dnode = veh.current_link.downstream
         remaining_length = veh.remaining_link_length
 
         unode_pos = np.array(self._graph.graph.nodes[unode].position)
@@ -201,12 +202,12 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             veh.update_achieved_path()
             self.set_vehicle_position(veh)
             try:
-                current_link, remaining_link_length = next(veh.activity.iter_path)
+                current_link, remaining_link_length = veh.activity.next_link()
                 veh._current_link = current_link
-                veh._current_node = current_link[0]
+                veh._current_node = current_link.upstream
                 veh._remaining_link_length = remaining_link_length
             except StopIteration:
-                veh._current_node = veh.current_link[1]
+                veh._current_node = veh.current_link.downstream
                 veh.next_activity(tcurrent)
                 if not veh.is_moving:
                     elapsed_time = dt
@@ -224,9 +225,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
     def get_vehicle_zone(self, veh):
         try:
             # Find the section where vehicle is currently
-            unode, dnode = veh.current_link
-            curr_link = self._graph.graph.nodes[unode].adj[dnode]
-            sids = self._graph.map_reference_links[curr_link.id]
+            sids = self._graph.map_reference_links[veh.current_link.id]
             if len(sids) == 1:
                 sid = sids[0]
             else:
@@ -239,7 +238,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                         break
             # Get section zone
             res_id = self._graph.roads.sections[sid].zone
-        except (KeyError, TypeError, UnboundLocalError): # FIXME The situations leading to these errors should be handled more explicitly.
+        except (KeyError, TypeError, AttributeError, UnboundLocalError): # FIXME The situations leading to these errors should be handled more explicitly.
             log.warning(f'Could not find zone of vehicle {veh.id} (current link = {veh.current_link}) with direct method...')
             pos = veh.position
             res_id = None

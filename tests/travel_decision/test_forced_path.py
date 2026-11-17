@@ -9,22 +9,17 @@ from mnms.demand.user import Path
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
 from mnms.time import Dt, Time, TimeTable
+from mnms.tools.exceptions import GraphPathConsistencyError
 from mnms.tools.observer import CSVUserObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
-
-
-def check_path_nodes(path: Path, graph):
-    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
-    for node in path.nodes:
-        if node not in graph.nodes:
-            raise ValueError(f'Node {node} does not exist in the graph')
 
 
 class TestForcedPath(unittest.TestCase):
@@ -67,8 +62,13 @@ class TestForcedPath(unittest.TestCase):
                                   251)
 
         if manager_type == 'base':
-            forced_path = Path(None, ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
-            check_path_nodes(forced_path, mlgraph.graph)
+            forced_path = Path(
+                GraphPath(
+                    ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'],
+                    ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'],
+                ),
+            )
+            forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -78,8 +78,14 @@ class TestForcedPath(unittest.TestCase):
         elif manager_type == 'wrong_csv':
             demand = CSVDemandManager(self.wrong_file)
         elif manager_type == 'wrong_base':
-            forced_path = Path(None, ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
-            check_path_nodes(forced_path, mlgraph.graph) # The nodes exist but there is no link ORIGIN_1 -> BUSL_S0.
+            forced_path = Path(
+                GraphPath(
+                    ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'],
+                    ['ORIGIN_1_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'],
+                ),
+            )
+            with self.assertRaises(GraphPathConsistencyError): # There is no link ORIGIN_1 -> BUSL_S0 in the graph.
+                forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -121,13 +127,13 @@ class TestForcedPath(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
@@ -148,13 +154,13 @@ class TestForcedPath(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0 BUSL_S0', 'BUSL_S0 BUSL_S1', 'BUSL_S1 DESTINATION_1'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
 
@@ -162,7 +168,7 @@ class TestForcedPath(unittest.TestCase):
         """Check that an error is triggered when the forced path is wrong.
         """
         ## Wrong base
-        with self.assertRaises(KeyError):
+        with self.assertRaises(GraphPathConsistencyError):
             self.create_supervisor('wrong_base')
             flow_dt = Dt(seconds=30)
             affectation_factor = 10
@@ -172,7 +178,7 @@ class TestForcedPath(unittest.TestCase):
                 affectation_factor)
 
         ## Wrong CSV
-        with self.assertRaises(KeyError):
+        with self.assertRaises(GraphPathConsistencyError):
             self.create_supervisor('wrong_csv')
             flow_dt = Dt(seconds=30)
             affectation_factor = 10

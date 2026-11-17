@@ -4,6 +4,8 @@ from collections.abc import Generator
 from functools import cached_property
 
 from mnms.demand import User
+from mnms.graph.graph_path import GraphPath
+from mnms.graph.link_descriptor import LinkDescriptor
 from mnms.log import create_logger
 from mnms.mobility_service.abstract import AbstractMobilityService, Request
 from mnms.time import Dt, Time
@@ -47,27 +49,27 @@ def _insert_in_activity(pu_node, ind_pu, do_node, ind_do, user, veh):
         # Insertion modifies only one activity in vehicles' activities
         ind = ind_pu
         activity_to_modify = activities_including_curr[ind]
-        pu_ind_inpath = veh.path_to_nodes(activity_to_modify.path).index(pu_node)
-        do_ind_inpath = veh.path_to_nodes(activity_to_modify.path).index(do_node)
+        pu_ind_inpath = activity_to_modify.path.nodes.index(pu_node)
+        do_ind_inpath = activity_to_modify.path.nodes.index(do_node)
         if ind == 0:
             # activity_to_modify have begun, pickup activity path should start
             # at vehicle current node
-            start_ind_inpath = veh.path_to_nodes(activity_to_modify.path).index(veh._current_node)
+            start_ind_inpath = activity_to_modify.path.nodes.index(veh._current_node)
         else:
             # activity_to_modify has not begun, pickup activity path should start
             # at the beginning of activity_to_modify path
             start_ind_inpath = 0
         # Deduce pickup and serving activities
-        pu_path = activity_to_modify.path[start_ind_inpath:pu_ind_inpath]
-        do_path = activity_to_modify.path[pu_ind_inpath:do_ind_inpath]
-        pu_activity = VehicleActivityPickup(node=pu_node,
-                                            path=pu_path,
-                                            user=user)
-        do_activity = VehicleActivityServing(node=do_node,
-                                            path=do_path,
-                                            user=user)
+        pu_path, pu_path_lengths = activity_to_modify.sub_path(start_ind_inpath, pu_ind_inpath - start_ind_inpath)
+        do_path, do_path_lengths = activity_to_modify.sub_path(pu_ind_inpath, do_ind_inpath - pu_ind_inpath)
+        pu_activity = VehicleActivityPickup(path=pu_path,
+                                            user=user,
+                                            link_lengths=pu_path_lengths)
+        do_activity = VehicleActivityServing(path=do_path,
+                                            user=user,
+                                            link_lengths=do_path_lengths)
         # Modify activity_to_modify
-        activity_to_modify.modify_path(activity_to_modify.path[do_ind_inpath:])
+        activity_to_modify.modify_path(*activity_to_modify.sub_path(do_ind_inpath))
         # Insert the new activities and the modified one
         if ind == 0 and veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
             # Interrupt current activity and insert the new activities plus the
@@ -76,8 +78,7 @@ def _insert_in_activity(pu_node, ind_pu, do_node, ind_do, user, veh):
             # Modify length to travel on the first link of pu_activity.path with
             # current remaining_link_length to prevent restarting the travel of
             # this link
-            pu_activity.path[0] = (pu_activity.path[0][0], veh._remaining_link_length)
-            pu_activity.reset_path_iterator()
+            pu_activity.link_lengths[0] = veh._remaining_link_length
             for a in reversed([pu_activity, do_activity, activity_to_modify]):
                 if decrement_insert_index:
                     veh.activities.insert(max(0, ind-1), a)
@@ -97,28 +98,28 @@ def _insert_in_activity(pu_node, ind_pu, do_node, ind_do, user, veh):
             "to be inserted: this is not consistent."
         # Start by inserting serving activity since it is located after pickup
         activity_to_modify_do = activities_including_curr[ind_do]
-        do_ind_inpath = veh.path_to_nodes(activity_to_modify_do.path).index(do_node)
-        do_path = activity_to_modify_do.path[:do_ind_inpath]
-        do_activity = VehicleActivityServing(node=do_node,
-                                            path=do_path,
-                                            user=user)
-        activity_to_modify_do.modify_path(activity_to_modify_do.path[do_ind_inpath:])
+        do_ind_inpath = activity_to_modify_do.path.nodes.index(do_node)
+        do_path, do_path_lengths = activity_to_modify_do.sub_path(0, do_ind_inpath)
+        do_activity = VehicleActivityServing(path=do_path,
+                                            user=user,
+                                            link_lengths=do_path_lengths)
+        activity_to_modify_do.modify_path(*activity_to_modify_do.sub_path(do_ind_inpath))
         if decrement_insert_index:
             veh.activities.insert(max(0, ind_do-1), do_activity)
         else:
             veh.activities.insert(ind_do, do_activity)
         # Then insert pickup activity
         activity_to_modify_pu = activities_including_curr[ind_pu]
-        pu_ind_inpath = veh.path_to_nodes(activity_to_modify_pu.path).index(pu_node)
+        pu_ind_inpath = activity_to_modify_pu.path.nodes.index(pu_node)
         if ind_pu == 0:
-            start_ind_inpath = veh.path_to_nodes(activity_to_modify_pu.path).index(veh._current_node)
+            start_ind_inpath = activity_to_modify_pu.path.nodes.index(veh._current_node)
         else:
             start_ind_inpath = 0
-        pu_path = activity_to_modify_pu.path[start_ind_inpath:pu_ind_inpath]
-        pu_activity = VehicleActivityPickup(node=pu_node,
-                                            path=pu_path,
-                                            user=user)
-        activity_to_modify_pu.modify_path(activity_to_modify_pu.path[pu_ind_inpath:])
+        pu_path, pu_path_lengths = activity_to_modify_pu.sub_path(start_ind_inpath, pu_ind_inpath - start_ind_inpath)
+        pu_activity = VehicleActivityPickup(path=pu_path,
+                                            user=user,
+                                            link_lengths=pu_path_lengths)
+        activity_to_modify_pu.modify_path(*activity_to_modify_pu.sub_path(pu_ind_inpath))
         if ind_pu == 0 and veh.activity is not None and veh.activity.activity_type is not ActivityType.STOP:
             # Interrupt current activity and insert the pickup activity plus the
             # modified one
@@ -126,9 +127,8 @@ def _insert_in_activity(pu_node, ind_pu, do_node, ind_do, user, veh):
             # Modify length to travel on the first link of pu_activity.path with
             # current remaining_link_length to prevent restarting the travel of
             # this link
-            if pu_activity.path:
-                pu_activity.path[0] = (pu_activity.path[0][0], veh._remaining_link_length)
-                pu_activity.reset_path_iterator()
+            if pu_activity.path.links:
+                pu_activity.link_lengths[0] = veh._remaining_link_length
             for a in reversed([pu_activity, activity_to_modify_pu]):
                 if decrement_insert_index:
                     veh.activities.insert(max(0, ind_pu-1), a)
@@ -179,7 +179,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
                 self.fleet.delete_vehicle(first_veh.id)
                 self.clean_arrived_vehicles(lid)
 
-    def construct_public_transport_path(self, lid):
+    def construct_public_transport_path(self, lid) -> tuple[GraphPath, list[float]]:
         """Method that builds the activity path for a certain public transport line.
 
         Args:
@@ -187,16 +187,10 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         Returns:
             -veh_path: path of a vehicle serving the line
+            -veh_path_lengths: the length of each link of the path
         """
-        veh_path = []
-        path = self.lines[lid]['nodes']
-        for i in range(len(path) - 1):
-            unode = path[i]
-            dnode = path[i + 1]
-            key = (unode, dnode)
-            link = self.graph.nodes[unode].adj[dnode]
-            veh_path.append((key, link.length))
-        return veh_path
+        path: GraphPath = self.lines[lid]['path']
+        return path, [self.graph.links[link_id].length for link_id in path.links]
 
     def new_departures(self, time, dt, lid: str):
         """Returns all the departures of a public transport line during the current time step.
@@ -217,19 +211,20 @@ class PublicTransportMobilityService(AbstractMobilityService):
             except StopIteration:
                 self._next_time_table[lid] = None
 
-        veh_path: list | None = None
-        end_node = self.lines[lid]['nodes'][-1]
-        start_node = self.lines[lid]['nodes'][0]
+        veh_path: GraphPath | None = None
+        veh_path_lengths: list[float] | None = None
+        start_node = self.lines[lid]['path'].origin
 
         ## Create vehicle that will depart next if not already exist
         if self._next_veh_departure[lid] is None and self._current_time_table[lid] is not None:
-            veh_path = self.construct_public_transport_path(lid)
-            new_veh = self.fleet.create_vehicle(start_node,
-                                                capacity=self._veh_capacity,
-                                                activities=[VehicleActivityStop(node=end_node,
-                                                                                path=veh_path)])
-            new_veh._current_link = veh_path[0][0]
-            new_veh._remaining_link_length = veh_path[0][1]
+            veh_path, veh_path_lengths = self.construct_public_transport_path(lid)
+            new_veh = self.fleet.create_vehicle(
+                start_node,
+                capacity=self._veh_capacity,
+                activities=[VehicleActivityStop(path=veh_path, link_lengths=veh_path_lengths)]
+            )
+            new_veh._current_link = LinkDescriptor.from_path(veh_path, 0)
+            new_veh._remaining_link_length = veh_path_lengths[0]
             self._next_veh_departure[lid] = (self._current_time_table[lid], new_veh)
             log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid}")
 
@@ -241,9 +236,9 @@ class PublicTransportMobilityService(AbstractMobilityService):
             start_veh = self._next_veh_departure[lid][1]
             log.info(f"Vehicle {start_veh.id} of type {type(start_veh).__name__} starts service on {self.id} line {lid}")
             stop_activity = start_veh.activity
-            repo_activity = VehicleActivityRepositioning(stop_activity.node,
-                                                         stop_activity.path,
-                                                         stop_activity.user)
+            repo_activity = VehicleActivityRepositioning(path=stop_activity.path,
+                                                         link_lengths=stop_activity.link_lengths,
+                                                         user=stop_activity.user)
             start_veh.add_activities([repo_activity])
             start_veh.next_activity(time)
 
@@ -254,13 +249,14 @@ class PublicTransportMobilityService(AbstractMobilityService):
             self._current_time_table[lid] = self._next_time_table[lid]
             if self._current_time_table[lid] is not None:
                 if veh_path is None:
-                    veh_path = self.construct_public_transport_path(lid)
-                new_veh = self.fleet.create_vehicle(start_node,
-                                                    capacity=self._veh_capacity,
-                                                    activities=[VehicleActivityStop(node=end_node,
-                                                                                    path=veh_path)])
-                new_veh._current_link = veh_path[0][0]
-                new_veh._remaining_link_length = veh_path[0][1]
+                    veh_path, veh_path_lengths = self.construct_public_transport_path(lid)
+                new_veh = self.fleet.create_vehicle(
+                    start_node,
+                    capacity=self._veh_capacity,
+                    activities=[VehicleActivityStop(path=veh_path, link_lengths=veh_path_lengths)]
+                )
+                new_veh._current_link = LinkDescriptor.from_path(veh_path, 0)
+                new_veh._remaining_link_length = veh_path_lengths[0]
                 self._next_veh_departure[lid] = (self._current_time_table[lid], new_veh)
                 log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid}")
             else:
@@ -286,19 +282,19 @@ class PublicTransportMobilityService(AbstractMobilityService):
         Returns:
             -all_departures: lists of vehicles that are about to start service on the line
         """
-        veh_path = self.construct_public_transport_path(lid)
-        end_node = self.lines[lid]['nodes'][-1]
-        start_node = self.lines[lid]['nodes'][0]
+        veh_path, veh_path_lengths = self.construct_public_transport_path(lid)
+        start_node = self.lines[lid]['path'].origin
 
         # At first call in the recursive process, create the next veh to depart
         if all_departures is None:
             if self._next_veh_departure[lid] is None and self._current_time_table[lid] is not None:
-                new_veh = self.fleet.create_vehicle(start_node,
-                                                    capacity=self._veh_capacity,
-                                                    activities=[VehicleActivityStop(node=end_node,
-                                                                                    path=veh_path)])
-                new_veh._current_link = veh_path[0][0]
-                new_veh._remaining_link_length = veh_path[0][1]
+                new_veh = self.fleet.create_vehicle(
+                    start_node,
+                    capacity=self._veh_capacity,
+                    activities=[VehicleActivityStop(path=veh_path, link_lengths=veh_path_lengths)]
+                )
+                new_veh._current_link = LinkDescriptor.from_path(veh_path, 0)
+                new_veh._remaining_link_length = veh_path_lengths[0]
                 self._next_veh_departure[lid] = (self._current_time_table[lid], new_veh)
                 log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid} (1)")
             all_departures = []
@@ -319,9 +315,9 @@ class PublicTransportMobilityService(AbstractMobilityService):
             start_veh = self._next_veh_departure[lid][1]
             log.info(f"Vehicle {start_veh.id} of type {type(start_veh).__name__} starts service on {self.id} line {lid}")
             stop_activity = start_veh.activity
-            repo_activity = VehicleActivityRepositioning(stop_activity.node,
-                                                         stop_activity.path,
-                                                         stop_activity.user)
+            repo_activity = VehicleActivityRepositioning(path=stop_activity.path,
+                                                         link_lengths=stop_activity.link_lengths,
+                                                         user=stop_activity.user)
             start_veh.add_activities([repo_activity])
             start_veh.next_activity(time)
 
@@ -331,12 +327,13 @@ class PublicTransportMobilityService(AbstractMobilityService):
             try:
                 self._next_time_table[lid] = next(self._timetable_iter[lid])
 
-                new_veh = self.fleet.create_vehicle(start_node,
-                                                    capacity=self._veh_capacity,
-                                                    activities=[VehicleActivityStop(node=end_node,
-                                                                                    path=veh_path)])
-                new_veh._current_link = veh_path[0][0]
-                new_veh._remaining_link_length = veh_path[0][1]
+                new_veh = self.fleet.create_vehicle(
+                    start_node,
+                    capacity=self._veh_capacity,
+                    activities=[VehicleActivityStop(path=veh_path, link_lengths=veh_path_lengths)]
+                )
+                new_veh._current_link = LinkDescriptor.from_path(veh_path, 0)
+                new_veh._remaining_link_length = veh_path_lengths[0]
                 self._next_veh_departure[lid] = (self._next_time_table[lid], new_veh)
                 log.info(f"Vehicle {new_veh.id} of type {type(new_veh).__name__} created for next departure on {self.id} line {lid} (2)")
             except StopIteration:
@@ -347,7 +344,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
 
         return all_departures
 
-    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_nodes: list[str]):
+    def add_passenger(self, user: User, drop_node: str, veh: Vehicle, line_path: GraphPath):
         """Method that updates a public transport vehicle plan by inserting user's pick-up and
         drop-off.
 
@@ -355,14 +352,14 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -user: user to pick-up and drop-off
             -drop_node: node where user would like to be dropped-off
             -veh: vehicle that will pick-up and drop-off the user
-            -line_nodes: list of nodes the vehicle should follow
+            -line_path: path of the line followed by the vehicle
         """
 
         log.info(f"User {user.id} matched with vehicle {veh.id} of mobility service {self.id}")
         user.set_state_waiting_vehicle(veh)
 
-        pu_node_ind = line_nodes.index(user.current_node)
-        do_node_ind = line_nodes.index(drop_node)
+        pu_node_ind = line_path.nodes.index(user.current_node)
+        do_node_ind = line_path.nodes.index(drop_node)
 
         assert pu_node_ind <= do_node_ind, f'Pickup index {pu_node_ind} should necessarily take place '\
             f'before dropoff index {do_node_ind} on the public transport line for User {user.id}.'
@@ -379,7 +376,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         ind_do = -1
         for ind, activity in enumerate(activities_including_curr):
             activity_node = activity.node
-            activity_node_ind = line_nodes.index(activity_node)
+            activity_node_ind = line_path.nodes.index(activity_node)
             if pu_node_ind <= activity_node_ind and ind_pu == -1:
                 ind_pu = ind
             if do_node_ind <= activity_node_ind:
@@ -410,19 +407,16 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -pickup_time: the estimated pick-up time
         """
         user_node = user.current_node
-        veh_link_borders = veh.current_link
         veh_remaining_length = veh.remaining_link_length
 
-        line = self.lines[line_id]
-        line_stops = line["nodes"]
-        ind_user = line_stops.index(user_node)
-        ind_veh = line_stops.index(veh_link_borders[0])
+        line_path: GraphPath = self.lines[line_id]['path']
+        ind_user = line_path.nodes.index(user_node)
+        ind_veh = line_path.nodes.index(veh.current_link.upstream)
 
-        path = line_stops[ind_veh:ind_user+1]
-        if len(path) > 1:
-            pickup_time = veh_remaining_length / self.graph.nodes[path[0]].adj[path[1]].costs[self.id]['speed']
-            for i in range(1, len(path)-1):
-                link = self.graph.nodes[path[i]].adj[path[i+1]]
+        links = [self.graph.links[link_id] for link_id in line_path.links[ind_veh:ind_user]]
+        if len(links) > 0:
+            pickup_time = veh_remaining_length / links[0].costs[self.id]['speed']
+            for link in links[1:]:
                 pickup_time += link.length / link.costs[self.id]['speed']
             pickup_time = Dt(seconds=pickup_time)
         else:
@@ -457,9 +451,9 @@ class PublicTransportMobilityService(AbstractMobilityService):
             departure_time, waiting_veh = self._next_veh_departure[user_line_id]
             chosen_veh = waiting_veh
         else:
-            ind_start = chosen_line["nodes"].index(start)
+            ind_start = chosen_line['path'].nodes.index(start)
             for veh in reversed(list(self.vehicles[user_line_id])):
-                ind_curr_veh = chosen_line["nodes"].index(veh.current_link[1])
+                ind_curr_veh = chosen_line['path'].nodes.index(veh.current_link.downstream)
                 if ind_curr_veh <= ind_start:
                     chosen_veh = veh
                     departure_time = None
@@ -485,7 +479,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         drop_node = request.drop_node
         veh, line = self._cache_request_vehicles[user.id]
         log.info(f'User {user.id} matched with vehicle {veh.id} of mobility service {self.id}')
-        self.add_passenger(user, drop_node, veh, line["nodes"])
+        self.add_passenger(user, drop_node, veh, line['path'])
 
     def step_maintenance(self, dt: Dt):
         """Method that proceeds to the maintenance phase. For PublicTransportMobilityService,
@@ -519,7 +513,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             -chosen_line: the line serving the node
         """
         for lid, line in self.lines.items():
-            if node in line['nodes']:
+            if node in line['path'].nodes:
                 chosen_line = line
                 chosen_line_id = lid
                 break
@@ -579,15 +573,19 @@ class PublicTransportMobilityService(AbstractMobilityService):
             'public transportation vehicle plan after a pickup/serving activity...'
         if index == 0:
             # Interrupt current activity and modify next activity consequently
-            ind_curr_node_in_curr_act = veh.path_to_nodes(all_activities[0].path).index(veh._current_node)
-            ongoing_leg = all_activities[0].path[ind_curr_node_in_curr_act:]
-            ongoing_leg[0] = (ongoing_leg[0][0], veh._remaining_link_length)
-            all_activities[1].modify_path(ongoing_leg + all_activities[1].path)
+            ind_curr_node_in_curr_act = all_activities[0].path.nodes.index(veh._current_node)
+            ongoing_leg, ongoing_leg_lengths = all_activities[0].sub_path(ind_curr_node_in_curr_act)
+            ongoing_leg_lengths[0] = veh._remaining_link_length
+            all_activities[1].modify_path(
+                ongoing_leg + all_activities[1].path,
+                ongoing_leg_lengths + all_activities[1].link_lengths
+            )
             veh.activity = None
         else:
             # Activity to remove has not begun, remove it from planning and update next activity consequently
             next_activity_new_path = all_activities[index].path + all_activities[index+1].path
-            all_activities[index+1].modify_path(next_activity_new_path)
+            next_activity_new_lengths = all_activities[index].link_lengths + all_activities[index+1].link_lengths
+            all_activities[index+1].modify_path(next_activity_new_path, next_activity_new_lengths)
             del veh.activities[index-1]
 
     def remove_user_activities(self, user):
@@ -643,7 +641,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
             for ind, a in enumerate(all_activities):
                 if a is not None and type(a).__name__ != 'VehicleActivityStop':
                     try:
-                        ind_new_drop_node = veh.path_to_nodes(a.path).index(new_drop_node)
+                        ind_new_drop_node = a.path.nodes.index(new_drop_node)
                         found = True
                         break
                     except ValueError:
@@ -655,27 +653,28 @@ class PublicTransportMobilityService(AbstractMobilityService):
             modified_act = all_activities[ind]
             if ind == 0:
                 # Interrupt current activity, modify next activity consequently and insert user serving activity
-                ind_curr_node_in_curr_act = veh.path_to_nodes(modified_act.path).index(veh._current_node)
+                ind_curr_node_in_curr_act = modified_act.path.nodes.index(veh._current_node)
                 assert ind_curr_node_in_curr_act <= ind_new_drop_node, \
                     f'New drop node {new_drop_node} of user {user.id} has already been passed...'
-                serving_act_path = modified_act.path[ind_curr_node_in_curr_act:ind_new_drop_node]
-                modified_act_path = modified_act.path[ind_new_drop_node:]
-                serving_act_path[0] = (serving_act_path[0][0], veh._remaining_link_length)
-                serving_act = VehicleActivityServing(node=new_drop_node,
-                                                    path=serving_act_path,
+                serving_act_path, serving_act_path_lengths = modified_act.sub_path(
+                    ind_curr_node_in_curr_act,
+                    ind_new_drop_node - ind_curr_node_in_curr_act
+                )
+                serving_act_path_lengths[0] = veh._remaining_link_length
+                serving_act = VehicleActivityServing(path=serving_act_path,
+                                                    link_lengths=serving_act_path_lengths,
                                                     user=user)
-                modified_act.modify_path(modified_act_path)
+                modified_act.modify_path(*modified_act.sub_path(ind_new_drop_node))
                 veh.activity = None
                 veh.activities.insert(0, serving_act)
                 veh.activities.insert(1, modified_act)
             else:
                 # Modify the activity and insert user serving activty before it in plan
-                serving_act_path = modified_act.path[:ind_new_drop_node]
-                modified_act_path = modified_act.path[ind_new_drop_node:]
-                serving_act = VehicleActivityServing(node=new_drop_node,
-                                                    path=serving_act_path,
+                serving_act_path, serving_act_path_lengths = modified_act.sub_path(0, ind_new_drop_node)
+                serving_act = VehicleActivityServing(path=serving_act_path,
+                                                    link_lengths=serving_act_path_lengths,
                                                     user=user)
-                modified_act.modify_path(modified_act_path)
+                modified_act.modify_path(*modified_act.sub_path(ind_new_drop_node))
                 veh.activities.insert(ind-1, serving_act)
         else:
             # Former and new drop nodes are equal: there is nothing to do
