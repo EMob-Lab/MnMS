@@ -58,6 +58,10 @@ class AbstractDemandManager(ABC):
         self._user_to_attach.append(user_ids)
 
 
+_MANDATORY_COLUMNS = ['ID', 'DEPARTURE', 'ORIGIN', 'DESTINATION']
+_FORCED_PATH_COLUMNS = ['PATH_NODES', 'PATH_LINKS', 'CHOSEN SERVICES']
+
+
 class BaseDemandManager(AbstractDemandManager):
     """Basic demand manager, it takes a list of User as input
 
@@ -102,7 +106,7 @@ class BaseDemandManager(AbstractDemandManager):
     def to_csv(self, file: Pathl | str, delimiter=";"):
         with open(file, 'w') as f:
             writer = csv.writer(f, delimiter=delimiter)
-            writer.writerow(["ID", "DEPARTURE", "ORIGIN", "DESTINATION"])
+            writer.writerow(_MANDATORY_COLUMNS)
 
             for u in self._users:
                 writer.writerow([u.id, u.departure_time, u.origin, u.destination])
@@ -123,15 +127,14 @@ class CSVDemandManager(AbstractDemandManager):
 
     def init_demand_reader(self, csvfile: Pathl | str):
 
-        mandatory_columns = ['ID', 'DEPARTURE', 'ORIGIN', 'DESTINATION']
         time_format_1 = "%H:%M:%S"
         time_format_2 = "%H:%M:%S.%f"
 
         try:
             headers = next(self._reader)
-            if headers[:4] != mandatory_columns:
+            if headers[:4] != _MANDATORY_COLUMNS:
                  raise CSVDemandParseError(csvfile)
-            optional_columns = [h for h in headers if h not in mandatory_columns]
+            optional_columns = [h for h in headers if h not in _MANDATORY_COLUMNS]
             self._optional_columns = {c: headers.index(c) for c in optional_columns}
             # Small checks on consistency of optional columns
             noms = 'MOBILITY SERVICES' not in self._optional_columns
@@ -151,9 +154,8 @@ class CSVDemandManager(AbstractDemandManager):
                             'forced paths must be specified with columns PATH_NODES and PATH_LINKS')
 
             # Columns for forced path definition must be either all present or all absent.
-            forced_path_columns = ['PATH_NODES', 'PATH_LINKS', 'CHOSEN SERVICES']
-            has_all = all(c in self._optional_columns for c in forced_path_columns)
-            has_none = all(c not in self._optional_columns for c in forced_path_columns)
+            has_all = all(c in self._optional_columns for c in _FORCED_PATH_COLUMNS)
+            has_none = all(c not in self._optional_columns for c in _FORCED_PATH_COLUMNS)
             if not (has_all or has_none):
                 raise CSVDemandParseError(csvfile)
 
@@ -253,7 +255,7 @@ class CSVDemandManager(AbstractDemandManager):
             raise TypeError("demand_type must be either 'node' or 'coordinate'")
         forced_path = None
         chosen_ms = None
-        if 'PATH_NODES' in self._optional_columns and row[self._optional_columns['PATH_NODES']] != '':
+        if 'PATH_NODES' in self._optional_columns and any(row[self._optional_columns[col]] != '' for col in _FORCED_PATH_COLUMNS):
             path_nodes = row[self._optional_columns['PATH_NODES']].split()
             path_links = row[self._optional_columns['PATH_LINKS']].split()
             forced_path = Path(GraphPath(path_nodes, path_links))
