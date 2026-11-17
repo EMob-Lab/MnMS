@@ -69,10 +69,10 @@ def draw_path(ax, mlgraph, path: GraphPath | None, color='orange', linkwidth=2, 
             line_segment = LineCollection(lines, linestyles='solid', colors=color, linewidths=linkwidth, alpha=alpha)
         ax.add_collection(line_segment)
 
-    on_pos = gnodes[path.nodes[0]].position
-    ax.scatter([on_pos[0]], [on_pos[1]], color='blue', s=markersize, label='Origin')
-    dn_pos = gnodes[path.nodes[-1]].position
-    ax.scatter([dn_pos[0]], [dn_pos[1]], color='red', s=markersize, label='Destination')
+        on_pos = gnodes[path.nodes[0]].position
+        ax.scatter([on_pos[0]], [on_pos[1]], color='blue', s=markersize, label='Origin')
+        dn_pos = gnodes[path.nodes[-1]].position
+        ax.scatter([dn_pos[0]], [dn_pos[1]], color='red', s=markersize, label='Destination')
 
     if colors is not None:
         colors_sel = set(lines_colors)
