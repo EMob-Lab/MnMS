@@ -6,6 +6,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from mnms.graph.graph_path import GraphPath
 from mnms.time import Time
 
 
@@ -45,19 +46,19 @@ def draw_roads(ax, roads, color='black', linkwidth=1, nodesize=2, node_label=Tru
     plt.tight_layout()
 
 
-def draw_path(ax, mlgraph, path, color='orange', linkwidth=2, alpha=1, nodes=False, markersize=10, label_size=5, colors=None):
+def draw_path(ax, mlgraph, path: GraphPath | None, color='orange', linkwidth=2, alpha=1, markersize=10, label_size=5, colors=None):
     lines = []
     if colors is not None:
         lines_colors = []
     gnodes = mlgraph.graph.nodes
+    glinks = mlgraph.graph.links
     if path is not None:
-        pnodes = path.nodes if not nodes else path
-        for ni in range(len(pnodes) - 1):
-            nj = ni + 1
-            unode = gnodes[pnodes[ni]].position
-            dnode = gnodes[pnodes[nj]].position
+        for lid in path.links:
+            link = glinks[lid]
+            unode = gnodes[link.upstream].position
+            dnode = gnodes[link.downstream].position
             if colors is not None:
-                link_label = gnodes[pnodes[ni]].adj[pnodes[nj]].label
+                link_label = link.label
                 assert link_label in colors, f'Cannot find color for {link_label}...'
                 lines_colors.append(colors[link_label])
             lines.append([unode, dnode])
@@ -68,9 +69,9 @@ def draw_path(ax, mlgraph, path, color='orange', linkwidth=2, alpha=1, nodes=Fal
             line_segment = LineCollection(lines, linestyles='solid', colors=color, linewidths=linkwidth, alpha=alpha)
         ax.add_collection(line_segment)
 
-    on_pos = gnodes[path.nodes[0]].position if not nodes else gnodes[path[0]].position
+    on_pos = gnodes[path.nodes[0]].position
     ax.scatter([on_pos[0]], [on_pos[1]], color='blue', s=markersize, label='Origin')
-    dn_pos = gnodes[path.nodes[-1]].position if not nodes else gnodes[path[-1]].position
+    dn_pos = gnodes[path.nodes[-1]].position
     ax.scatter([dn_pos[0]], [dn_pos[1]], color='red', s=markersize, label='Destination')
 
     if colors is not None:
@@ -82,27 +83,27 @@ def draw_path(ax, mlgraph, path, color='orange', linkwidth=2, alpha=1, nodes=Fal
     else:
         plt.legend()
 
-def draw_paths(ax, mlgraph, paths, color='orange', linkwidth=2, alpha=1, nodes=False, markersize=10, label_size=5, colors=None):
+def draw_paths(ax, mlgraph, paths: list[GraphPath | None], color='orange', linkwidth=2, alpha=1, markersize=10, label_size=5, colors=None):
     lines = []
     oposs = []
     dposs = []
     if colors is not None:
         lines_colors = []
     gnodes = mlgraph.graph.nodes
+    glinks = mlgraph.graph.links
     for i, path in enumerate(paths):
         if not path:
             continue
-        on_pos = np.array(gnodes[path.nodes[0]].position) if not nodes else np.array(gnodes[path[0]].position)
+        on_pos = np.array(gnodes[path.nodes[0]].position)
         oposs.append(on_pos)
-        dn_pos = np.array(gnodes[path.nodes[-1]].position) if not nodes else np.array(gnodes[path[-1]].position)
+        dn_pos = np.array(gnodes[path.nodes[-1]].position)
         dposs.append(dn_pos)
-        pnodes = path.nodes if not nodes else path
-        for ni in range(len(pnodes) - 1):
-            nj = ni + 1
-            unode = gnodes[pnodes[ni]].position
-            dnode = gnodes[pnodes[nj]].position
+        for lid in path.links:
+            link = glinks[lid]
+            unode = gnodes[link.upstream].position
+            dnode = gnodes[link.downstream].position
             if colors is not None:
-                link_label = gnodes[pnodes[ni]].adj[pnodes[nj]].label
+                link_label = link.label
                 assert link_label in colors, f'Cannot find color for {link_label}...'
                 lines_colors.append(colors[link_label])
             lines.append([unode, dnode])
