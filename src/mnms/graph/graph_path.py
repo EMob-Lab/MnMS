@@ -183,34 +183,45 @@ class GraphPath:
         Args:
             -start: the index of the first node of the part to replace
             -end: the index of the last node of the part to replace (0 <= start <= end <= len(self.links))
-            -new: the path to insert instead, it must start with the node at index start
-                and end with the node at index end
+            -new: the path to insert instead, it must start with the node at index start (unless the whole head
+                of the current path is replaced, i.e. start == 0) and end with the node at index end
+                (unless the whole tail of the current path is replaced, i.e. end == len(self.links))
 
         Raises:
             -IndexError: if start or end is out of range
-            -GraphPathConsistencyError: if new does not start and end with the nodes at index start and end
+            -GraphPathConsistencyError: if new does not satisfy the constraints stated above
         """
-        if not 0 <= start <= end < len(self._nodes):
+        if not 0 <= start <= end <= len(self._links):
             raise IndexError(f'Invalid node indices {start} and/or {end} in path {self}')
-        if new.origin != self._nodes[start] or new.destination != self._nodes[end]:
+        if start > 0 and new.origin != self._nodes[start]:
             raise GraphPathConsistencyError(
-                f'Cannot replace the part of path {self} between {self._nodes[start]} and '
-                f'{self._nodes[end]} by {new}: they do not have the same origin and destination'
+                f'Cannot replace the part of path {self} starting at {self._nodes[start]} by {new}: '
+                'they do not have the same origin'
             )
-        return self.sub_path(0, start) + new + self.sub_path(end)
+        if end < len(self._links) and new.destination != self._nodes[end]:
+            raise GraphPathConsistencyError(
+                f'Cannot replace the part of path {self} ending at {self._nodes[end]} by {new}: '
+                'they do not have the same destination'
+            )
+        return GraphPath(
+            self._nodes[:start] + new._nodes + self._nodes[end+1:],
+            self._links[:start] + new._links + self._links[end:],
+        )
 
     def replace_first(self, old: GraphPath, new: GraphPath) -> GraphPath:
         """Return the path where the first occurrence of a part of path is replaced by another path.
 
         Args:
             -old: the part of path to replace
-            -new: the path to insert instead, it must have the same origin and destination as old
+            -new: the path to insert instead, it must have the same origin as old (unless the first occurrence
+                of old is at the head of the current path) and the same destination as old (unless
+                the first occurrence of old is at the tail of the current path)
 
         Raises:
-            -GraphPathConsistencyError: if old and new do not have the same ends
+            -GraphPathConsistencyError: if new does not satisfy the constraints stated above
             -ValueError: if old is not found
         """
-        pos = self._find_for_replacement(old, new)[0]
+        pos = self._find_for_replacement(old)[0]
         return self.replace_in_between(pos, pos + len(old._links), new)
 
     def replace_last(self, old: GraphPath, new: GraphPath) -> GraphPath:
@@ -218,21 +229,19 @@ class GraphPath:
 
         Args:
             -old: the part of path to replace
-            -new: the path to insert instead, it must have the same origin and destination as old
+            -new: the path to insert instead, it must have the same origin as old (unless the last occurrence
+                of old is at the head of the current path) and the same destination as old (unless
+                the last occurrence of old is at the tail of the current path)
 
         Raises:
-            -GraphPathConsistencyError: if old and new do not have the same ends
+            -GraphPathConsistencyError: if new does not satisfy the constraints stated above
             -ValueError: if old is not found
         """
-        pos = self._find_for_replacement(old, new)[-1]
+        pos = self._find_for_replacement(old)[-1]
         return self.replace_in_between(pos, pos + len(old._links), new)
 
-    def _find_for_replacement(self, old: GraphPath, new: GraphPath) -> list[int]:
-        """Check that old can be replaced by new, and return the positions of old in this path (not empty)."""
-        if old.origin != new.origin or old.destination != new.destination:
-            raise GraphPathConsistencyError(
-                f'Cannot replace {old} by {new}: they do not have the same origin and destination'
-            )
+    def _find_for_replacement(self, old: GraphPath) -> list[int]:
+        """Return the positions of old in this path (raise ValueError if not found, so the result is never empty)."""
         positions = self.find(old)
         if len(positions) == 0:
             raise ValueError(f'Cannot replace {old} in path {self}: not found')

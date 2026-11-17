@@ -195,6 +195,21 @@ class TestGraphPath(unittest.TestCase):
             make_path('A', 'B', 'C', 'X', 'C', 'D', 'E'))
         self.assertEqual(path.replace_in_between(2, 2, make_empty_path('C')), path)
 
+        # Replacement of the whole head and/or tail of the path: origin and/or destination may change
+        self.assertEqual(path.replace_in_between(0, 2, make_path('X', 'Y', 'C')),
+            make_path('X', 'Y', 'C', 'D', 'E'))
+        self.assertEqual(path.replace_in_between(0, 0, make_path('X', 'A')),
+            make_path('X', 'A', 'B', 'C', 'D', 'E'))
+        self.assertEqual(path.replace_in_between(0, 2, make_empty_path('C')), make_path('C', 'D', 'E'))
+        self.assertEqual(path.replace_in_between(2, 4, make_path('C', 'X', 'Y')),
+            make_path('A', 'B', 'C', 'X', 'Y'))
+        self.assertEqual(path.replace_in_between(4, 4, make_path('E', 'X')),
+            make_path('A', 'B', 'C', 'D', 'E', 'X'))
+        self.assertEqual(path.replace_in_between(2, 4, make_empty_path('C')), make_path('A', 'B', 'C'))
+        self.assertEqual(path.replace_in_between(0, 4, make_path('X', 'Y')), make_path('X', 'Y'))
+        self.assertEqual(path.replace_in_between(0, 4, make_empty_path('X')), make_empty_path('X'))
+        self.assertEqual(make_empty_path('A').replace_in_between(0, 0, make_path('X', 'Y')), make_path('X', 'Y'))
+
         # Removal of a loop
         path = make_path('A', 'B', 'C', 'B', 'D')
         self.assertEqual(path.replace_in_between(1, 3, make_empty_path('B')), make_path('A', 'B', 'D'))
@@ -211,6 +226,12 @@ class TestGraphPath(unittest.TestCase):
             path.replace_in_between(1, 3, make_path('B', 'X'))
         with self.assertRaises(GraphPathConsistencyError):
             path.replace_in_between(1, 3, make_path('X', 'D'))
+        # The origin may differ when the whole head is replaced, but not the destination if the tail is not
+        with self.assertRaises(GraphPathConsistencyError):
+            path.replace_in_between(0, 2, make_path('X', 'Y'))
+        # The destination may differ when the whole tail is replaced, but not the origin if the head is not
+        with self.assertRaises(GraphPathConsistencyError):
+            path.replace_in_between(2, 4, make_path('X', 'Y'))
 
     def test_replace_first_or_last(self):
         for replace in [GraphPath.replace_first, GraphPath.replace_last]:
@@ -231,6 +252,18 @@ class TestGraphPath(unittest.TestCase):
                 self.assertEqual(replace(path, make_empty_path('C'), make_path('C', 'X', 'C')),
                     make_path('A', 'B', 'C', 'X', 'C', 'D', 'E'))
 
+                # Replacement of the whole head and/or tail of the path: origin and/or destination may change
+                self.assertEqual(replace(path, make_path('A', 'B', 'C'), make_path('X', 'Y', 'C')),
+                    make_path('X', 'Y', 'C', 'D', 'E'))
+                self.assertEqual(replace(path, make_path('C', 'D', 'E'), make_path('C', 'X', 'Y')),
+                    make_path('A', 'B', 'C', 'X', 'Y'))
+                self.assertEqual(replace(path, make_empty_path('A'), make_path('X', 'A')),
+                    make_path('X', 'A', 'B', 'C', 'D', 'E'))
+                self.assertEqual(replace(path, make_empty_path('E'), make_path('E', 'X')),
+                    make_path('A', 'B', 'C', 'D', 'E', 'X'))
+                self.assertEqual(replace(path, path, make_path('X', 'Y')), make_path('X', 'Y'))
+                self.assertEqual(replace(path, path, make_empty_path('X')), make_empty_path('X'))
+
                 # Removal of a loop
                 path = make_path('A', 'B', 'C', 'B', 'D')
                 self.assertEqual(replace(path, make_path('B', 'C', 'B'), make_empty_path('B')), make_path('A', 'B', 'D'))
@@ -242,6 +275,14 @@ class TestGraphPath(unittest.TestCase):
         self.assertEqual(path.replace_last(make_path('A', 'B'), make_path('A', 'X', 'B')),
             make_path('A', 'B', 'A', 'X', 'B'))
 
+        # The head/tail exception only applies if the first/last occurrence is at the head/tail of the path
+        self.assertEqual(path.replace_first(make_path('A', 'B'), make_path('X', 'B')), make_path('X', 'B', 'A', 'B'))
+        with self.assertRaises(GraphPathConsistencyError):
+            path.replace_last(make_path('A', 'B'), make_path('X', 'B'))
+        self.assertEqual(path.replace_last(make_path('A', 'B'), make_path('A', 'X')), make_path('A', 'B', 'A', 'X'))
+        with self.assertRaises(GraphPathConsistencyError):
+            path.replace_first(make_path('A', 'B'), make_path('A', 'X'))
+
     def test_replace_first_or_last_invalid(self):
         path = make_path('A', 'B', 'C', 'D', 'E')
         for replace in [path.replace_first, path.replace_last]:
@@ -251,6 +292,12 @@ class TestGraphPath(unittest.TestCase):
                     replace(make_path('B', 'C', 'D'), make_path('B', 'X'))
                 with self.assertRaises(GraphPathConsistencyError):
                     replace(make_path('B', 'C', 'D'), make_path('X', 'D'))
+                # The origin may differ when the whole head is replaced, but not the destination if the tail is not
+                with self.assertRaises(GraphPathConsistencyError):
+                    replace(make_path('A', 'B', 'C'), make_path('X', 'Y'))
+                # The destination may differ when the whole tail is replaced, but not the origin if the head is not
+                with self.assertRaises(GraphPathConsistencyError):
+                    replace(make_path('C', 'D', 'E'), make_path('X', 'Y'))
                 # Part to replace not found
                 with self.assertRaises(ValueError):
                     replace(make_path('B', 'D'), make_path('B', 'X', 'D'))
