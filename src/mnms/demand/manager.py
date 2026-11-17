@@ -13,7 +13,7 @@ from mnms.demand.user import Path, User
 from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Time
-from mnms.tools.exceptions import CSVDemandParseError
+from mnms.tools.exceptions import CSVDemandParseError, GraphPathConsistencyError
 from mnms.tools.observer import Observer
 
 log = create_logger(__name__)
@@ -253,16 +253,20 @@ class CSVDemandManager(AbstractDemandManager):
             destination = np.fromstring(row[3], sep=' ')
         else:
             raise TypeError("demand_type must be either 'node' or 'coordinate'")
+        userId = row[0]
         forced_path = None
         chosen_ms = None
         if 'PATH_NODES' in self._optional_columns and any(row[self._optional_columns[col]] != '' for col in _FORCED_PATH_COLUMNS):
-            path_nodes = row[self._optional_columns['PATH_NODES']].split()
-            path_links = row[self._optional_columns['PATH_LINKS']].split()
-            forced_path = Path(GraphPath(path_nodes, path_links))
+            try:
+                path_nodes = row[self._optional_columns['PATH_NODES']].split()
+                path_links = row[self._optional_columns['PATH_LINKS']].split()
+                forced_path = Path(GraphPath(path_nodes, path_links))
+            except GraphPathConsistencyError as e:
+                raise GraphPathConsistencyError(f'Inconsistent forced path for user {userId}: {e}') from e
             chosen_ms = row[self._optional_columns['CHOSEN SERVICES']].split(' ')
             chosen_ms = {cms.split(':')[0]:cms.split(':')[1] for cms in chosen_ms}
         return User(
-            row[0],
+            userId,
             origin,
             destination,
             Time(row[1]),

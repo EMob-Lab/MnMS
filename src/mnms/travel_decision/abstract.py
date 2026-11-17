@@ -231,13 +231,13 @@ class AbstractDecisionModel(ABC):
             -user: the user who has a forced initial path
 
         Raises:
-            -GraphPathConsistencyError: if the forced initial path is not consistent with the graph
+            -GraphPathConsistencyError: if the forced path is not consistent with the graph
         """
 
         try:
             user.path.graph_path.check_consistency(self._mlgraph.graph)
         except GraphPathConsistencyError as e:
-            raise GraphPathConsistencyError(f'Inconsistent forced initial path for user {user.id}: {e}') from e
+            raise GraphPathConsistencyError(f'Inconsistent forced path for user {user.id}: {e}') from e
 
         if user.path.layers == []:
             user.path.construct_layers_from_links(self._mlgraph.graph.links)
