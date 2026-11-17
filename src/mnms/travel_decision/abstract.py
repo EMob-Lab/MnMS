@@ -20,6 +20,7 @@ from mnms.log import create_logger
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.time import Time
 from mnms.tools.dict_tools import sum_dict
+from mnms.tools.exceptions import GraphPathConsistencyError
 
 log = create_logger(__name__)
 
@@ -228,7 +229,16 @@ class AbstractDecisionModel(ABC):
 
         Args:
             -user: the user who has a forced initial path
+
+        Raises:
+            -GraphPathConsistencyError: if the forced initial path is not consistent with the graph
         """
+
+        try:
+            user.path.graph_path.check_consistency(self._mlgraph.graph)
+        except GraphPathConsistencyError as e:
+            raise GraphPathConsistencyError(f'Inconsistent forced initial path for user {user.id}: {e}') from e
+
         if user.path.layers == []:
             user.path.construct_layers_from_links(self._mlgraph.graph.links)
         if user.path.mobility_services == []:

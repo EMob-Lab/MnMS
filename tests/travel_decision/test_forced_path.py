@@ -15,6 +15,7 @@ from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.simulation import Supervisor
 from mnms.time import Dt, Time, TimeTable
+from mnms.tools.exceptions import GraphPathConsistencyError
 from mnms.tools.observer import CSVUserObserver
 from mnms.travel_decision.dummy import DummyDecisionModel
 from mnms.vehicles.manager import VehicleManager
@@ -83,7 +84,7 @@ class TestForcedPath(unittest.TestCase):
                     ['ORIGIN_1_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'],
                 ),
             )
-            with self.assertRaises(ValueError): # Intentionally wrong path: there is no link ORIGIN_1 -> BUSL_S0
+            with self.assertRaises(GraphPathConsistencyError): # There is no link ORIGIN_1 -> BUSL_S0 in the graph.
                 forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
@@ -167,7 +168,7 @@ class TestForcedPath(unittest.TestCase):
         """Check that an error is triggered when the forced path is wrong.
         """
         ## Wrong base
-        with self.assertRaises(KeyError):
+        with self.assertRaises(GraphPathConsistencyError):
             self.create_supervisor('wrong_base')
             flow_dt = Dt(seconds=30)
             affectation_factor = 10
@@ -177,7 +178,7 @@ class TestForcedPath(unittest.TestCase):
                 affectation_factor)
 
         ## Wrong CSV
-        with self.assertRaises(KeyError):
+        with self.assertRaises(GraphPathConsistencyError):
             self.create_supervisor('wrong_csv')
             flow_dt = Dt(seconds=30)
             affectation_factor = 10

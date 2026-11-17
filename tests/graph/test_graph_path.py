@@ -8,6 +8,7 @@ from hipop.graph import make_empty_path as make_empty_hipop_path
 from hipop.graph import make_path as make_hipop_path
 
 from mnms.graph.graph_path import GraphPath
+from mnms.tools.exceptions import GraphPathConsistencyError
 
 
 def make_path(*nodes: str) -> GraphPath:
@@ -305,15 +306,15 @@ class TestGraphPathWithGraph(unittest.TestCase):
     def test_check_consistency_invalid(self):
 
         # Unknown link
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath(['A', 'B'], ['A_Z']).check_consistency(self.graph)
 
         # Link not connecting the nodes
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath(['A', 'C'], ['A_B']).check_consistency(self.graph)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath(['B', 'A'], ['A_B']).check_consistency(self.graph)
 
         # Unknown node (can only happen with an empty path)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             make_empty_path('Z').check_consistency(self.graph)

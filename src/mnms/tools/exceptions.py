@@ -26,3 +26,7 @@ class CSVDemandParseError(Exception):
     def __init__(self, file):
         msg = f"Cannot parse the origin or destination for demand_type for the file {file}"
         super().__init__(msg)
+
+
+class GraphPathConsistencyError(Exception):
+    """Raised when a GraphPath is not consistent with the graph it is supposed to belong to."""

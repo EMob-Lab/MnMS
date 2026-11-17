@@ -4,6 +4,8 @@ from collections.abc import Iterable
 
 from hipop.graph import OrientedGraph, OrientedGraphPath
 
+from mnms.tools.exceptions import GraphPathConsistencyError
+
 
 class GraphPath:
     """Path in a graph, described by the IDs of the nodes and of the links it goes through.
@@ -71,7 +73,7 @@ class GraphPath:
         nodes[i] and nodes[i+1] respectively).
 
         Raises:
-            -ValueError: if any of the conditions above is not satisfied
+            -GraphPathConsistencyError: if any of the conditions above is not satisfied
         """
 
         # REMARK: this method assumes that the number of nodes and links is consistent
@@ -81,7 +83,7 @@ class GraphPath:
         # actually exists in the graph.
         if len(self._links) == 0:
             if self._nodes[0] not in graph.nodes:
-                raise ValueError(f'Node {self._nodes[0]} does not exist in the graph')
+                raise GraphPathConsistencyError(f'Node {self._nodes[0]} does not exist in the graph')
 
         # Regular case: check that each link exists in the graph, and that it has the expected
         # upstream and downstream nodes. The existence of the nodes themselves is not explicitly checked,
@@ -90,10 +92,10 @@ class GraphPath:
         else:
             for i, lid in enumerate(self._links):
                 if lid not in graph.links:
-                    raise ValueError(f'Link {lid} does not exist in the graph')
+                    raise GraphPathConsistencyError(f'Link {lid} does not exist in the graph')
                 link = graph.links[lid]
                 if link.upstream != self._nodes[i] or link.downstream != self._nodes[i+1]:
-                    raise ValueError(f'Link {lid} goes from {link.upstream} to {link.downstream}, '
+                    raise GraphPathConsistencyError(f'Link {lid} goes from {link.upstream} to {link.downstream}, '
                         f'not from {self._nodes[i]} to {self._nodes[i+1]}')
 
     def compute_length(self, graph: OrientedGraph) -> float:
