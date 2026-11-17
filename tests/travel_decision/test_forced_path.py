@@ -9,6 +9,7 @@ from mnms.demand.user import Path
 from mnms.flow.MFD import MFDFlowMotor, Reservoir
 from mnms.generation.layers import generate_layer_from_roads, generate_matching_origin_destination_layer
 from mnms.generation.roads import generate_line_road
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import MultiLayerGraph, PublicTransportLayer
 from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
@@ -20,8 +21,6 @@ from mnms.vehicles.manager import VehicleManager
 from mnms.vehicles.veh_type import Bus
 
 
-# TODO OrientedGraphPath: re-enable once forced paths provide the link IDs required by Path
-@unittest.skip("Forced path mechanism is broken: Path requires link IDs that forced paths do not provide")
 class TestForcedPath(unittest.TestCase):
     def setUp(self):
         """Initiates the test.
@@ -62,9 +61,13 @@ class TestForcedPath(unittest.TestCase):
                                   251)
 
         if manager_type == 'base':
-            forced_path = Path(None, ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
-            # TODO OrientedGraphPath: when re-enabling this test, build forced_path from a GraphPath and validate it with
-            # forced_path.graph_path.check_consistency(mlgraph.graph)
+            forced_path = Path(
+                GraphPath(
+                    ['ORIGIN_0', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'],
+                    ['ORIGIN_0_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'],
+                ),
+            )
+            forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,
@@ -74,10 +77,14 @@ class TestForcedPath(unittest.TestCase):
         elif manager_type == 'wrong_csv':
             demand = CSVDemandManager(self.wrong_file)
         elif manager_type == 'wrong_base':
-            forced_path = Path(None, ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'])
-            # TODO OrientedGraphPath: when re-enabling this test, build forced_path from a GraphPath and validate it with
-            # forced_path.graph_path.check_consistency(mlgraph.graph). Beware: this path is intentionally wrong (there is
-            # no link ORIGIN_1 -> BUSL_S0), so check_consistency would raise a ValueError instead of the expected KeyError.
+            forced_path = Path(
+                GraphPath(
+                    ['ORIGIN_1', 'BUSL_S0', 'BUSL_S1', 'DESTINATION_1'],
+                    ['ORIGIN_1_BUSL_S0', 'BUSL_S0_S1', 'BUSL_S1_DESTINATION_1'],
+                ),
+            )
+            with self.assertRaises(ValueError): # Intentionally wrong path: there is no link ORIGIN_1 -> BUSL_S0
+                forced_path.graph_path.check_consistency(mlgraph.graph)
             chosen_ms = {'CAR': 'CAR', 'BUS': 'BUS', 'TRANSIT': 'WALK'}
             demand = BaseDemandManager([User("U0", [0, 0], [0, 5000], Time("07:00:00")),
                 User("U1", [0, 0], [0, 5000], Time("07:00:00"), path=forced_path,

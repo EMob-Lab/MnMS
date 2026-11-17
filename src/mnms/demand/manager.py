@@ -140,12 +140,23 @@ class CSVDemandManager(AbstractDemandManager):
                 pass
             else:
                 raise CSVDemandParseError(csvfile)
-            nop = 'PATH' not in self._optional_columns
-            nocms = 'CHOSEN SERVICES' not in self._optional_columns
-            if (nop and nocms) or (not nop and not nocms):
-                pass
-            else:
+
+            # In former MnMS versions, forced paths used to be defined by a single column PATH,
+            # containing the list of node IDs (i.e. what is now PATH_NODES).
+            # Backward compatibility with this former data-format is not ensured,
+            # though a warning is issued if this former PATH column is detected,
+            # instead of ignoring it silently.
+            if 'PATH' in self._optional_columns:
+                log.warning(f'Column PATH in {csvfile} is not supported anymore and will be ignored: '
+                            'forced paths must be specified with columns PATH_NODES and PATH_LINKS')
+
+            # Columns for forced path definition must be either all present or all absent.
+            forced_path_columns = ['PATH_NODES', 'PATH_LINKS', 'CHOSEN SERVICES']
+            has_all = all(c in self._optional_columns for c in forced_path_columns)
+            has_none = all(c not in self._optional_columns for c in forced_path_columns)
+            if not (has_all or has_none):
                 raise CSVDemandParseError(csvfile)
+
         except StopIteration:
             log.error(f'{self._filename} is empty')
             sys.exit(-1)
@@ -242,10 +253,10 @@ class CSVDemandManager(AbstractDemandManager):
             raise TypeError("demand_type must be either 'node' or 'coordinate'")
         forced_path = None
         chosen_ms = None
-        if 'PATH' in self._optional_columns and row[self._optional_columns['PATH']] != '':
-            # TODO OrientedGraphPath BROKEN: Path requires the link IDs in addition to the node IDs,
-            # but only the node IDs are available in the CSV file, so this call raises a ValueError.
-            forced_path = Path(GraphPath(row[self._optional_columns['PATH']].split(' '), []))
+        if 'PATH_NODES' in self._optional_columns and row[self._optional_columns['PATH_NODES']] != '':
+            path_nodes = row[self._optional_columns['PATH_NODES']].split()
+            path_links = row[self._optional_columns['PATH_LINKS']].split()
+            forced_path = Path(GraphPath(path_nodes, path_links))
             chosen_ms = row[self._optional_columns['CHOSEN SERVICES']].split(' ')
             chosen_ms = {cms.split(':')[0]:cms.split(':')[1] for cms in chosen_ms}
         return User(
