@@ -29,4 +29,4 @@ class CSVDemandParseError(Exception):
 
 
 class GraphPathConsistencyError(Exception):
-    """Raised when a GraphPath is not consistent with the graph it is supposed to belong to."""
+    """Raised when a GraphPath consistency rule is or would be broken (see GraphPath for more details)."""

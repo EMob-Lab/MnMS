@@ -38,11 +38,11 @@ class TestGraphPath(unittest.TestCase):
         self.assertEqual(p.destination, 'A')
 
     def test_construction_inconsistent(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath([], [])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath(['A', 'B'], [])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             GraphPath(['A', 'B'], ['A_B', 'B_C'])
 
     def test_construction_copies_input(self):
@@ -139,13 +139,13 @@ class TestGraphPath(unittest.TestCase):
         self.assertEqual(make_empty_path('A') + path, path)
 
     def test_concatenate_invalid(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             make_path('A', 'B') + make_path('C', 'D')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             make_path('A', 'B') + make_empty_path('C')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             make_empty_path('A') + make_path('B', 'C')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             make_empty_path('A') + make_empty_path('B')
         with self.assertRaises(TypeError):
             make_path('A', 'B', 'C') + ['C', 'D', 'E']
@@ -207,9 +207,9 @@ class TestGraphPath(unittest.TestCase):
             path.replace_in_between(3, 2, make_path('D', 'C'))
         with self.assertRaises(IndexError):
             path.replace_in_between(3, 5, make_path('D', 'E'))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             path.replace_in_between(1, 3, make_path('B', 'X'))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GraphPathConsistencyError):
             path.replace_in_between(1, 3, make_path('X', 'D'))
 
     def test_replace_first_or_last(self):
@@ -247,9 +247,9 @@ class TestGraphPath(unittest.TestCase):
         for replace in [path.replace_first, path.replace_last]:
             with self.subTest(replacement_method=replace.__name__):
                 # Different ends
-                with self.assertRaises(ValueError):
+                with self.assertRaises(GraphPathConsistencyError):
                     replace(make_path('B', 'C', 'D'), make_path('B', 'X'))
-                with self.assertRaises(ValueError):
+                with self.assertRaises(GraphPathConsistencyError):
                     replace(make_path('B', 'C', 'D'), make_path('X', 'D'))
                 # Part to replace not found
                 with self.assertRaises(ValueError):

@@ -29,11 +29,17 @@ class GraphPath:
         Args:
             -nodes: the IDs of the nodes the path goes through
             -links: the IDs of the links the path goes through (links[i] goes from nodes[i] to nodes[i+1])
+
+        Raises:
+            -GraphPathConsistencyError: if len(nodes) != len(links) + 1
         """
         nodes = tuple(nodes)
         links = tuple(links)
         if len(nodes) != len(links) + 1:
-            raise ValueError(f'Inconsistent path: {len(nodes)} nodes {nodes} and {len(links)} links {links}')
+            raise GraphPathConsistencyError(
+                f'Inconsistent number of nodes ({len(nodes)}) with respect to number of links ({len(links)}), '
+                ' expecting N+1 nodes for N links'
+            )
         self._nodes = nodes
         self._links = links
 
@@ -95,8 +101,10 @@ class GraphPath:
                     raise GraphPathConsistencyError(f'Link {lid} does not exist in the graph')
                 link = graph.links[lid]
                 if link.upstream != self._nodes[i] or link.downstream != self._nodes[i+1]:
-                    raise GraphPathConsistencyError(f'Link {lid} goes from {link.upstream} to {link.downstream}, '
-                        f'not from {self._nodes[i]} to {self._nodes[i+1]}')
+                    raise GraphPathConsistencyError(
+                        f'Link {lid} goes from {link.upstream} to {link.downstream}, '
+                        f'not from {self._nodes[i]} to {self._nodes[i+1]}'
+                    )
 
     def compute_length(self, graph: OrientedGraph) -> float:
         """Compute the length of the path (i.e. the sum of the lengths of its links in the given graph)."""
@@ -140,12 +148,14 @@ class GraphPath:
         """Concatenate the current path with another one.
 
         Raises:
-            -ValueError: if the other path does not start where the current path ends
+            -GraphPathConsistencyError: if the other path does not start where the current path ends
         """
         if not isinstance(other, GraphPath):
             return NotImplemented
         if other.origin != self.destination:
-            raise ValueError(f'Cannot concatenate path {self} with path {other}: {other.origin} != {self.destination}')
+            raise GraphPathConsistencyError(
+                f'Cannot concatenate path {self} with path {other}: {other.origin} != {self.destination}'
+            )
         return GraphPath(self._nodes + other._nodes[1:], self._links + other._links)
 
     def starts_with(self, prefix: GraphPath) -> bool:
@@ -178,13 +188,15 @@ class GraphPath:
 
         Raises:
             -IndexError: if start or end is out of range
-            -ValueError: if new does not start and end with the nodes at index start and end
+            -GraphPathConsistencyError: if new does not start and end with the nodes at index start and end
         """
         if not 0 <= start <= end < len(self._nodes):
             raise IndexError(f'Invalid node indices {start} and/or {end} in path {self}')
         if new.origin != self._nodes[start] or new.destination != self._nodes[end]:
-            raise ValueError(f'Cannot replace the part of path {self} between {self._nodes[start]} and '
-                f'{self._nodes[end]} by {new}: they do not have the same origin and destination')
+            raise GraphPathConsistencyError(
+                f'Cannot replace the part of path {self} between {self._nodes[start]} and '
+                f'{self._nodes[end]} by {new}: they do not have the same origin and destination'
+            )
         return self.sub_path(0, start) + new + self.sub_path(end)
 
     def replace_first(self, old: GraphPath, new: GraphPath) -> GraphPath:
@@ -195,7 +207,8 @@ class GraphPath:
             -new: the path to insert instead, it must have the same origin and destination as old
 
         Raises:
-            -ValueError: if old and new do not have the same ends, or if old is not found
+            -GraphPathConsistencyError: if old and new do not have the same ends
+            -ValueError: if old is not found
         """
         pos = self._find_for_replacement(old, new)[0]
         return self.replace_in_between(pos, pos + len(old._links), new)
@@ -208,7 +221,8 @@ class GraphPath:
             -new: the path to insert instead, it must have the same origin and destination as old
 
         Raises:
-            -ValueError: if old and new do not have the same ends, or if old is not found
+            -GraphPathConsistencyError: if old and new do not have the same ends
+            -ValueError: if old is not found
         """
         pos = self._find_for_replacement(old, new)[-1]
         return self.replace_in_between(pos, pos + len(old._links), new)
@@ -216,7 +230,9 @@ class GraphPath:
     def _find_for_replacement(self, old: GraphPath, new: GraphPath) -> list[int]:
         """Check that old can be replaced by new, and return the positions of old in this path (not empty)."""
         if old.origin != new.origin or old.destination != new.destination:
-            raise ValueError(f'Cannot replace {old} by {new}: they do not have the same origin and destination')
+            raise GraphPathConsistencyError(
+                f'Cannot replace {old} by {new}: they do not have the same origin and destination'
+            )
         positions = self.find(old)
         if len(positions) == 0:
             raise ValueError(f'Cannot replace {old} in path {self}: not found')
