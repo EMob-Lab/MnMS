@@ -114,7 +114,7 @@ class TestAvailabilityPersonalVehicle(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b', 'CAR_1 CAR_2', 'CAR_2 DESTINATION_2'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_CAR_1', 'TRANSIT_CAR_1_RIDEHAILING_1b', 'CAR_1_CAR_2', 'CAR_2_DESTINATION_2'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1', 'CAR_1', 'CAR_2'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'RIDEHAILING_1b', 'CAR_2', 'DESTINATION_2'])
         self.assertEqual(df0['STATE'].iloc[-1], 'ARRIVED')
@@ -144,7 +144,7 @@ class TestAvailabilityPersonalVehicle(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 RIDEHAILING_1b'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_CAR_1', 'TRANSIT_CAR_1_RIDEHAILING_1b'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'RIDEHAILING_1b'])
         self.assertEqual(df0['STATE'].iloc[-1], 'DEADEND')

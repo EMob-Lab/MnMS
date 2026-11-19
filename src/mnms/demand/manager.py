@@ -10,9 +10,10 @@ from typing import Literal
 import numpy as np
 
 from mnms.demand.user import Path, User
+from mnms.graph.graph_path import GraphPath
 from mnms.log import create_logger
 from mnms.time import Time
-from mnms.tools.exceptions import CSVDemandParseError
+from mnms.tools.exceptions import CSVDemandParseError, GraphPathConsistencyError
 from mnms.tools.observer import Observer
 
 log = create_logger(__name__)
@@ -55,6 +56,10 @@ class AbstractDemandManager(ABC):
     def add_user_observer(self, obs: Observer, user_ids: Literal['all'] | list[str] = "all"):
         self._observers.append(obs)
         self._user_to_attach.append(user_ids)
+
+
+_MANDATORY_COLUMNS = ['ID', 'DEPARTURE', 'ORIGIN', 'DESTINATION']
+_FORCED_PATH_COLUMNS = ['PATH_NODES', 'PATH_LINKS', 'CHOSEN SERVICES']
 
 
 class BaseDemandManager(AbstractDemandManager):
@@ -101,7 +106,7 @@ class BaseDemandManager(AbstractDemandManager):
     def to_csv(self, file: Pathl | str, delimiter=";"):
         with open(file, 'w') as f:
             writer = csv.writer(f, delimiter=delimiter)
-            writer.writerow(["ID", "DEPARTURE", "ORIGIN", "DESTINATION"])
+            writer.writerow(_MANDATORY_COLUMNS)
 
             for u in self._users:
                 writer.writerow([u.id, u.departure_time, u.origin, u.destination])
@@ -122,15 +127,14 @@ class CSVDemandManager(AbstractDemandManager):
 
     def init_demand_reader(self, csvfile: Pathl | str):
 
-        mandatory_columns = ['ID', 'DEPARTURE', 'ORIGIN', 'DESTINATION']
         time_format_1 = "%H:%M:%S"
         time_format_2 = "%H:%M:%S.%f"
 
         try:
             headers = next(self._reader)
-            if headers[:4] != mandatory_columns:
+            if headers[:4] != _MANDATORY_COLUMNS:
                  raise CSVDemandParseError(csvfile)
-            optional_columns = [h for h in headers if h not in mandatory_columns]
+            optional_columns = [h for h in headers if h not in _MANDATORY_COLUMNS]
             self._optional_columns = {c: headers.index(c) for c in optional_columns}
             # Small checks on consistency of optional columns
             noms = 'MOBILITY SERVICES' not in self._optional_columns
@@ -139,12 +143,22 @@ class CSVDemandManager(AbstractDemandManager):
                 pass
             else:
                 raise CSVDemandParseError(csvfile)
-            nop = 'PATH' not in self._optional_columns
-            nocms = 'CHOSEN SERVICES' not in self._optional_columns
-            if (nop and nocms) or (not nop and not nocms):
-                pass
-            else:
+
+            # In former MnMS versions, forced paths used to be defined by a single column PATH,
+            # containing the list of node IDs (i.e. what is now PATH_NODES).
+            # Backward compatibility with this former data-format is not ensured,
+            # though a warning is issued if this former PATH column is detected,
+            # instead of ignoring it silently.
+            if 'PATH' in self._optional_columns:
+                log.warning(f'Column PATH in {csvfile} is not supported anymore and will be ignored: '
+                            'forced paths must be specified with columns PATH_NODES and PATH_LINKS')
+
+            # Columns for forced path definition must be either all present or all absent.
+            has_all = all(c in self._optional_columns for c in _FORCED_PATH_COLUMNS)
+            has_none = all(c not in self._optional_columns for c in _FORCED_PATH_COLUMNS)
+            if not (has_all or has_none):
                 raise CSVDemandParseError(csvfile)
+
         except StopIteration:
             log.error(f'{self._filename} is empty')
             sys.exit(-1)
@@ -239,14 +253,20 @@ class CSVDemandManager(AbstractDemandManager):
             destination = np.fromstring(row[3], sep=' ')
         else:
             raise TypeError("demand_type must be either 'node' or 'coordinate'")
+        userId = row[0]
         forced_path = None
         chosen_ms = None
-        if 'PATH' in self._optional_columns and row[self._optional_columns['PATH']] != '':
-            forced_path = Path(None, row[self._optional_columns['PATH']].split(' '))
+        if 'PATH_NODES' in self._optional_columns and any(row[self._optional_columns[col]] != '' for col in _FORCED_PATH_COLUMNS):
+            try:
+                path_nodes = row[self._optional_columns['PATH_NODES']].split()
+                path_links = row[self._optional_columns['PATH_LINKS']].split()
+                forced_path = Path(GraphPath(path_nodes, path_links))
+            except GraphPathConsistencyError as e:
+                raise GraphPathConsistencyError(f'Inconsistent forced path for user {userId}: {e}') from e
             chosen_ms = row[self._optional_columns['CHOSEN SERVICES']].split(' ')
             chosen_ms = {cms.split(':')[0]:cms.split(':')[1] for cms in chosen_ms}
         return User(
-            row[0],
+            userId,
             origin,
             destination,
             Time(row[1]),

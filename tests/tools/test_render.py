@@ -5,14 +5,8 @@ import matplotlib.pyplot as plt
 from mnms.demand.user import Path
 from mnms.generation.mlgraph import generate_manhattan_passenger_car
 from mnms.generation.roads import generate_line_road
+from mnms.graph.graph_path import GraphPath
 from mnms.tools.render import draw_path, draw_roads
-
-
-def check_path_nodes(path: Path, graph):
-    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
-    for node in path.nodes:
-        if node not in graph.nodes:
-            raise ValueError(f'Node {node} does not exist in the graph')
 
 
 class TestRenderRoads(unittest.TestCase):
@@ -41,7 +35,13 @@ class TestRenderPath(unittest.TestCase):
         pass
 
     def test_draw_path(self):
-        path = Path(cost=0, nodes=["CAR_NORTH_0", "CAR_3", "CAR_2", "CAR_1", "CAR_0"])
-        check_path_nodes(path, self.mlgraph.graph)
+        path = Path(
+            graph_path=GraphPath(
+                ["CAR_NORTH_0", "CAR_3", "CAR_2", "CAR_1", "CAR_0"],
+                ["CAR_NORTH_0_3", "CAR_3_2", "CAR_2_1", "CAR_1_0"],
+            ),
+            cost=0,
+        )
+        path.graph_path.check_consistency(self.mlgraph.graph)
         _, ax = plt.subplots()
         draw_path(ax, self.mlgraph, path)

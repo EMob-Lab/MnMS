@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 
 from mnms.demand.user import Path, User
 from mnms.flow.user_flow import UserFlow
+from mnms.graph.graph_path import GraphPath
 from mnms.graph.layers import BusLayer, CarLayer, MultiLayerGraph
 from mnms.graph.road import RoadDescriptor
 from mnms.graph.zone import construct_zone_from_sections
@@ -10,13 +11,6 @@ from mnms.mobility_service.personal_vehicle import PersonalMobilityService
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.time import Dt, Time, TimeTable
 from mnms.vehicles.manager import VehicleManager
-
-
-def check_path_nodes(path: Path, graph):
-    """Ensure that the node IDs of the given path actually refer to existing nodes in the given graph."""
-    for node in path.nodes:
-        if node not in graph.nodes:
-            raise ValueError(f'Node {node} does not exist in the graph')
 
 
 class TestUserFlow(unittest.TestCase):
@@ -86,9 +80,14 @@ class TestUserFlow(unittest.TestCase):
     def test_request_veh(self):
         user = User('U0', '0', '4', Time('00:01:00'))
         user._current_node = 'C0'
-        user.set_path(Path(cost=3400,
-                           nodes=['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4']))
-        check_path_nodes(user.path, self.mlgraph.graph)
+        user.set_path(Path(
+            graph_path=GraphPath(
+                ['C0', 'C2', 'L1_B2', 'L1_B3', 'L1_B4'],
+                ['C0_C2', 'CAR_BUS', 'L1_B2_B3', 'L1_B3_B4'],
+            ),
+            cost=3400,
+        ))
+        user.path.graph_path.check_consistency(self.mlgraph.graph)
         self.user_flow.step(Dt(minutes=1), [user])
 
         self.assertIn('U0', self.user_flow.users)

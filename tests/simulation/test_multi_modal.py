@@ -98,7 +98,7 @@ class TestMultiModal(unittest.TestCase):
         with open(self.dir_results / "user.csv") as f:
             df = pd.read_csv(f, sep=';')
         df_links = df[df['LINK'] != df['LINK'].shift()]
-        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 CAR_2', 'CAR_2 CAR_3', 'CAR_3 L0_S0', 'L0_S0 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_5'])
+        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_2', 'CAR_2_3', 'TRANSIT_LINK', 'L0_S0_S1', 'L0_S1_S2', 'L0_S2_DESTINATION_5'])
         self.assertEqual(df_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1', 'CAR_2', 'CAR_3', 'L0_S0', 'L0_S1', 'L0_S2'])
         self.assertEqual(df_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'CAR_2', 'CAR_3', 'L0_S0', 'L0_S1', 'L0_S2', 'DESTINATION_5'])
 
