@@ -44,7 +44,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: dist
+          name: python-distributions
           path: |
             ./dist/*.tar.gz
             ./dist/*.whl
@@ -66,8 +66,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
+          name: python-distributions
           path: dist
-          merge-multiple: true
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
