@@ -320,10 +320,10 @@ class TestGraphPathWithGraph(unittest.TestCase):
         #      -S2/time=11     -S2/time=21     -S2/time=31
         #
         self.graph = OrientedGraph()
-        self.graph.add_node('A', 0, 0, '')
-        self.graph.add_node('B', 10, 0, '')
-        self.graph.add_node('C', 30, 0, '')
-        self.graph.add_node('D', 60, 0, '')
+        self.graph.add_node('A', 0, 0)
+        self.graph.add_node('B', 10, 0)
+        self.graph.add_node('C', 30, 0)
+        self.graph.add_node('D', 60, 0)
         self.graph.add_link('A_B', 'A', 'B', 10, {'S1': {'time': 1}, 'S2': {'time': 11}}, 'L1')
         self.graph.add_link('B_C', 'B', 'C', 20, {'S1': {'time': 2}, 'S2': {'time': 21}}, 'L1')
         self.graph.add_link('C_D', 'C', 'D', 30, {'S1': {'time': 3}, 'S2': {'time': 31}}, 'L2')
