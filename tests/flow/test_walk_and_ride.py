@@ -185,7 +185,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 BIKESHARING_1', 'BIKESHARING_1 BIKESHARING_2', 'BIKESHARING_2 BIKESHARING_3', 'BIKESHARING_3 DESTINATION_3'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_BIKESHARING_1', 'BIKESHARING_1_2', 'BIKESHARING_2_3', 'BIKESHARING_3_DESTINATION_3'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'BIKESHARING_1', 'BIKESHARING_2', 'BIKESHARING_3'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['BIKESHARING_1', 'BIKESHARING_2', 'BIKESHARING_3', 'DESTINATION_3'])
         self.assertGreaterEqual(Time(df0.iloc[-1]['TIME']), Time('07:06:21'))
@@ -193,7 +193,7 @@ class TestWalkAndRide(unittest.TestCase):
 
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 BIKESHARING_3', 'BIKESHARING_3 BIKESHARING_4', 'BIKESHARING_4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_BIKESHARING_3', 'BIKESHARING_3_4', 'BIKESHARING_4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'BIKESHARING_3', 'BIKESHARING_4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['BIKESHARING_3', 'BIKESHARING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:41'))
@@ -219,7 +219,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 CAR_3', 'CAR_3 CAR_4', 'CAR_4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_CAR_3', 'CAR_3_CAR_4', 'CAR_4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'CAR_3', 'CAR_4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['CAR_3', 'CAR_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:41'))
@@ -247,7 +247,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 L_S3', 'L_S3 L_S4', 'L_S4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_L_S3', 'L_S3_S4', 'L_S4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'L_S3', 'L_S4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['L_S3', 'L_S4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:30'))
@@ -273,7 +273,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 RIDEHAILING_3', 'RIDEHAILING_3 RIDEHAILING_4', 'RIDEHAILING_4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_RIDEHAILING_3', 'RIDEHAILING_3_RIDEHAILING_4', 'RIDEHAILING_4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'RIDEHAILING_3', 'RIDEHAILING_4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['RIDEHAILING_3', 'RIDEHAILING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:41'))
@@ -299,7 +299,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 RIDEHAILING_3', 'RIDEHAILING_3 RIDEHAILING_4', 'RIDEHAILING_4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_RIDEHAILING_3', 'RIDEHAILING_3_RIDEHAILING_4', 'RIDEHAILING_4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'RIDEHAILING_3', 'RIDEHAILING_4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['RIDEHAILING_3', 'RIDEHAILING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:16:20'))
@@ -325,7 +325,7 @@ class TestWalkAndRide(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df1 = df[df['ID'] == 'U1']
         df1_links = df1[df1['LINK'] != df1['LINK'].shift()]
-        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2 RIDESHARING_3', 'RIDESHARING_3 RIDESHARING_4', 'RIDESHARING_4 DESTINATION_4'])
+        self.assertEqual(df1_links['LINK'].tolist(), ['ORIGIN_2_RIDESHARING_3', 'RIDESHARING_3_RIDESHARING_4', 'RIDESHARING_4_DESTINATION_4'])
         self.assertEqual(df1_links['UP'].tolist(), ['ORIGIN_2', 'RIDESHARING_3', 'RIDESHARING_4'])
         self.assertEqual(df1_links['DOWN'].tolist(), ['RIDESHARING_3', 'RIDESHARING_4', 'DESTINATION_4'])
         self.assertGreaterEqual(Time(df1.iloc[-1]['TIME']), Time('07:15:41'))
