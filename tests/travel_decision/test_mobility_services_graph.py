@@ -118,7 +118,7 @@ class TestMobilityServicesGraph(unittest.TestCase):
             df = pd.read_csv(f, sep=';')
         df0 = df[df['ID'] == 'U0']
         df0_links = df0[df0['LINK'] != df0['LINK'].shift()]
-        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0 RIDEHAILING_0', 'ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df0_links['LINK'].tolist(), ['ORIGIN_0_RIDEHAILING_0', 'ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
         self.assertEqual(df0_links['UP'].tolist(), ['ORIGIN_0', 'ORIGIN_0', 'CAR_0', 'CAR_1'])
         self.assertEqual(df0_links['DOWN'].tolist(), ['RIDEHAILING_0', 'CAR_0', 'CAR_1', 'DESTINATION_1'])
 
@@ -127,7 +127,7 @@ class TestMobilityServicesGraph(unittest.TestCase):
 
         df2 = df[df['ID'] == 'U2']
         df2_links = df2[df2['LINK'] != df2['LINK'].shift()]
-        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_0 CAR_0', 'CAR_0 CAR_1', 'CAR_1 DESTINATION_1'])
+        self.assertEqual(df2_links['LINK'].tolist(), ['ORIGIN_0_CAR_0', 'CAR_0_1', 'CAR_1_DESTINATION_1'])
         self.assertEqual(df2_links['UP'].tolist(), ['ORIGIN_0', 'CAR_0', 'CAR_1'])
         self.assertEqual(df2_links['DOWN'].tolist(), ['CAR_0', 'CAR_1', 'DESTINATION_1'])
 

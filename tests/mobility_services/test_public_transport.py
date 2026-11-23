@@ -117,11 +117,11 @@ class TestPublicTransport(unittest.TestCase):
         df_bus0 = dfveh[dfveh['ID'] == 0]
         df_bus1 = dfveh[dfveh['ID'] == 1]
         df_bus0_links = df_bus0[df_bus0['LINK'] != df_bus0['LINK'].shift()]
-        self.assertEqual(df_bus0_links['LINK'].tolist(), ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
+        self.assertEqual(df_bus0_links['LINK'].tolist(), ['L0_S0_S1', 'L0_S1_S2'])
         self.assertEqual(df_bus0_links['UP'].tolist(), ['L0_S0', 'L0_S1'])
         self.assertEqual(df_bus0_links['DOWN'].tolist(), ['L0_S1', 'L0_S2'])
         df_bus1_links = df_bus1[df_bus1['LINK'] != df_bus1['LINK'].shift()]
-        self.assertEqual(df_bus1_links['LINK'].tolist(), ['L0_S0 L0_S1', 'L0_S1 L0_S2'])
+        self.assertEqual(df_bus1_links['LINK'].tolist(), ['L0_S0_S1', 'L0_S1_S2'])
         self.assertEqual(df_bus1_links['UP'].tolist(), ['L0_S0', 'L0_S1'])
         self.assertEqual(df_bus1_links['DOWN'].tolist(), ['L0_S1', 'L0_S2'])
 
@@ -134,7 +134,7 @@ class TestPublicTransport(unittest.TestCase):
 
         # Check user's route
         df_links = df[df['LINK'] != df['LINK'].shift()]
-        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_S1 L0_S1', 'L0_S1 L0_S2', 'L0_S2 DESTINATION_3'])
+        self.assertEqual(df_links['LINK'].tolist(), ['ORIGIN_S1_L0_S1', 'L0_S1_S2', 'L0_S2_DESTINATION_3'])
         self.assertEqual(df_links['UP'].tolist(), ['ORIGIN_S1', 'L0_S1', 'L0_S2'])
         self.assertEqual(df_links['DOWN'].tolist(), ['L0_S1', 'L0_S2', 'DESTINATION_3'])
 
@@ -167,7 +167,7 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh1['DISTANCE'].iloc[-1], 3000)
         self.assertEqual(dfveh1['STATE'].iloc[-1], 'STOP')
         dfveh1_links = dfveh1[dfveh1['LINK'] != dfveh1['LINK'].shift()]
-        self.assertEqual(dfveh1_links['LINK'].tolist(), ['L0r_S2r L0r_S1r', 'L0r_S1r L0r_S0r'])
+        self.assertEqual(dfveh1_links['LINK'].tolist(), ['L0r_S2r_S1r', 'L0r_S1r_S0r'])
         self.assertEqual(dfveh1_links['UP'].tolist(), ['L0r_S2r', 'L0r_S1r'])
         self.assertEqual(dfveh1_links['DOWN'].tolist(), ['L0r_S1r', 'L0r_S0r'])
 
@@ -181,7 +181,7 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh3['DISTANCE'].iloc[-1], 1500)
         self.assertEqual(dfveh3['STATE'].iloc[-1], 'REPOSITIONING')
         dfveh3_links = dfveh3[dfveh3['LINK'] != dfveh3['LINK'].shift()]
-        self.assertEqual(dfveh3_links['LINK'].tolist(), ['L0r_S2r L0r_S1r'])
+        self.assertEqual(dfveh3_links['LINK'].tolist(), ['L0r_S2r_S1r'])
         self.assertEqual(dfveh3_links['UP'].tolist(), ['L0r_S2r'])
         self.assertEqual(dfveh3_links['DOWN'].tolist(), ['L0r_S1r'])
 
@@ -195,6 +195,6 @@ class TestPublicTransport(unittest.TestCase):
         self.assertEqual(dfveh2['DISTANCE'].iloc[-1], 1200)
         self.assertEqual(dfveh2['STATE'].iloc[-1], 'REPOSITIONING')
         dfveh2_links = dfveh2[dfveh2['LINK'] != dfveh2['LINK'].shift()]
-        self.assertEqual(dfveh2_links['LINK'].tolist(), ['L0r-_S2r L0r-_S1r'])
+        self.assertEqual(dfveh2_links['LINK'].tolist(), ['L0r-_S2r_S1r'])
         self.assertEqual(dfveh2_links['UP'].tolist(), ['L0r-_S2r'])
         self.assertEqual(dfveh2_links['DOWN'].tolist(), ['L0r-_S1r'])
