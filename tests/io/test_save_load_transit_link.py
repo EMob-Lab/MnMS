@@ -101,10 +101,10 @@ class TestIOGraphTransit(unittest.TestCase):
         data = {l["ID"] for l in data["LINKS"]}
 
         for origin in self.mlgraph.odlayer.origins:
-            for link in self.mlgraph.graph.nodes[origin].adj.values():
+            for link in self.mlgraph.graph.nodes[origin].out_links:
                 assert link.id in data
         for destination in self.mlgraph.odlayer.destinations:
-            for link in self.mlgraph.graph.nodes[destination].radj.values():
+            for link in self.mlgraph.graph.nodes[destination].in_links:
                 assert link.id in data
 
 

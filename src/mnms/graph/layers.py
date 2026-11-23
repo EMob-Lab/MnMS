@@ -288,10 +288,12 @@ class MultiLayerGraph:
 
         for tl in transit_links:
             # Check that this transit link does not already exist
-            up_node = self.graph.nodes.get(tl['upstream_node'])
-            if up_node is not None and tl['downstream_node'] in up_node.adj:
-                link = up_node.adj[tl['downstream_node']]
-                log.warning(f"A transit link from {tl['upstream_node']} to {tl['downstream_node']} already exists (link id = {link.id})")
+            existing_links = self.graph.find_connecting_link_ids(tl['upstream_node'], tl['downstream_node'])
+            if len(existing_links) > 0:
+                log.warning(
+                    f"{len(existing_links)} transit link(s) from {tl['upstream_node']} to {tl['downstream_node']} "
+                    f"already exist(s) (link ID(s) = {', '.join(existing_links)})"
+                )
                 continue
 
             # Create the transit link with the official costs (only length if this
@@ -309,7 +311,7 @@ class MultiLayerGraph:
 
             # Update the other costs within simulation
             if self.transitlayer.walk_speed is not None:
-                link = self.graph.nodes[tl['upstream_node']].adj[tl['downstream_node']]
+                link = self.graph.links[tl['id']]
                 for mservice, cost_functions in self.transitlayer._costs_functions.items():
                     for cost_name, cost_func in cost_functions.items():
                         costs[mservice][cost_name] = cost_func(self.graph.nodes, self.transitlayer, link, costs)
@@ -368,12 +370,16 @@ class MultiLayerGraph:
                 bool_connect = (layer_nid != nid)
                 if bool_connect:
                     # Check if a link does not already exist between these two nodes
-                    unode = self.graph.nodes.get(nid)
-                    if unode is not None and layer_nid in unode.adj:
-                        link = unode.adj[layer_nid]
-                        if link.label == 'TRANSIT':
-                            log.warning(f'A transit link already exist from {nid} to {layer_nid} (link id = {link.id})')
-                            continue
+                    existing_links = [
+                        link.id for link in self.graph.find_connecting_links(nid, layer_nid)
+                        if link.label == 'TRANSIT'
+                    ]
+                    if len(existing_links) > 0:
+                        log.warning(
+                            f"{len(existing_links)} transit link(s) from {nid} to {layer_nid} "
+                            f"already exist(s) (link ID(s) = {', '.join(existing_links)})"
+                        )
+                        continue
                     lid = f"{nid}_{layer_nid}"
                     self.graph.add_link(lid, nid, layer_nid, dist, {"WALK": {'length': dist}}, "TRANSIT")
                     self.map_linkid_layerid[lid] = "TRANSIT"
@@ -418,10 +424,12 @@ class MultiLayerGraph:
 
                             for layer_nid, dist in zip(graph_dnode_ids[mask], dist_nodes[mask]):
                                 # Check if this transit link already exist
-                                onode = self.graph.nodes.get(onid)
-                                if onode is not None and layer_nid in onode.adj:
-                                    link = onode.adj[layer_nid]
-                                    log.warning(f'A transit link from {onid} to {layer_nid} already exists (link id = {link.id})')
+                                existing_links = self.graph.find_connecting_link_ids(onid, layer_nid)
+                                if len(existing_links) > 0:
+                                    log.warning(
+                                        f"{len(existing_links)} transit link(s) from {onid} to {layer_nid} "
+                                        f"already exist(s) (link ID(s) = {', '.join(existing_links)})"
+                                    )
                                     continue
                                 lid = f"{onid}_{layer_nid}"
                                 self.graph.add_link(lid, onid, layer_nid, dist, {"WALK": {'length': dist}}, "TRANSIT")
@@ -436,10 +444,12 @@ class MultiLayerGraph:
 
     def connect_layers(self, lid: str, upstream: str, downstream: str, length: float, costs: dict[str, float]):
         # Check if this transit link does not already exist
-        up_node = self.graph.nodes.get(upstream)
-        if up_node is not None and downstream in up_node.adj:
-            link = up_node.adj[downstream]
-            log.warning(f'A transit link from {upstream} to {downstream} already exist (link id = {link.id})')
+        existing_links = self.graph.find_connecting_link_ids(upstream, downstream)
+        if len(existing_links) > 0:
+            log.warning(
+                f"{len(existing_links)} transit link(s) from {upstream} to {downstream} "
+                f"already exist(s) (link ID(s) = {', '.join(existing_links)})"
+            )
         else:
             if "WALK" not in costs:
                 costs = {"WALK": costs}

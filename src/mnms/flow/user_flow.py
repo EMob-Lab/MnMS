@@ -1,4 +1,5 @@
 import csv
+from itertools import pairwise
 
 import numpy as np
 
@@ -355,27 +356,41 @@ class UserFlow:
         if user is None:
             for uid,u in self.users.items():
                 self._csvhandler.writerow([uid, " ".join(u.achieved_path),
-                    " ".join(self.build_achieved_path_links(u.achieved_path)),
+                    self._recover_path_links(u.achieved_path),
                     " ".join(u.achieved_path_ms)])
         else:
             self._csvhandler.writerow([user.id, " ".join(user.achieved_path),
-                " ".join(self.build_achieved_path_links(user.achieved_path)),
+                self._recover_path_links(user.achieved_path),
                 " ".join(user.achieved_path_ms)])
 
-    def build_achieved_path_links(self, path_nodes):
-        """Method to convert a list of nodes into a list of links.
+    def _recover_path_links(self, path_nodes: list[str]) -> str:
+        """Method to recover the links traversed by a path given as a list of nodes.
+
+        FIXME This method is a workaround for the fact that User.achieved_path tracks only the visited nodes,
+        but not the visited links. Tracking both nodes and links at the source and avoiding this method
+        would be much more robust.
+        Besides, since the graph may contain parallel links (i.e. several links between the same pair of nodes),
+        non-ambiguous recovery of the links may not always be possible: an error marker is returned for the paths
+        that go through such parallel links.
 
         Args:
             -path_nodes: the list of nodes
+
+        Returns:
+            -the IDs of the links, separated by spaces, or an error marker if the links cannot be recovered
         """
         links = []
-        for i in range(len(path_nodes)-1):
-            try:
-                link = self._graph.graph.nodes[path_nodes[i]].adj[path_nodes[i+1]]
-                links.append(link.id)
-            except KeyError:
-                log.error(f'Cannot find link between {path_nodes[i]} and {path_nodes[i+1]}...')
-        return links
+        for up, down in pairwise(path_nodes):
+            candidate_links = self._graph.graph.find_connecting_link_ids(up, down)
+            if len(candidate_links) == 0:
+                log.error(f'Unfeasible path: no link from {up} to {down}...')
+                return '### ERROR unfeasible path ###'
+            elif len(candidate_links) >= 2:
+                log.error(f'Ambiguous path: {len(candidate_links)} links exist from {up} to {down}...')
+                return '### ERROR ambiguous path ###'
+            else:
+                links.append(next(iter(candidate_links)))
+        return ' '.join(links)
 
     def finalize(self):
         if self._write:
