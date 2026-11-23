@@ -79,7 +79,7 @@ class DynamicSpaceSharing:
         costs[mobility_service][self.cost] = float("inf")
         if self.cost != 'travel_time':
             costs[mobility_service]['travel_time'] = float("inf")
-        self.graph.graph.update_link_costs(lid, costs)
+        link.update_costs(costs)
         layer = self.graph.mapping_layer_services[mobility_service]
         layer.graph.links[lid].update_costs(costs)
 
@@ -129,7 +129,7 @@ class DynamicSpaceSharing:
             costs[banned_ms][self.cost] = costs_functions[banned_ms][self.cost](gnodes, layer, link, costs)
 
         # Update link cost
-        self.graph.graph.update_link_costs(lid, costs)
+        link.update_costs(costs)
         layer.graph.links[lid].update_costs(costs)
 
     def update(self, tcurrent: Time, vehicles: list[Vehicle]) -> list[tuple[Vehicle, VehicleActivity]]:
