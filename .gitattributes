@@ -1,2 +1,6 @@
 # See https://docs.github.com/en/get-started/git-basics/configuring-git-to-handle-line-endings
 * text=auto
+
+# Windows batch files must use CRLF line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf

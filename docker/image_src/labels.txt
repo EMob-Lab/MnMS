@@ -1,0 +1,7 @@
+# Metadata of the published container image, one `key=value` per line (no quotes).
+# Applied by the publishing workflow both as image labels and as OCI annotations.
+# Lines starting with '#' and blank lines are ignored.
+
+org.opencontainers.image.title=MnMS-Docker
+org.opencontainers.image.description=Agent-based Multimodal Urban Mobility Simulator resulting from the ERC MAGnUM project
+org.opencontainers.image.licenses=LGPL-3.0-only
