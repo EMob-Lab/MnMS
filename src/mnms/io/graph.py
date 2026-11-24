@@ -94,11 +94,11 @@ def save_transit_link_odlayer(mlgraph: MultiLayerGraph, filename: str | Path, in
     links = []
     gnodes = mlgraph.graph.nodes
     for origin in mlgraph.odlayer.origins:
-        for link in gnodes[origin].adj.values():
+        for link in gnodes[origin].out_links:
             links.append(link_to_dict(link))
 
     for destination in mlgraph.odlayer.destinations:
-        for link in gnodes[destination].radj.values():
+        for link in gnodes[destination].in_links:
             links.append(link_to_dict(link))
 
     data = {"LINKS": links}

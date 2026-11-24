@@ -3,7 +3,6 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from hipop.graph import NodeMap
 from hipop.shortest_path import parallel_dijkstra_heterogeneous_costs
 
 from mnms.graph.graph_path import GraphPath
@@ -79,7 +78,7 @@ class DynamicSpaceSharing:
         costs[mobility_service][self.cost] = float("inf")
         if self.cost != 'travel_time':
             costs[mobility_service]['travel_time'] = float("inf")
-        self.graph.graph.update_link_costs(lid, costs)
+        link.update_costs(costs)
         layer = self.graph.mapping_layer_services[mobility_service]
         layer.graph.links[lid].update_costs(costs)
 
@@ -104,13 +103,12 @@ class DynamicSpaceSharing:
 
         return vehicles_to_reroute
 
-    def unban_link(self, lid: str, gnodes: NodeMap):
+    def unban_link(self, lid: str):
         """Method to unban a banned link for a specific mobility service.
         It recomputes the travel time and cost on that link.
 
         Args:
             -lid: id of the link to unban
-            -gnodes: the multi layer graph nodes
         """
         assert lid in self.banned_links, f'Try to unban a non banned link {lid}...'
 
@@ -126,10 +124,11 @@ class DynamicSpaceSharing:
         if self.cost != 'travel_time' and banned_ms in costs_functions:
             costs_functions = layer._costs_functions
             assert self.cost in costs_functions[banned_ms], f'Cannot find cost {self.cost} in cost funtions of {banned_ms} service...'
+            gnodes = self.graph.graph.nodes
             costs[banned_ms][self.cost] = costs_functions[banned_ms][self.cost](gnodes, layer, link, costs)
 
         # Update link cost
-        self.graph.graph.update_link_costs(lid, costs)
+        link.update_costs(costs)
         layer.graph.links[lid].update_costs(costs)
 
     def update(self, tcurrent: Time, vehicles: list[Vehicle]) -> list[tuple[Vehicle, VehicleActivity]]:
@@ -148,7 +147,7 @@ class DynamicSpaceSharing:
             if banned_link.period <= 0:
                 to_del.append(lid)
         for lid in to_del:
-            self.unban_link(lid, self.graph.graph.nodes)
+            self.unban_link(lid)
             log.info(f'Unban {lid} at {tcurrent}')
             del self.banned_links[lid]
 

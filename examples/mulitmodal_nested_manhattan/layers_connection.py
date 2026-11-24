@@ -71,7 +71,7 @@ def connect_layers(mlgraph, max_transfer_dist, personal_mob_service_park_radius)
                 mlgraph.connect_layers(lid, rhn.id, node.id, dist, {'length': dist})
 
     # Transit from ridehailing to origin (be refused, go back to home to be able to take car)
-    #origin_nodes = np.array([n for n in mlgraph.graph.nodes.values() if n.label == 'ODLAYER' and n.radj == {}])
+    #origin_nodes = np.array([n for n in mlgraph.graph.nodes.values() if n.label == 'ODLAYER' and len(n.in_links) == 0])
     #origin_nodes_pos = np.array([n.position for n in origin_nodes])
     #for rhn in rh_nodes:
     #    rhn_pos = np.array(rhn.position)
@@ -85,7 +85,7 @@ def connect_layers(mlgraph, max_transfer_dist, personal_mob_service_park_radius)
     # origin nodes that are not yet connected to a PT station
     origins = mlgraph.odlayer.origins
     for oid,coord in origins.items():
-        ly_connected_to = [mlgraph.graph.nodes[adjn.downstream].label for adjn in mlgraph.graph.nodes[oid].adj.values()]
+        ly_connected_to = [mlgraph.graph.nodes[link.downstream].label for link in mlgraph.graph.nodes[oid].out_links]
         if [ly for ly in ly_connected_to if ly in pt_layers_ids] == []:
             dist_nodes = _norm(pt_nodes_pos-coord, axis=1)
             min_dist = min(dist_nodes)
@@ -97,7 +97,7 @@ def connect_layers(mlgraph, max_transfer_dist, personal_mob_service_park_radius)
     # that are not yet connected to a PT station
     destinations = mlgraph.odlayer.destinations
     for oid,coord in destinations.items():
-        ly_back_connected_to = [mlgraph.graph.nodes[radjn.upstream].label for radjn in mlgraph.graph.nodes[oid].radj.values()]
+        ly_back_connected_to = [mlgraph.graph.nodes[link.upstream].label for link in mlgraph.graph.nodes[oid].in_links]
         if [ly for ly in ly_back_connected_to if ly in pt_layers_ids] == []:
             dist_nodes = _norm(pt_nodes_pos-coord, axis=1)
             min_dist = min(dist_nodes)
