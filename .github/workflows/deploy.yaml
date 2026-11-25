@@ -81,7 +81,7 @@ jobs:
 
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME: EMob-Lab/mnms-docker
+      IMAGE_NAME: emob-lab/mnms-docker
 
     environment:
       name: ghcr-env

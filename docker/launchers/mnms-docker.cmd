@@ -4,7 +4,7 @@ setlocal
 
 rem Identifier of the Docker image to run.
 rem To run an image built locally, change it to the image name passed to the `docker build ...` command.
-set "IMAGE_NAME=ghcr.io/EMob-Lab/mnms-docker:latest"
+set "IMAGE_NAME=ghcr.io/emob-lab/mnms-docker:latest"
 
 rem If TRY_PULL_IMAGE_FROM_REGISTRY is defined, fetch the latest version of the Docker image
 rem from the container registry before running it (so that you get updates automatically).
