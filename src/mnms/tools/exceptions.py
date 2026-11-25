@@ -30,3 +30,7 @@ class CSVDemandParseError(Exception):
 
 class GraphPathConsistencyError(Exception):
     """Raised when a GraphPath consistency rule is or would be broken (see GraphPath for more details)."""
+
+
+class SupervisorStateError(Exception):
+    """Raised when one of the usage rules of the Supervisor class is violated."""
