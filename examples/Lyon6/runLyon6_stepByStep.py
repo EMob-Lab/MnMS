@@ -1,3 +1,11 @@
+"""
+This example illustrates how to run a MnMS simulation in step-by-step mode.
+
+This mode allows more flexibility regarding simulation loop control:
+the stop condition can be customized, additional operations can be performed
+at each iteration step, etc.
+"""
+
 import argparse
 from pathlib import Path
 
@@ -8,12 +16,6 @@ from mnms.time import Dt, Time
 
 
 def run_simulation(parameters: Lyon6Parameters) -> None:
-    """This example illustrates how to run a MnMS simulation in step-by-step mode.
-
-    This mode allows more flexibility regarding simulation loop control:
-    the stop condition can be customized, additional operations can be performed
-    at each iteration step, etc.
-    """
 
     supervisor_params = parameters.supervisor
     start_time = Time(supervisor_params["start_time"])
@@ -28,7 +30,7 @@ def run_simulation(parameters: Lyon6Parameters) -> None:
 
         # Simulation loop.
         while supervisor.tcurrent < end_time:
-            print(f'Running step {supervisor.affectation_step}...')
+            print(f'Running affectation step {supervisor.affectation_step}...')
             supervisor.run_one_affectation_step(affectation_factor)
         print('Done')
 
