@@ -104,7 +104,9 @@ class TestTransitLayer(unittest.TestCase):
         transit_layer = self.mlgraph.transitlayer
         self.assertEqual(len(transit_layer.links["CAR"]["BUS"]), 1)
         self.assertEqual(transit_layer.links["CAR"]["BUS"], ['TEST'])
-        self.assertEqual(self.mlgraph.graph.nodes["C0"].adj["L0_S0"].costs, {'WALK': {'test': 1.43}})
+        links = self.mlgraph.graph.find_connecting_links("C0", "L0_S0")
+        self.assertEqual(len(links), 1)
+        self.assertEqual(next(iter(links)).costs, {'WALK': {'test': 1.43}})
 
     def test_double_transit_link_connect_origindestination_layers(self):
         """Check that we cannot create two times the same transit links.

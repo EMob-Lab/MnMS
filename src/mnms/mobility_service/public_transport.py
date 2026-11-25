@@ -445,7 +445,7 @@ class PublicTransportMobilityService(AbstractMobilityService):
         # Select the proper line for user
         user_line_id, chosen_line = self.find_line(start)
 
-        if not self.graph.nodes[start].radj:
+        if len(self.graph.nodes[start].in_links) == 0:
             if self._next_veh_departure[user_line_id] is None:
                 return Dt(hours=24)
             departure_time, waiting_veh = self._next_veh_departure[user_line_id]

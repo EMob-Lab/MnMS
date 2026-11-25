@@ -223,5 +223,10 @@ class TestCostsFunctions(unittest.TestCase):
         self.create_supervisor('2')
         self.supervisor.finalize() # Must be called explicitly since `supervisor.run()` is not invoked.
 
-        self.assertEqual(set(self.supervisor._mlgraph.graph.get_links_without_cost('generalized_cost',{'CAR':'PersonalVehicle','BUS':'Bus', 'TRANSIT': 'WALK'})),
-            {'CAR_BUS', 'ORIGIN_C0', 'L1_B3_DESTINATION'})
+        self.assertEqual(
+            self.supervisor._mlgraph.graph.get_links_without_cost(
+                'generalized_cost',
+                {'CAR': 'PersonalVehicle', 'BUS': 'Bus', 'TRANSIT': 'WALK'},
+            ),
+            {'CAR_BUS', 'ORIGIN_C0', 'L1_B3_DESTINATION'},
+        )
