@@ -6,9 +6,9 @@ __pycache__/
 
 # Temporary directories and files created by miscellaneous development tools
 /.cache
-/.coverage
-/.ruff_cache
-/.pytest_cache
+.coverage
+.ruff_cache
+.pytest_cache
 
 # FIXME Running the tests result to a log file generated in the root directory.
 # It would be better to isolate these logs in a dedicated directory,
