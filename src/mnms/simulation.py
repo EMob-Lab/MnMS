@@ -268,6 +268,8 @@ class Supervisor:
         """
         self._flow_motor.finalize()
 
+        if self._user_flow._write:
+            self._user_flow.write_result()
         self._user_flow.finalize()
 
         if self._decision_model._write:
@@ -471,25 +473,20 @@ class Supervisor:
                 progress.update()
                 progress.show()
                 self.run_one_affectation_step(affectation_factor, update_graph_threshold)
-        except Exception:
 
-            # Ensure the opened files get closed, even if an exception occurs in the main loop.
+            if snapshot:
+                self.take_snapshot(snapshot_folder)
+
+        finally:
+
+            # Finalize simulation
             # FIXME Output files are currently opened in the constructors of the Supervisor
             # and of the objects it aggregates (observers, decision model, flow motor...).
             # It would be better to open them only in Supervisor.initialize(),
             # so that Supervisor.run() becomes responsible for both opening and closing them.
-            # Supervisor.initialize() and Supervisor.finalize() could then become private methods.
             self.finalize()
 
-            raise
-
-        if snapshot:
-            self.take_snapshot(snapshot_folder)
-
-        # Finalize simulation
-        if self._user_flow._write:
-            self._user_flow.write_result()
-        self.finalize()
+        # Finalize progress bar
         progress.update()
         progress.show()
         progress.end()
