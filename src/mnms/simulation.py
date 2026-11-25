@@ -124,17 +124,6 @@ class Supervisor:
             self._csvhandler.writerow(['AFFECTATION_STEP', 'TIME', 'ID', 'MOBILITY_SERVICE', 'COSTS'])
 
 
-    def set_random_seed(self, seed: int | None) -> None:
-        """Method that sets the seed for all modules that can be stochastic.
-
-        Args:
-            -seed: seed as an integer
-        """
-        if seed is not None:
-            # NB: For now, only the decision model can be stochastic
-            self._decision_model.set_random_seed(seed)
-
-
     def _init_graph(self) -> None:
         """Method to initialize the multilayer graph of the supervisor.
         A map associating each mobility service of the graph to the corresponding
@@ -198,7 +187,7 @@ class Supervisor:
         return self._simulation_state
 
 
-    def initialize(self, tstart: Time, flow_dt: Dt) -> None:
+    def initialize(self, tstart: Time, flow_dt: Dt, seed: int | None = None) -> None:
         """Method that initializes the simulation by initializing the simulation state variables,
         propagating them to the different modules, and initializing the costs on the multilayer graph.
 
@@ -212,6 +201,7 @@ class Supervisor:
         Args:
             -tstart: start time of the simulation
             -flow_dt: the simulation flow time step
+            -seed: seed of the simulation
         Raises:
             -SupervisorStateError if pre-existing state variables do exist,
              and if they are incompatible with the given parameters.
@@ -260,6 +250,11 @@ class Supervisor:
         self._user_flow.set_time(tstart)
 
         self._mlgraph.dynamic_space_sharing.set_cost(self._decision_model._cost)
+
+        # Set the seed for all modules that can be stochastic
+        # NB: for now, that's only the decision model
+        if seed is not None:
+            self._decision_model.set_random_seed(seed)
 
 
     def finalize(self) -> None:
@@ -461,8 +456,7 @@ class Supervisor:
         log.info(f'Start run from {tstart} to {tend}')
 
         # Initializations
-        self.set_random_seed(seed)
-        self.initialize(tstart, flow_dt)
+        self.initialize(tstart, flow_dt, seed)
         sim_state = self._fetch_sim_state()
 
         progress = ProgressBar(ceil((tend-tstart).to_seconds()/(flow_dt.to_seconds()*affectation_factor)))
