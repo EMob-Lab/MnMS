@@ -49,7 +49,7 @@ class Supervisor:
             -loglevel: level of log to print
         """
 
-        self._mlgraph: MultiLayerGraph = None
+        self._mlgraph: MultiLayerGraph = graph
         self._demand: AbstractDemandManager = demand
         self._flow_motor: AbstractMFDFlowMotor = flow_motor
 
@@ -59,7 +59,7 @@ class Supervisor:
         else:
             self._user_flow = user_flow
 
-        self.add_graph(graph)
+        self._init_graph()
         self._flow_motor.set_graph(graph)
         self._user_flow.set_graph(graph)
 
@@ -111,44 +111,15 @@ class Supervisor:
             # NB: For now, only the decision model can be stochastic
             self._decision_model.set_random_seed(seed)
 
-    def add_graph(self, mlgraph: MultiLayerGraph):
-        """Method to add a multilayer graph to the supervisor.
+    def _init_graph(self):
+        """Method to initialize the multilayer graph of the supervisor.
         A map associating each mobility service of the graph to the corresponding
-        layer is build. Timetables of the PublicTransportLayer objects of the graph
+        layer is built. Timetables of the PublicTransportLayer objects of the graph
         are initialized.
-
-        Args:
-            -mlgraph: the MultiLayerGraph object to add
         """
-        self._mlgraph = mlgraph
         self._mlgraph.construct_layer_service_mapping()
-        for layer in mlgraph.layers.values():
+        for layer in self._mlgraph.layers.values():
             layer.initialize()
-
-    def add_flow_motor(self, flow: AbstractMFDFlowMotor):
-        """Method to add a flow motor to the supervisor.
-
-        Args:
-            -flow: the AbstractMFDFlowMotor object to add
-        """
-        self._flow_motor = flow
-        flow.set_graph(self._mlgraph)
-
-    def add_demand(self, demand: AbstractDemandManager):
-        """Method to add a demand manager to the supervisor.
-
-        Args:
-            -demand: the AbstractDemandManager object to add
-        """
-        self._demand = demand
-
-    def add_decision_model(self, model: AbstractDecisionModel):
-        """Method to add a decision model to the supervisor.
-
-        Args:
-            -model: the AbstractDecisionModel object to add
-        """
-        self._decision_model = model
 
     def initialize(self, tstart:Time):
         """Method that initializes the simulation by setting the time of the different
@@ -198,7 +169,7 @@ class Supervisor:
         VehicleManager.empty()
         Vehicle.reset_counter()
 
-    def call_planning(self):
+    def _call_planning(self):
         """Calls the (re)planning module and measures execution time.
         """
         log.info('Launch (re)planning...')
@@ -207,7 +178,7 @@ class Supervisor:
         end = time()
         log.info(f'(Re)planning done in [{end - start:.5} s]')
 
-    def call_update_graph(self, threshold):
+    def _call_update_graph(self, threshold):
         """Calls the graph update and measures execution time.
         """
         log.info(' Updating graph...')
@@ -216,7 +187,7 @@ class Supervisor:
         end = time()
         log.info(f' Update graph done in [{end-start:.5} s]')
 
-    def call_update_mobility_services(self, flow_dt:Dt):
+    def _call_update_mobility_services(self, flow_dt:Dt):
         """Calls the update method of all mobility services and measures the execution
         times.
 
@@ -232,7 +203,7 @@ class Supervisor:
                 end = time()
                 log.info(f' Update mobility service {mservice.id} done in [{end-start:.5} s]')
 
-    def call_user_flow_step(self, flow_dt: Dt, users_step: list[User]):
+    def _call_user_flow_step(self, flow_dt: Dt, users_step: list[User]):
         """Calls the user flow step and measures execution time.
 
         Args:
@@ -250,7 +221,7 @@ class Supervisor:
         log.info(f' User flow step done [{end - start:.5} s]')
         return users_reach_dt_answer
 
-    def call_matching_mobility_services(self, new_users, flow_dt):
+    def _call_matching_mobility_services(self, new_users, flow_dt):
         """Calls the matching for all mobility services and measures execution times.
 
         Args:
@@ -266,7 +237,7 @@ class Supervisor:
                 end = time()
                 log.info(f' Matching for mobility service {ms.id} done in [{end - start:.5} s]')
 
-    def call_flow_motor_step(self, flow_dt: Dt):
+    def _call_flow_motor_step(self, flow_dt: Dt):
         """Calls the flow motor step and measures execution time.
 
         Args:
@@ -279,7 +250,7 @@ class Supervisor:
         end = time()
         log.info(f' Flow motor step done in [{end - start:.5} s]')
 
-    def step_dynamic_space_sharing(self):
+    def _step_dynamic_space_sharing(self):
         """Calls the dynamic space sharing update and reroutes vehicles impacted by
         the modification of available links.
         """
@@ -287,7 +258,7 @@ class Supervisor:
         # vehicles consequently
         self._mlgraph.dynamic_space_sharing.update(self.tcurrent, list(VehicleManager._vehicles.values()))
 
-    def get_new_users(self, principal_dt):
+    def _get_new_users(self, principal_dt):
         """Gathers/Creates the users who depart during the coming affectation step.
 
         Args:
@@ -305,7 +276,7 @@ class Supervisor:
 
         return new_users
 
-    def get_users_step(self, new_users: list[User], flow_dt: Dt):
+    def _get_users_step(self, new_users: list[User], flow_dt: Dt):
         """Gathers the users who depart during the coming simulation flow step.
 
         Args:
@@ -373,7 +344,7 @@ class Supervisor:
 
                 ## Get all departures during the next principal_dt and add the ones
                 ## with no forced path in the list of users about to plan their journey
-                new_users = self.get_new_users(principal_dt)
+                new_users = self._get_new_users(principal_dt)
                 new_users_for_planning = []
                 for u in new_users:
                     if u.path is None:
@@ -392,27 +363,27 @@ class Supervisor:
                 for _ in range(affectation_factor):
 
                     # Call the planning module
-                    self.call_planning()
+                    self._call_planning()
 
                     # Gather users who depart during this flow step
-                    users_step, new_users = self.get_users_step(new_users, flow_dt)
+                    users_step, new_users = self._get_users_step(new_users, flow_dt)
                     log.info(f'Users step:{users_step}')
 
                     # Call update of all mobility services, update means maintenance
-                    self.call_update_mobility_services(flow_dt)
+                    self._call_update_mobility_services(flow_dt)
 
                     # Call user flow step
-                    users_reach_dt_answer = self.call_user_flow_step(flow_dt, users_step)
+                    users_reach_dt_answer = self._call_user_flow_step(flow_dt, users_step)
                     self._decision_model.add_users_for_planning(users_reach_dt_answer, [Event.MATCH_FAILURE]*len(users_reach_dt_answer))
 
                     # Call dynamic space sharing step
-                    self.step_dynamic_space_sharing()
+                    self._step_dynamic_space_sharing()
 
                     # Call matching for all mobility services
-                    self.call_matching_mobility_services(new_users, flow_dt)
+                    self._call_matching_mobility_services(new_users, flow_dt)
 
                     # Call flow motor step
-                    self.call_flow_motor_step(flow_dt)
+                    self._call_flow_motor_step(flow_dt)
                     if self._flow_motor._write:
                         self._flow_motor.write_result(affectation_step, flow_step, flow_dt)
 
@@ -421,7 +392,7 @@ class Supervisor:
                     flow_step += 1
 
                 ## Call the update graph
-                self.call_update_graph(update_graph_threshold)
+                self._call_update_graph(update_graph_threshold)
 
                 if self._write:
                     log.info('Writing costs of each link in graph ...')
