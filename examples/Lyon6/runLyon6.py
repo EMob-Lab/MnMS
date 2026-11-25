@@ -103,7 +103,7 @@ def weighted_travel_time_transit(gnodes: Any, layer: Any, link: Any, costs: dict
     return costs["WALK"]["travel_time"]
 
 
-def run_simulation(parameters: Lyon6Parameters) -> None:
+def create_supervisor(parameters: Lyon6Parameters) -> Supervisor:
 
     parameters.output_directory.mkdir(parents=True, exist_ok=True)
     set_mnms_logger_level(parameters.log_level, ["mnms.simulation"])
@@ -163,14 +163,18 @@ def run_simulation(parameters: Lyon6Parameters) -> None:
     )
     travel_decision.add_waiting_cost_function(cost_name, lambda waiting_time: waiting_time)
 
-    supervisor = Supervisor(
+    return Supervisor(
         graph=mmgraph,
         flow_motor=flow_motor,
         demand=demand,
         decision_model=travel_decision,
         outfile=str(parameters.output_path(parameters.output["travel_time_file"])),
     )
+
+
+def run_simulation(parameters: Lyon6Parameters) -> None:
     supervisor_params = parameters.supervisor
+    supervisor = create_supervisor(parameters)
     supervisor.run(
         Time(supervisor_params["start_time"]),
         Time(supervisor_params["end_time"]),
