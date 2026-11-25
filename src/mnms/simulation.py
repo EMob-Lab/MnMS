@@ -3,6 +3,7 @@ import json
 import traceback
 from math import ceil
 from time import time
+from typing import Any, TypedDict
 
 import dill as pickle
 import dill.detect
@@ -24,16 +25,27 @@ from mnms.vehicles.veh_type import Vehicle
 log = create_logger(__name__)
 
 
+class CrashReport(TypedDict):
+    """Information about an error raised during a simulation run,
+    as returned by Supervisor.create_crash_report(..).
+    """
+    time: str
+    affectation_step: int
+    flow_step: int
+    error: str
+
+
 class Supervisor:
+
     def __init__(self,
                  graph: MultiLayerGraph,
                  demand: AbstractDemandManager,
                  flow_motor: AbstractMFDFlowMotor,
                  decision_model: AbstractDecisionModel,
-                 user_flow: UserFlow = None,
+                 user_flow: UserFlow | None = None,
                  outfile: str | None = None,
                  logfile: str | None = None,
-                 loglevel: LOGLEVEL = LOGLEVEL.WARNING):
+                 loglevel: int = LOGLEVEL.WARNING) -> None:
         """
         Main class to launch a simulation.
 
@@ -80,7 +92,8 @@ class Supervisor:
         if logfile is not None:
             attach_log_file(logfile, loglevel)
 
-    def __getstate__(self):
+
+    def __getstate__(self) -> dict[str, Any]:
 
         state = self.__dict__.copy()
 
@@ -92,7 +105,8 @@ class Supervisor:
 
         return state
 
-    def __setstate__(self, state):
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
 
         self.__dict__.update(state)
 
@@ -101,7 +115,8 @@ class Supervisor:
             self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
             self._csvhandler.writerow(['AFFECTATION_STEP', 'TIME', 'ID', 'MOBILITY_SERVICE', 'COSTS'])
 
-    def set_random_seed(self, seed: int | None):
+
+    def set_random_seed(self, seed: int | None) -> None:
         """Method that sets the seed for all modules that can be stochastic.
 
         Args:
@@ -111,7 +126,8 @@ class Supervisor:
             # NB: For now, only the decision model can be stochastic
             self._decision_model.set_random_seed(seed)
 
-    def _init_graph(self):
+
+    def _init_graph(self) -> None:
         """Method to initialize the multilayer graph of the supervisor.
         A map associating each mobility service of the graph to the corresponding
         layer is built. Timetables of the PublicTransportLayer objects of the graph
@@ -121,7 +137,8 @@ class Supervisor:
         for layer in self._mlgraph.layers.values():
             layer.initialize()
 
-    def initialize(self, tstart:Time):
+
+    def initialize(self, tstart: Time) -> None:
         """Method that initializes the simulation by setting the time of the different
         modules  and initializing the costs on the multilayer graph of the simulation.
 
@@ -142,7 +159,8 @@ class Supervisor:
 
         self._mlgraph.dynamic_space_sharing.set_cost(self._decision_model._cost)
 
-    def finalize(self):
+
+    def finalize(self) -> None:
         """Method that finalizes the simulation by closing open files, and cleaning
         class attributes.
         """
@@ -169,7 +187,8 @@ class Supervisor:
         VehicleManager.empty()
         Vehicle.reset_counter()
 
-    def _call_planning(self):
+
+    def _call_planning(self) -> None:
         """Calls the (re)planning module and measures execution time.
         """
         log.info('Launch (re)planning...')
@@ -178,7 +197,8 @@ class Supervisor:
         end = time()
         log.info(f'(Re)planning done in [{end - start:.5} s]')
 
-    def _call_update_graph(self, threshold):
+
+    def _call_update_graph(self, threshold: float) -> None:
         """Calls the graph update and measures execution time.
         """
         log.info(' Updating graph...')
@@ -187,7 +207,8 @@ class Supervisor:
         end = time()
         log.info(f' Update graph done in [{end-start:.5} s]')
 
-    def _call_update_mobility_services(self, flow_dt:Dt):
+
+    def _call_update_mobility_services(self, flow_dt: Dt) -> None:
         """Calls the update method of all mobility services and measures the execution
         times.
 
@@ -203,7 +224,8 @@ class Supervisor:
                 end = time()
                 log.info(f' Update mobility service {mservice.id} done in [{end-start:.5} s]')
 
-    def _call_user_flow_step(self, flow_dt: Dt, users_step: list[User]):
+
+    def _call_user_flow_step(self, flow_dt: Dt, users_step: list[User]) -> list[User]:
         """Calls the user flow step and measures execution time.
 
         Args:
@@ -221,7 +243,8 @@ class Supervisor:
         log.info(f' User flow step done [{end - start:.5} s]')
         return users_reach_dt_answer
 
-    def _call_matching_mobility_services(self, new_users, flow_dt):
+
+    def _call_matching_mobility_services(self, new_users: list[User], flow_dt: Dt) -> None:
         """Calls the matching for all mobility services and measures execution times.
 
         Args:
@@ -237,7 +260,8 @@ class Supervisor:
                 end = time()
                 log.info(f' Matching for mobility service {ms.id} done in [{end - start:.5} s]')
 
-    def _call_flow_motor_step(self, flow_dt: Dt):
+
+    def _call_flow_motor_step(self, flow_dt: Dt) -> None:
         """Calls the flow motor step and measures execution time.
 
         Args:
@@ -250,7 +274,8 @@ class Supervisor:
         end = time()
         log.info(f' Flow motor step done in [{end - start:.5} s]')
 
-    def _step_dynamic_space_sharing(self):
+
+    def _step_dynamic_space_sharing(self) -> None:
         """Calls the dynamic space sharing update and reroutes vehicles impacted by
         the modification of available links.
         """
@@ -258,7 +283,8 @@ class Supervisor:
         # vehicles consequently
         self._mlgraph.dynamic_space_sharing.update(self.tcurrent, list(VehicleManager._vehicles.values()))
 
-    def _get_new_users(self, principal_dt):
+
+    def _get_new_users(self, principal_dt: Dt) -> list[User]:
         """Gathers/Creates the users who depart during the coming affectation step.
 
         Args:
@@ -268,7 +294,7 @@ class Supervisor:
             -new_users: list of users who depart during the coming affectation step
         """
         log.info(f'Getting next departures {self.tcurrent}->{self.tcurrent.add_time(principal_dt)} ...')
-        new_users = []
+        new_users: list[User] = []
         if self._demand:
             new_users = self._demand.get_next_departures(self.tcurrent, self.tcurrent.add_time(principal_dt))
             self._demand.construct_user_parameters(new_users)
@@ -276,7 +302,8 @@ class Supervisor:
 
         return new_users
 
-    def _get_users_step(self, new_users: list[User], flow_dt: Dt):
+
+    def _get_users_step(self, new_users: list[User], flow_dt: Dt) -> tuple[list[User], list[User]]:
         """Gathers the users who depart during the coming simulation flow step.
 
         Args:
@@ -304,8 +331,9 @@ class Supervisor:
             pass
         return users_step, remaining_new_users
 
+
     def run(self, tstart: Time, tend: Time, flow_dt: Dt, affectation_factor: int, update_graph_threshold: float = 0.,
-            seed: int | None = None, snapshot: bool = False, snapshot_folder: str = ''):
+            seed: int | None = None, snapshot: bool = False, snapshot_folder: str = '') -> None:
         """Launch a full simulation.
 
         Args:
@@ -431,17 +459,17 @@ class Supervisor:
         progress.show()
         progress.end()
 
-    def create_crash_report(self, affectation_step, flow_step) -> dict:
-        data = {
+
+    def create_crash_report(self, affectation_step: int, flow_step: int) -> CrashReport:
+        return {
             "time": str(self.tcurrent),
             "affectation_step": affectation_step,
             "flow_step": flow_step,
             "error": traceback.format_exc(),
         }
 
-        return data
 
-    def take_snapshot(self, snapshot_folder:str):
+    def take_snapshot(self, snapshot_folder: str) -> None:
 
         class SetEncoder(json.JSONEncoder):
             def default(self, obj):
@@ -467,7 +495,8 @@ class Supervisor:
         #with dill.detect.trace():
         pickle.dump(self, file)
 
-def load_snaphshot(snapshot_prefix: str ):
+
+def load_snaphshot(snapshot_prefix: str) -> Supervisor:
     class JSONDCoder(json.JSONDecoder):
         def __init__(self):
             json.JSONDecoder.__init__(self, object_hook=JSONDCoder.from_dict)
