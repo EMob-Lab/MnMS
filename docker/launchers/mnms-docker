@@ -4,7 +4,7 @@ set -eo pipefail
 
 # Identifier of the Docker image to run.
 # To run an image built locally, change it to the image name passed to the `docker build ...` command.
-IMAGE_NAME=ghcr.io/EMob-Lab/mnms-docker:latest
+IMAGE_NAME=ghcr.io/emob-lab/mnms-docker:latest
 
 # If TRY_PULL_IMAGE_FROM_REGISTRY is defined, fetch the latest version of the Docker image
 # from the container registry before running it (so that you get updates automatically).
