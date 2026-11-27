@@ -3,6 +3,7 @@ import json
 import traceback
 from math import ceil
 from time import time
+from typing import Any, TypedDict
 
 import dill as pickle
 import dill.detect
@@ -16,6 +17,7 @@ from mnms.graph.layers import MultiLayerGraph
 from mnms.log import LOGLEVEL, attach_log_file, create_logger
 from mnms.mobility_service.public_transport import PublicTransportMobilityService
 from mnms.time import Dt, Time
+from mnms.tools.exceptions import SupervisorStateError
 from mnms.tools.progress import ProgressBar
 from mnms.travel_decision.abstract import AbstractDecisionModel, Event
 from mnms.vehicles.manager import VehicleManager
@@ -24,16 +26,37 @@ from mnms.vehicles.veh_type import Vehicle
 log = create_logger(__name__)
 
 
+class CrashReport(TypedDict):
+    """Information about an error raised during a simulation run,
+    as returned by Supervisor.create_crash_report(..).
+    """
+    time: str | None
+    affectation_step: int | None
+    flow_step: int | None
+    error: str
+
+
+class _SimulationState:
+    """State variables controlling the simulation."""
+
+    def __init__(self, *, flow_dt: Dt, tstart: Time) -> None:
+        self.flow_dt = flow_dt
+        self.tcurrent = tstart
+        self.affectation_step = 0
+        self.flow_step = 0
+
+
 class Supervisor:
+
     def __init__(self,
                  graph: MultiLayerGraph,
                  demand: AbstractDemandManager,
                  flow_motor: AbstractMFDFlowMotor,
                  decision_model: AbstractDecisionModel,
-                 user_flow: UserFlow = None,
+                 user_flow: UserFlow | None = None,
                  outfile: str | None = None,
                  logfile: str | None = None,
-                 loglevel: LOGLEVEL = LOGLEVEL.WARNING):
+                 loglevel: int = LOGLEVEL.WARNING) -> None:
         """
         Main class to launch a simulation.
 
@@ -49,7 +72,7 @@ class Supervisor:
             -loglevel: level of log to print
         """
 
-        self._mlgraph: MultiLayerGraph = None
+        self._mlgraph: MultiLayerGraph = graph
         self._demand: AbstractDemandManager = demand
         self._flow_motor: AbstractMFDFlowMotor = flow_motor
 
@@ -59,16 +82,13 @@ class Supervisor:
         else:
             self._user_flow = user_flow
 
-        self.add_graph(graph)
+        self._init_graph()
         self._flow_motor.set_graph(graph)
         self._user_flow.set_graph(graph)
 
+        self._simulation_state: _SimulationState | None = None
+
         self._outfilename = outfile
-
-        self.tcurrent: Time | None = None
-
-        self.from_snapshot = False
-
         if outfile is None:
             self._write = False
         else:
@@ -80,7 +100,8 @@ class Supervisor:
         if logfile is not None:
             attach_log_file(logfile, loglevel)
 
-    def __getstate__(self):
+
+    def __getstate__(self) -> dict[str, Any]:
 
         state = self.__dict__.copy()
 
@@ -92,7 +113,8 @@ class Supervisor:
 
         return state
 
-    def __setstate__(self, state):
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
 
         self.__dict__.update(state)
 
@@ -101,67 +123,125 @@ class Supervisor:
             self._csvhandler = csv.writer(self._outfile, delimiter=';', quotechar='|')
             self._csvhandler.writerow(['AFFECTATION_STEP', 'TIME', 'ID', 'MOBILITY_SERVICE', 'COSTS'])
 
-    def set_random_seed(self, seed: int | None):
-        """Method that sets the seed for all modules that can be stochastic.
 
-        Args:
-            -seed: seed as an integer
-        """
-        if seed is not None:
-            # NB: For now, only the decision model can be stochastic
-            self._decision_model.set_random_seed(seed)
-
-    def add_graph(self, mlgraph: MultiLayerGraph):
-        """Method to add a multilayer graph to the supervisor.
+    def _init_graph(self) -> None:
+        """Method to initialize the multilayer graph of the supervisor.
         A map associating each mobility service of the graph to the corresponding
-        layer is build. Timetables of the PublicTransportLayer objects of the graph
+        layer is built. Timetables of the PublicTransportLayer objects of the graph
         are initialized.
-
-        Args:
-            -mlgraph: the MultiLayerGraph object to add
         """
-        self._mlgraph = mlgraph
         self._mlgraph.construct_layer_service_mapping()
-        for layer in mlgraph.layers.values():
+        for layer in self._mlgraph.layers.values():
             layer.initialize()
 
-    def add_flow_motor(self, flow: AbstractMFDFlowMotor):
-        """Method to add a flow motor to the supervisor.
 
-        Args:
-            -flow: the AbstractMFDFlowMotor object to add
+    @property
+    def flow_dt(self) -> Dt:
+        """Simulation flow time step. Constant during a given simulation.
+
+        Raises:
+            -SupervisorStateError if simulation state variables have not been initialized yet.
         """
-        self._flow_motor = flow
-        flow.set_graph(self._mlgraph)
+        return self._fetch_sim_state().flow_dt.copy() # Defensive copy, as Dt is not immutable.
 
-    def add_demand(self, demand: AbstractDemandManager):
-        """Method to add a demand manager to the supervisor.
 
-        Args:
-            -demand: the AbstractDemandManager object to add
+    @property
+    def tcurrent(self) -> Time:
+        """Current simulation time. Incremented by flow_dt at each flow step (inner simulation loop),
+        hence by flow_dt * affectation_factor at each affectation step (outer simulation loop).
+
+        Raises:
+            -SupervisorStateError if simulation state variables have not been initialized yet.
         """
-        self._demand = demand
+        return self._fetch_sim_state().tcurrent.copy() # Defensive copy, as Time is not immutable.
 
-    def add_decision_model(self, model: AbstractDecisionModel):
-        """Method to add a decision model to the supervisor.
 
-        Args:
-            -model: the AbstractDecisionModel object to add
+    @property
+    def affectation_step(self) -> int:
+        """Current affectation step.
+
+        Raises:
+            -SupervisorStateError if simulation state variables have not been initialized yet.
         """
-        self._decision_model = model
+        return self._fetch_sim_state().affectation_step
 
-    def initialize(self, tstart:Time):
-        """Method that initializes the simulation by setting the time of the different
-        modules  and initializing the costs on the multilayer graph of the simulation.
+
+    @property
+    def flow_step(self) -> int:
+        """Current flow step.
+
+        Raises:
+            -SupervisorStateError if simulation state variables have not been initialized yet.
+        """
+        return self._fetch_sim_state().flow_step
+
+
+    def _fetch_sim_state(self) -> _SimulationState:
+        """Return the simulation state variables, ensuring they have been initialized beforehand.
+
+        Raises:
+            -SupervisorStateError if the simulation state variables have not been initialized beforehand.
+        """
+        if self._simulation_state is None:
+            raise SupervisorStateError('Simulation state variables not initialized yet.')
+        return self._simulation_state
+
+
+    def initialize(self, tstart: Time, flow_dt: Dt, seed: int | None = None) -> None:
+        """Method that initializes the simulation by initializing the simulation state variables,
+        propagating them to the different modules, and initializing the costs on the multilayer graph.
+
+        Pre-existing state variables may exist from a previous run, for example
+        if the Supervisor instance is reloaded from a snapshot. In that case,
+        this method also checks that the pre-existing state variables are compatible
+        with the given ones.
+
+        self._simulation_state is guaranteed to be initialized when this method returns.
 
         Args:
             -tstart: start time of the simulation
+            -flow_dt: the simulation flow time step
+            -seed: seed of the simulation
+        Raises:
+            -SupervisorStateError if pre-existing state variables do exist,
+             and if they are incompatible with the given parameters.
         """
+
+        if self._simulation_state is None:
+            is_first_initialization = True
+            self._simulation_state = _SimulationState(
+                tstart=tstart,
+                flow_dt=flow_dt,
+            )
+        else:
+            is_first_initialization = False
+
+            # Check pre-existing state variables against what is received in input of the method.
+            sim_state = self._simulation_state
+            sim_state_consistency_issue_encountered = False
+            if flow_dt != sim_state.flow_dt:
+                sim_state_consistency_issue_encountered = True
+                log.error(
+                    'flow_dt must not change for a given simulation '
+                    f'(previous value = {sim_state.flow_dt}, new value = {flow_dt})'
+                )
+            if tstart != sim_state.tcurrent:
+                sim_state_consistency_issue_encountered = True
+                log.error(
+                    f'The current timestamp of the simulation ({sim_state.tcurrent}) is different '
+                    f'from the start timestamp that has been provided ({tstart}), simulation is not possible.'
+                )
+            if sim_state_consistency_issue_encountered:
+                raise SupervisorStateError(
+                    'Simulation parameters inconsistent with the ones previously used with this supervisor. '
+                    'Details in the simulation log.'
+                )
+
         for layer in self._mlgraph.layers.values():
             for service in layer.mobility_services.values():
                 service.set_time(tstart)
 
-        if not self.from_snapshot:
+        if is_first_initialization:
             self._mlgraph.initialize_costs(self._user_flow._walk_speed)
 
         self._flow_motor.set_time(tstart)
@@ -171,12 +251,20 @@ class Supervisor:
 
         self._mlgraph.dynamic_space_sharing.set_cost(self._decision_model._cost)
 
-    def finalize(self):
+        # Set the seed for all modules that can be stochastic
+        # NB: for now, that's only the decision model
+        if seed is not None:
+            self._decision_model.set_random_seed(seed)
+
+
+    def finalize(self) -> None:
         """Method that finalizes the simulation by closing open files, and cleaning
         class attributes.
         """
         self._flow_motor.finalize()
 
+        if self._user_flow._write:
+            self._user_flow.write_result()
         self._user_flow.finalize()
 
         if self._decision_model._write:
@@ -198,16 +286,21 @@ class Supervisor:
         VehicleManager.empty()
         Vehicle.reset_counter()
 
-    def call_planning(self):
+
+    def _call_planning(self, tcurrent: Time) -> None:
         """Calls the (re)planning module and measures execution time.
+
+        Args:
+            -tcurrent: current simulation time
         """
         log.info('Launch (re)planning...')
         start = time()
-        self._decision_model(self.tcurrent)
+        self._decision_model(tcurrent)
         end = time()
         log.info(f'(Re)planning done in [{end - start:.5} s]')
 
-    def call_update_graph(self, threshold):
+
+    def _call_update_graph(self, threshold: float) -> None:
         """Calls the graph update and measures execution time.
         """
         log.info(' Updating graph...')
@@ -216,7 +309,8 @@ class Supervisor:
         end = time()
         log.info(f' Update graph done in [{end-start:.5} s]')
 
-    def call_update_mobility_services(self, flow_dt:Dt):
+
+    def _call_update_mobility_services(self, flow_dt: Dt) -> None:
         """Calls the update method of all mobility services and measures the execution
         times.
 
@@ -232,7 +326,8 @@ class Supervisor:
                 end = time()
                 log.info(f' Update mobility service {mservice.id} done in [{end-start:.5} s]')
 
-    def call_user_flow_step(self, flow_dt: Dt, users_step: list[User]):
+
+    def _call_user_flow_step(self, flow_dt: Dt, users_step: list[User]) -> list[User]:
         """Calls the user flow step and measures execution time.
 
         Args:
@@ -250,7 +345,8 @@ class Supervisor:
         log.info(f' User flow step done [{end - start:.5} s]')
         return users_reach_dt_answer
 
-    def call_matching_mobility_services(self, new_users, flow_dt):
+
+    def _call_matching_mobility_services(self, new_users: list[User], flow_dt: Dt) -> None:
         """Calls the matching for all mobility services and measures execution times.
 
         Args:
@@ -266,7 +362,8 @@ class Supervisor:
                 end = time()
                 log.info(f' Matching for mobility service {ms.id} done in [{end - start:.5} s]')
 
-    def call_flow_motor_step(self, flow_dt: Dt):
+
+    def _call_flow_motor_step(self, flow_dt: Dt) -> None:
         """Calls the flow motor step and measures execution time.
 
         Args:
@@ -279,36 +376,44 @@ class Supervisor:
         end = time()
         log.info(f' Flow motor step done in [{end - start:.5} s]')
 
-    def step_dynamic_space_sharing(self):
+
+    def _step_dynamic_space_sharing(self, tcurrent: Time) -> None:
         """Calls the dynamic space sharing update and reroutes vehicles impacted by
         the modification of available links.
+
+        Args:
+            -tcurrent: current simulation time
         """
         # Call the dynamic space sharing update to unban and ban links when relevant, and reroute
         # vehicles consequently
-        self._mlgraph.dynamic_space_sharing.update(self.tcurrent, list(VehicleManager._vehicles.values()))
+        self._mlgraph.dynamic_space_sharing.update(tcurrent, list(VehicleManager._vehicles.values()))
 
-    def get_new_users(self, principal_dt):
+
+    def _get_new_users(self, tcurrent: Time, principal_dt: Dt) -> list[User]:
         """Gathers/Creates the users who depart during the coming affectation step.
 
         Args:
+            -tcurrent: current simulation time
             -principal_dt: duration of one affectation step
 
         Returns:
             -new_users: list of users who depart during the coming affectation step
         """
-        log.info(f'Getting next departures {self.tcurrent}->{self.tcurrent.add_time(principal_dt)} ...')
-        new_users = []
+        log.info(f'Getting next departures {tcurrent}->{tcurrent.add_time(principal_dt)} ...')
+        new_users: list[User] = []
         if self._demand:
-            new_users = self._demand.get_next_departures(self.tcurrent, self.tcurrent.add_time(principal_dt))
+            new_users = self._demand.get_next_departures(tcurrent, tcurrent.add_time(principal_dt))
             self._demand.construct_user_parameters(new_users)
         log.info(f'Getting next departures done: {len(new_users)} new departures')
 
         return new_users
 
-    def get_users_step(self, new_users: list[User], flow_dt: Dt):
+
+    def _get_users_step(self, tcurrent: Time, new_users: list[User], flow_dt: Dt) -> tuple[list[User], list[User]]:
         """Gathers the users who depart during the coming simulation flow step.
 
         Args:
+            -tcurrent: current simulation time
             -new_users: list of users who depart during the coming affectation step
             -flow_dt: the simulation flow time step
 
@@ -319,13 +424,13 @@ class Supervisor:
         """
         if new_users == []:
             return [], []
-        next_time = self.tcurrent.add_time(flow_dt)
+        next_time = tcurrent.add_time(flow_dt)
         iter_new_users = iter(new_users)
         u = next(iter_new_users)
         users_step = []
         remaining_new_users = new_users.copy()
         try:
-            while self.tcurrent <= u.departure_time < next_time:
+            while tcurrent <= u.departure_time < next_time:
                 users_step.append(u)
                 remaining_new_users.remove(u)
                 u = next(iter_new_users)
@@ -333,144 +438,147 @@ class Supervisor:
             pass
         return users_step, remaining_new_users
 
+
     def run(self, tstart: Time, tend: Time, flow_dt: Dt, affectation_factor: int, update_graph_threshold: float = 0.,
-            seed: int | None = None, snapshot: bool = False, snapshot_folder: str = ''):
+            seed: int | None = None, snapshot: bool = False, snapshot_folder: str = '') -> None:
         """Launch a full simulation.
 
         Args:
             -tstart: simulation start time
             -tend: simulation end time
             -flow_dt: the simulation flow time step
-            -affectation_factor: the number of simulation flow time step representing one affectation time step
+            -affectation_factor: the number of simulation flow time step (i.e. the number of inner loop iterations)
+             per affectation time step (i.e. per outer loop iteration)
             -update_graph_threshold: threshold on the speed variation below which costs on the graph links are not updated
             -seed: seed of the simulation
             -snapshot: indicates whether a snapshot is taken at the end of the simulation
         """
         log.info(f'Start run from {tstart} to {tend}')
 
-        ### Initializations
+        # Initializations
+        self.initialize(tstart, flow_dt, seed)
+        sim_state = self._fetch_sim_state()
 
-        self.set_random_seed(seed)
-        self.initialize(tstart)
-
-        affectation_step = 0
-        flow_step = 0
-        principal_dt = flow_dt * affectation_factor
-
-        if self.from_snapshot and self.tcurrent != tstart:
-            log.error(f'The time stamp of the snapshot ({self.tcurrent}) is different from the start of the simulation ({tstart}), simulation is not possible.')
-            return
-
-        self.tcurrent = tstart
         progress = ProgressBar(ceil((tend-tstart).to_seconds()/(flow_dt.to_seconds()*affectation_factor)))
 
-        ### Main loop
+        # Main loop (aka. outer simulation loop)
         try:
-            while self.tcurrent < tend:
+            while sim_state.tcurrent < tend:
                 progress.update()
                 progress.show()
-                log.info(f'Current time: {self.tcurrent}, affectation step: {affectation_step}')
+                self.run_one_affectation_step(affectation_factor, update_graph_threshold)
 
-                ## Get all departures during the next principal_dt and add the ones
-                ## with no forced path in the list of users about to plan their journey
-                new_users = self.get_new_users(principal_dt)
-                new_users_for_planning = []
-                for u in new_users:
-                    if u.path is None:
-                        new_users_for_planning.append(u)
-                    else:
-                        self._decision_model.manage_forced_initial_path(u)
-                self._decision_model.add_users_for_planning(new_users_for_planning, [Event.DEPARTURE]*len(new_users_for_planning))
+            if snapshot:
+                self.take_snapshot(snapshot_folder)
 
-                ## Set pickup_dt to infinite for all PT mobility services
-                pt_mob_services_names = self._mlgraph.get_all_mobility_services_of_type(PublicTransportMobilityService)
-                for user in new_users:
-                    for pt_ms in pt_mob_services_names:
-                        user.set_pickup_dt(pt_ms, Dt(hours=24))
+        finally:
 
-                ## Call affectation_factor simulation flow steps
-                for _ in range(affectation_factor):
-
-                    # Call the planning module
-                    self.call_planning()
-
-                    # Gather users who depart during this flow step
-                    users_step, new_users = self.get_users_step(new_users, flow_dt)
-                    log.info(f'Users step:{users_step}')
-
-                    # Call update of all mobility services, update means maintenance
-                    self.call_update_mobility_services(flow_dt)
-
-                    # Call user flow step
-                    users_reach_dt_answer = self.call_user_flow_step(flow_dt, users_step)
-                    self._decision_model.add_users_for_planning(users_reach_dt_answer, [Event.MATCH_FAILURE]*len(users_reach_dt_answer))
-
-                    # Call dynamic space sharing step
-                    self.step_dynamic_space_sharing()
-
-                    # Call matching for all mobility services
-                    self.call_matching_mobility_services(new_users, flow_dt)
-
-                    # Call flow motor step
-                    self.call_flow_motor_step(flow_dt)
-                    if self._flow_motor._write:
-                        self._flow_motor.write_result(affectation_step, flow_step, flow_dt)
-
-                    # Update current time and current flow step number
-                    self.tcurrent = self.tcurrent.add_time(flow_dt)
-                    flow_step += 1
-
-                ## Call the update graph
-                self.call_update_graph(update_graph_threshold)
-
-                if self._write:
-                    log.info('Writing costs of each link in graph ...')
-                    start = time()
-                    t_str = self._flow_motor.time
-                    for link in self._mlgraph.graph.links.values():
-                        for mservice, costs in link.costs.items():
-                            self._csvhandler.writerow([str(affectation_step), t_str, link.id, mservice, costs])
-                    end = time()
-                    log.info(f'Done [{end - start:.5} s]')
-
-                ## Update affectation step number
-                log.info('-'*50)
-                affectation_step += 1
-
-        except Exception:
-
-            # Ensure the opened files get closed, even if an exception occurs in the main loop.
+            # Finalize simulation
             # FIXME Output files are currently opened in the constructors of the Supervisor
             # and of the objects it aggregates (observers, decision model, flow motor...).
             # It would be better to open them only in Supervisor.initialize(),
             # so that Supervisor.run() becomes responsible for both opening and closing them.
-            # Supervisor.initialize() and Supervisor.finalize() could then become private methods.
             self.finalize()
 
-            raise
-
-        if snapshot:
-            self.take_snapshot(snapshot_folder)
-
-        ### Finalize simulation
-        if self._user_flow._write:
-            self._user_flow.write_result()
-        self.finalize()
+        # Finalize progress bar
         progress.update()
         progress.show()
         progress.end()
 
-    def create_crash_report(self, affectation_step, flow_step) -> dict:
-        data = {
-            "time": str(self.tcurrent),
-            "affectation_step": affectation_step,
-            "flow_step": flow_step,
+
+    def run_one_affectation_step(self, affectation_factor: int, update_graph_threshold: float = 0.) -> None:
+        """Execute 1 iteration of the outer simulation loop.
+
+        Args:
+            -affectation_factor: the number of simulation flow time step (i.e. the number of inner loop iterations)
+            -update_graph_threshold: threshold on the speed variation below which costs on the graph links are not updated
+        Raises:
+            -SupervisorStateError if simulation state variables have not been initialized yet.
+        """
+
+        sim_state = self._fetch_sim_state()
+        log.info(f'Current time: {sim_state.tcurrent}, affectation step: {sim_state.affectation_step}')
+
+        ## Get all departures during the next principal_dt and add the ones
+        ## with no forced path in the list of users about to plan their journey
+        new_users = self._get_new_users(sim_state.tcurrent, sim_state.flow_dt * affectation_factor)
+        new_users_for_planning = []
+        for u in new_users:
+            if u.path is None:
+                new_users_for_planning.append(u)
+            else:
+                self._decision_model.manage_forced_initial_path(u)
+        self._decision_model.add_users_for_planning(new_users_for_planning, [Event.DEPARTURE]*len(new_users_for_planning))
+
+        ## Set pickup_dt to infinite for all PT mobility services
+        pt_mob_services_names = self._mlgraph.get_all_mobility_services_of_type(PublicTransportMobilityService)
+        for user in new_users:
+            for pt_ms in pt_mob_services_names:
+                user.set_pickup_dt(pt_ms, Dt(hours=24))
+
+        ## Call affectation_factor simulation flow steps (i.e. inner simulation loop).
+        for _ in range(affectation_factor):
+
+            # Call the planning module
+            self._call_planning(sim_state.tcurrent)
+
+            # Gather users who depart during this flow step
+            users_step, new_users = self._get_users_step(sim_state.tcurrent, new_users, sim_state.flow_dt)
+            log.info(f'Users step:{users_step}')
+
+            # Call update of all mobility services, update means maintenance
+            self._call_update_mobility_services(sim_state.flow_dt)
+
+            # Call user flow step
+            users_reach_dt_answer = self._call_user_flow_step(sim_state.flow_dt, users_step)
+            self._decision_model.add_users_for_planning(users_reach_dt_answer, [Event.MATCH_FAILURE]*len(users_reach_dt_answer))
+
+            # Call dynamic space sharing step
+            self._step_dynamic_space_sharing(sim_state.tcurrent)
+
+            # Call matching for all mobility services
+            self._call_matching_mobility_services(new_users, sim_state.flow_dt)
+
+            # Call flow motor step
+            self._call_flow_motor_step(sim_state.flow_dt)
+            if self._flow_motor._write:
+                self._flow_motor.write_result(sim_state.affectation_step, sim_state.flow_step, sim_state.flow_dt)
+
+            # Update current time and current flow step number
+            sim_state.tcurrent = sim_state.tcurrent.add_time(sim_state.flow_dt)
+            sim_state.flow_step += 1
+
+        ## Call the update graph
+        self._call_update_graph(update_graph_threshold)
+
+        if self._write:
+            log.info('Writing costs of each link in graph ...')
+            start = time()
+            t_str = self._flow_motor.time
+            for link in self._mlgraph.graph.links.values():
+                for mservice, costs in link.costs.items():
+                    self._csvhandler.writerow([
+                        str(sim_state.affectation_step), t_str, link.id, mservice, costs
+                    ])
+            end = time()
+            log.info(f'Done [{end - start:.5} s]')
+
+        ## Update affectation step number
+        log.info('-' * 50)
+        sim_state.affectation_step += 1
+
+
+    def create_crash_report(self) -> CrashReport:
+        sim_state = self._simulation_state
+        return {
+            "time": None if sim_state is None else str(sim_state.tcurrent),
+            "affectation_step": None if sim_state is None else sim_state.affectation_step,
+            "flow_step": None if sim_state is None else sim_state.flow_step,
             "error": traceback.format_exc(),
         }
 
-        return data
 
-    def take_snapshot(self, snapshot_folder:str):
+    def take_snapshot(self, snapshot_folder: str) -> None:
 
         class SetEncoder(json.JSONEncoder):
             def default(self, obj):
@@ -496,7 +604,8 @@ class Supervisor:
         #with dill.detect.trace():
         pickle.dump(self, file)
 
-def load_snaphshot(snapshot_prefix: str ):
+
+def load_snaphshot(snapshot_prefix: str) -> Supervisor:
     class JSONDCoder(json.JSONDecoder):
         def __init__(self):
             json.JSONDecoder.__init__(self, object_hook=JSONDCoder.from_dict)
@@ -531,7 +640,5 @@ def load_snaphshot(snapshot_prefix: str ):
             dict_to_link(layer_graph, link)
 
         supervisor._mlgraph.layers[layer].graph = layer_graph
-
-    supervisor.from_snapshot = True
 
     return supervisor

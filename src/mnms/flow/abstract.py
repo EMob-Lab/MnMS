@@ -118,14 +118,14 @@ class AbstractMFDFlowMotor(ABC):
         self._tcurrent = self._tcurrent.add_time(dt)
 
     @abstractmethod
-    def step(self, dt:float):
+    def step(self, dt: Dt):
         pass
 
     @abstractmethod
     def update_graph(self, threshold):
         pass
 
-    def write_result(self, step_affectation:int, step_flow:int):
+    def write_result(self, step_affectation: int, step_flow: int, flow_dt: Dt):
         raise NotImplementedError(f"{self.__class__.__name__} do not implement a write_result method")
 
     def initialize(self):
